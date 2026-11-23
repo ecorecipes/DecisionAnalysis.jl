@@ -30,8 +30,19 @@ Decision rules for a finite nonempty family of priors `P : I → Θ → K`, the 
 * **`IsMaximal.isIntervalUndominated`**: maximal ⊆ interval-undominated.
 * **`IsGammaMaximin.isMaximal`**: every Γ-maximin action is maximal.
 
-Not claimed: the converse characterisation of E-admissibility by mixed-action dominance (T12b
-in `Roadmap.lean`), and nothing about the linear programme Julia uses to decide it.
+## Mixed dominance (T12b, easy direction)
+
+* **`IsMixedDominated.not_isEAdmissible`**: if a mixed action has strictly larger expected
+  utility than `a` at every generating point, `a` is not E-admissible. Backs the checker of
+  `"not-e-admissible-witness/1"` (`Certificate/Refutation.lean`), which certifies an action
+  that `decide(problem, EAdmissible())` leaves out.
+* **`isMixedDominated_of_not_isMaximal`**: an action that is not maximal has such a witness
+  (the pure dominating action).
+
+The converse (every action that is not E-admissible has such a mixed action) is
+`not_isEAdmissible_iff_isMixedDominated` in `Finite/Alternative.lean`.
+
+Not claimed: anything about the linear programme Julia uses to decide E-admissibility.
 -/
 
 set_option autoImplicit false
@@ -181,6 +192,54 @@ theorem IsMaximal.not_dominated_on_hull {u : A → Θ → K} {P : I → Θ → K
   have h1 := hdom (fun j => if j = i then 1 else 0)
     (fun j => by by_cases hj : j = i <;> simp [hj]) (by simp)
   rwa [hm] at h1
+
+/-! ### Mixed dominance: the certificate that an action is not E-admissible -/
+
+/-- Some mixed action `m` (a probability vector over actions) has strictly larger expected
+utility than `a` under every member of the family. This is what a `"not-e-admissible-witness/1"`
+document asserts; the vector is the dual solution of the programme `eadmissibility_model`. -/
+def IsMixedDominated (u : A → Θ → K) (P : I → Θ → K) (a : A) : Prop :=
+  ∃ m : A → K, (∀ b, 0 ≤ m b) ∧ ∑ b, m b = 1 ∧
+    ∀ i, expectedUtility u (P i) a < ∑ b, m b * expectedUtility u (P i) b
+
+omit [Nonempty A] [Nonempty I] in
+/-- **T12b, easy direction.** An action that a mixed action strictly dominates at every
+generating point is not E-admissible. -/
+theorem IsMixedDominated.not_isEAdmissible {u : A → Θ → K} {P : I → Θ → K} {a : A}
+    (h : IsMixedDominated u P a) : ¬ IsEAdmissible u P a := by
+  obtain ⟨m, hm, hm1, hdom⟩ := h
+  rintro ⟨w, hw, hw1, hB⟩
+  obtain ⟨i, hi⟩ : ∃ i, 0 < w i := by
+    by_contra hne
+    have : ∑ i, w i ≤ 0 := Finset.sum_nonpos fun i _ => not_lt.mp fun hi => hne ⟨i, hi⟩
+    linarith
+  have h1 : ∑ b, m b * expectedUtility u (mixture w P) b ≤ expectedUtility u (mixture w P) a :=
+    calc ∑ b, m b * expectedUtility u (mixture w P) b
+        ≤ ∑ b, m b * expectedUtility u (mixture w P) a :=
+          Finset.sum_le_sum fun b _ => mul_le_mul_of_nonneg_left (hB b) (hm b)
+      _ = expectedUtility u (mixture w P) a := by rw [← Finset.sum_mul, hm1, one_mul]
+  have h2 : expectedUtility u (mixture w P) a <
+      ∑ b, m b * expectedUtility u (mixture w P) b := by
+    have e : ∑ b, m b * expectedUtility u (mixture w P) b =
+        ∑ i, w i * ∑ b, m b * expectedUtility u (P i) b := by
+      simp only [expectedUtility_mixture, Finset.mul_sum]
+      rw [Finset.sum_comm]
+      exact Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun b _ => by ring
+    rw [e, expectedUtility_mixture]
+    exact Finset.sum_lt_sum (fun j _ => mul_le_mul_of_nonneg_left (hdom j).le (hw j))
+      ⟨i, Finset.mem_univ i, mul_lt_mul_of_pos_left (hdom i) hi⟩
+  linarith
+
+omit [Nonempty A] [Nonempty I] in
+/-- An action that is not maximal is dominated by a pure action, which is a mixed one: every
+action rejected by `Maximal()` has a `"not-e-admissible-witness/1"`. -/
+theorem isMixedDominated_of_not_isMaximal {u : A → Θ → K} {P : I → Θ → K} {a : A}
+    (h : ¬ IsMaximal u P a) : IsMixedDominated u P a := by
+  classical
+  obtain ⟨a', hdom⟩ := not_not.mp h
+  refine ⟨fun b => if b = a' then 1 else 0, fun b => ?_, by simp, fun i => ?_⟩
+  · by_cases hb : b = a' <;> simp [hb]
+  · simpa using hdom i
 
 /-- **T12.** Every maximal action is interval-undominated. -/
 theorem IsMaximal.isIntervalUndominated {u : A → Θ → K} {P : I → Θ → K} {a : A}

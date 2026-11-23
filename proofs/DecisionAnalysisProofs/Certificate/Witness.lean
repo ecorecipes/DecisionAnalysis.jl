@@ -29,8 +29,8 @@ action is Bayes under it.
   witness proves `IsEAdmissible`, hence `IsMaximal`.
 
 Both checks are sound and not complete: a rejected witness says nothing about whether another
-witness exists. Completeness needs the Blackwell converse (S1) and the mixed-dominance
-characterisation (T12b); see `Roadmap.lean`.
+witness exists. A negative answer has its own witness and checker, in
+`Certificate/Refutation.lean`.
 
 Not claimed: correctness of the JSON parser in `CheckCertificate.lean`, which is trusted.
 -/

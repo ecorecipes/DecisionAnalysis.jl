@@ -10,6 +10,14 @@ import DecisionAnalysisProofs.Finite.Credal
 import DecisionAnalysisProofs.Finite.Selection
 import DecisionAnalysisProofs.Finite.MinimaxRegretIIA
 import DecisionAnalysisProofs.Finite.Examples
+import DecisionAnalysisProofs.Finite.Fidelity
+import DecisionAnalysisProofs.Finite.Deficiency
+import DecisionAnalysisProofs.Finite.SelectionBias
+import DecisionAnalysisProofs.Finite.Envelope
+import DecisionAnalysisProofs.Finite.Farkas
+import DecisionAnalysisProofs.Finite.Alternative
+import DecisionAnalysisProofs.Finite.Dilation
 import DecisionAnalysisProofs.Theory.FiniteKernels
 import DecisionAnalysisProofs.Certificate.Check
 import DecisionAnalysisProofs.Certificate.Witness
+import DecisionAnalysisProofs.Certificate.Refutation

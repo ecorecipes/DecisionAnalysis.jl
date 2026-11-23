@@ -28,8 +28,8 @@ path = "../../FiniteKernels.jl/proofs"
 [[lean_lib]]
 name = "DecisionAnalysisProofs"
 
-# `lake exe check_certificate CERTIFICATE.json`: parse a "decision-certificate/1" document and
-# recompute every claim over ℚ with the definitions of `Finite/Computable.lean`.
+# `lake exe check_certificate FILE.json`: parse a certificate or witness document, dispatch on
+# its `"schema"`, and decide it over ℚ with the proved checkers of `Certificate/`.
 [[lean_exe]]
 name = "check_certificate"
 root = "CheckCertificate"

@@ -42,3 +42,21 @@ Each is `flood_gauge.json` with one change.
 | `reject_eadmissible_relocate.json` | "relocate" is not Bayes under member 1 | rejected (exit 1) |
 | `reject_eadmissible_negative_weight.json` | weights `1/2, 1, -1/2` | rejected (exit 1) |
 | `reject_eadmissible_prior_not_mixture.json` | the stated prior is not the stated mixture | rejected (exit 1) |
+
+## Certified "no" answers (written by hand; schemas in `../SCHEMAS-PROPOSED.md`)
+
+No Julia exporter writes these yet.
+
+| File | Content | Expected |
+|:--|:--|:--|
+| `not_eadmissible_mixed.json` | the "hedge" instance of `test/test_credal.jl`: payoffs `(1,0), (0,1), (2/5,2/5)`, the two point masses; the hedge is maximal but the mixture `1/2, 1/2, 0` beats it at both | accepted (exit 0) |
+| `not_eadmissible_flood_relocate.json` | "relocate" is beaten by "do nothing" (mixed action `1, 0, 0`) under every ensemble member | accepted (exit 0) |
+| `reject_not_eadmissible_pure.json` | as `not_eadmissible_mixed.json` with the pure action `1, 0, 0`, which loses at the second extreme point | rejected (exit 1) |
+| `reject_not_eadmissible_not_normalised.json` | mixed action `1, 1, 0` | rejected (exit 1) |
+| `reject_not_eadmissible_raise_levee.json` | "raise levee" is E-admissible; "do nothing" does not beat it under member 1 | rejected (exit 1) |
+| `reject_not_eadmissible_tie.json` | payoffs `(2,2), (0,4), (4,0)`: the mixture `0, 1/2, 1/2` only ties the first action, which is E-admissible | rejected (exit 1) |
+| `not_garbling_flood.json` | the gauge is not a garbling of the garbled gauge: the flood problem values it strictly higher | accepted (exit 0) |
+| `reject_not_garbling_is_garbling.json` | the two experiments swapped: the garbled gauge is a garbling of the gauge | rejected (exit 1) |
+| `reject_not_garbling_same_experiment.json` | the gauge against itself: equal values, not strictly larger | rejected (exit 1) |
+| `reject_not_garbling_prior_not_normalised.json` | prior sums to `21/20` | rejected (exit 1) |
+| `malformed_not_garbling_no_prior.json` | the `prior` member is missing | malformed (exit 2) |

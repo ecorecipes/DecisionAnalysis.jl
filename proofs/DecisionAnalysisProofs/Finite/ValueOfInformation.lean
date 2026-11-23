@@ -26,7 +26,8 @@ nonnegative prior its value is the perfect-information value).
   here because posteriors are not defined in this library.)
 
 Not claimed: any of these for sampled or regression estimators of EVPPI or EVSI, and nothing
-for imprecise beliefs, where free information can have negative value (T13 in `Roadmap.lean`).
+for imprecise beliefs, where free information can have negative value (T13,
+`Finite/Dilation.lean`).
 -/
 
 set_option autoImplicit false

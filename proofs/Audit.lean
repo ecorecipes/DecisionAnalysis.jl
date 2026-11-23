@@ -80,6 +80,61 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.IsGammaMaximin.isMaximal
 #print axioms DecisionAnalysisProofs.IsMaximal.not_dominated_on_hull
 
+-- T12b, easy direction: mixed dominance refutes E-admissibility.
+#print axioms DecisionAnalysisProofs.IsMixedDominated.not_isEAdmissible
+#print axioms DecisionAnalysisProofs.isMixedDominated_of_not_isMaximal
+
+-- T10: total variation and the decision-loss bound (`decision_loss_bound`).
+#print axioms DecisionAnalysisProofs.totalVariation_nonneg
+#print axioms DecisionAnalysisProofs.totalVariation_eq_zero_iff
+#print axioms DecisionAnalysisProofs.totalVariation_le_one
+#print axioms DecisionAnalysisProofs.sum_sub_mul_le
+#print axioms DecisionAnalysisProofs.abs_expectedUtility_sub_le
+#print axioms DecisionAnalysisProofs.decision_loss_nonneg
+#print axioms DecisionAnalysisProofs.decision_loss_le
+#print axioms DecisionAnalysisProofs.IsBayes.decision_loss_le
+#print axioms DecisionAnalysisProofs.decision_loss_bound_tight
+
+-- T6a: deficiency bounds the value gap (`deficiency`).
+#print axioms DecisionAnalysisProofs.IsDeficientWithin.mono
+#print axioms DecisionAnalysisProofs.isDeficientWithin_zero_iff
+#print axioms DecisionAnalysisProofs.IsGarblingOf.isDeficientWithin
+#print axioms DecisionAnalysisProofs.valueWithInformation_le_add_of_totalVariation_le
+#print axioms DecisionAnalysisProofs.IsDeficientWithin.valueWithInformation_le
+#print axioms DecisionAnalysisProofs.IsDeficientWithin.evsi_le
+
+-- T16: selection bias from maximising estimated payoffs.
+#print axioms DecisionAnalysisProofs.actNowValue_meanTable_le
+#print axioms DecisionAnalysisProofs.perfectValue_meanTable_le
+#print axioms DecisionAnalysisProofs.valueWithInformation_meanTable_le
+#print axioms DecisionAnalysisProofs.sum_mul_expectedUtility_meanTable_le
+#print axioms DecisionAnalysisProofs.evpi_bias_sign_indefinite
+
+-- T15: the EVPI envelope (`robust_evpi`, `evpi_envelope_model`).
+#print axioms DecisionAnalysisProofs.perfectValue_mixture
+#print axioms DecisionAnalysisProofs.actNowValue_mixture_le
+#print axioms DecisionAnalysisProofs.sum_mul_evpi_le_evpi_mixture
+#print axioms DecisionAnalysisProofs.minOver_evpi_le_evpi_mixture
+#print axioms DecisionAnalysisProofs.exists_forall_evpi_le_evpi_mixture
+#print axioms DecisionAnalysisProofs.EvpiEnvelopeFeasible.objective_le
+#print axioms DecisionAnalysisProofs.evpiEnvelopeFeasible_actNowValue
+#print axioms DecisionAnalysisProofs.evpiEnvelope_optimum
+#print axioms DecisionAnalysisProofs.evpi_max_not_at_generating_point
+
+-- Farkas and Ville: the duality behind the completeness of the "no" certificates.
+#print axioms DecisionAnalysisProofs.farkas_cone
+#print axioms DecisionAnalysisProofs.exists_mixed_pos_or_exists_mixed_nonpos
+
+-- T12b and S1: completeness of the "no" certificates.
+#print axioms DecisionAnalysisProofs.isEAdmissible_or_isMixedDominated
+#print axioms DecisionAnalysisProofs.not_isEAdmissible_iff_isMixedDominated
+#print axioms DecisionAnalysisProofs.isGarblingOf_of_forall_valueWithInformation_le
+#print axioms DecisionAnalysisProofs.not_isGarblingOf_iff_exists_separating
+#print axioms DecisionAnalysisProofs.isGarblingOf_iff_forall_valueWithInformation_le
+
+-- T13: negative value of information under Gamma-maximin.
+#print axioms DecisionAnalysisProofs.dilation_robust_evsi_negative
+
 -- T8: minimax regret and independence of irrelevant alternatives.
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaSmall_iff
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaLarge_iff
@@ -127,3 +182,6 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.Certificate.RawGarbling.accepts_sound
 #print axioms DecisionAnalysisProofs.Certificate.EAdmissibleWitnessOk.isEAdmissible
 #print axioms DecisionAnalysisProofs.Certificate.RawEAdmissible.accepts_sound
+#print axioms DecisionAnalysisProofs.Certificate.MixedDominanceWitnessOk.not_isEAdmissible
+#print axioms DecisionAnalysisProofs.Certificate.RawNotEAdmissible.accepts_sound
+#print axioms DecisionAnalysisProofs.Certificate.RawNotGarbling.accepts_sound

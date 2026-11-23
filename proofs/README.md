@@ -51,7 +51,13 @@ certificate checker instantiate the same definitions at `K = ℚ`. There is no s
 | `regret_table`, `expected_regret`, `max_regret`; `decide(p, MinimaxRegret())` | `regret`, `expectedRegret`, `maxRegret`, `IsMinimaxRegret` | `expectedRegret_eq`, `regret_nonneg` |
 | `bayes_invert` | `signalProbability`, `posterior` | normalised when `P(z) ≠ 0` (`posterior_normalised`), nonnegative, marginals sum to one, posteriors average to the prior |
 | `garble`, `is_garbling_of`, `garbling_result` (programme: `garbling_model`) | `garble`, `IsGarblingOf` | `garble` is `Kernel.comp` of FiniteKernels (`garble_eq_comp`); preorder (`IsGarblingOf.refl`, `.trans`) |
-| `decide(p, GammaMaximin())`, `EAdmissible()` (programme: `eadmissibility_model`), `Maximal()`, `IntervalDominance()` | `IsGammaMaximin`, `IsEAdmissible` (over the convex hull), `IsMaximal`, `IsIntervalUndominated` | inclusions below; a maximal action is not strictly beaten by one rival at every prior of the hull (`IsMaximal.not_dominated_on_hull`) |
+| `decide(p, GammaMaximin())`, `EAdmissible()` (programme: `eadmissibility_model`), `Maximal()`, `IntervalDominance()` | `IsGammaMaximin`, `IsEAdmissible` (over the convex hull), `IsMaximal`, `IsIntervalUndominated`, `IsMixedDominated` | inclusions below; a maximal action is not strictly beaten by one rival at every prior of the hull (`IsMaximal.not_dominated_on_hull`); an action is not E-admissible iff a mixed action strictly beats it at every extreme point (`not_isEAdmissible_iff_isMixedDominated`, T12b) |
+| `total_variation`, `decision_loss_bound(B, ε)` | `totalVariation` (half the ℓ¹ distance) | each action's expected utility moves by at most `B · TV` (`abs_expectedUtility_sub_le`); a Bayes action under `q` loses at most `2 · B · TV(p, q)` under `p` (`IsBayes.decision_loss_le`, T10), `+ ε′` for an `ε′`-optimal choice (`decision_loss_le`); the constant 2 is attained (`decision_loss_bound_tight`); `0 ≤ TV ≤ 1` |
+| `deficiency(e, e′)` (programme: `deficiency_model`) | `IsDeficientWithin e e' δ` (a feasible point of the programme with objective `δ`) | value(e′) ≤ value(e) + `B · δ` for every probability prior (`IsDeficientWithin.valueWithInformation_le`, T6a); `δ = 0` iff garbling (`isDeficientWithin_zero_iff`) |
+| `is_garbling_of`, `garbling_result`: the answer "no" | `IsGarblingOf` | Blackwell's converse: not a garbling iff some decision problem values `e′` strictly higher (`not_isGarblingOf_iff_exists_separating`, `isGarblingOf_iff_forall_valueWithInformation_le`, S1) |
+| `robust_evpi`: `lower`, `upper` (programme: `evpi_envelope_model`) | `mixture`, `EvpiEnvelopeFeasible`, `evpiEnvelopeObjective` | EVPI is concave in the prior (`sum_mul_evpi_le_evpi_mixture`); its minimum over the hull is at a generating point (`minOver_evpi_le_evpi_mixture`); an optimum of the programme is the EVPI at `Σ λ_k p_k` and the largest over the hull (`evpiEnvelope_optimum`); the maximum need not be at a generating point (`evpi_max_not_at_generating_point`) (T15) |
+| `robust_evsi` under `GammaMaximin` | `updatedLowerUtility`, `strategyPayoff`, `strategyLowerValue` | the dilation instance: `act_now = 1/10`, `informed = 0`, each member's EVSI `11/10` (`dilation_robust_evsi_negative`, T13) |
+| a payoff table estimated from simulator replicates (docstring of `evpi`) | `meanTable` | reported act-now, perfect and informed values are biased upwards (`actNowValue_meanTable_le`, `perfectValue_meanTable_le`, `valueWithInformation_meanTable_le`); the chosen action disappoints on average (`sum_mul_expectedUtility_meanTable_le`); the bias of EVPI has no sign (`evpi_bias_sign_indefinite`) (T16) |
 
 ### By Julia property test
 
@@ -76,15 +82,29 @@ certificate checker instantiate the same definitions at `K = ℚ`. There is no s
 | `test_lean_mirror.jl`: the first Bayes action is unchanged by `s * Q[a, θ] + b[θ]` with `s > 0` | `bayesAction_rescale`, `expectedUtility_rescale` (T7) |
 | `test_rules.jl`: minimax regret violates independence of irrelevant alternatives; `test_api.jl`: the result of `MinimaxRegret` and the report carry the warning | `minimaxRegret_violates_iia` (T8; a different instance from the Julia test's) |
 | `test_api.jl`: `information_can_change_decision(p, e) == (evsi(p, e) > 0)` on random rational problems | `evsi_eq_zero_iff`, `evsi_eq_zero_iff_of_pos` (T14) |
+| `test_voi.jl`: `0 <= loss <= decision_loss_bound(B, total_variation(p, q))` | `decision_loss_nonneg`, `IsBayes.decision_loss_le` (T10) |
+| `test_voi.jl`: `total_variation` values | `totalVariation` (definition), `totalVariation_le_one` |
+| `test_experiments.jl`, `test_programs.jl`: a witness exactly when `deficiency` is zero (`is_garbling == iszero(deficiency(e, f))`) | `isDeficientWithin_zero_iff` |
+| `test_voi.jl`: `v.lower == minimum(members)`, `v.lower <= minimum(grid)`, `v.upper >= maximum(members)`, `v.upper >= maximum(grid)` for `robust_evpi` | `minOver_evpi_le_evpi_mixture`, `evpiEnvelope_optimum` (T15) |
+| `test_voi.jl`: "robust EVSI can be negative and is not clamped" (`act_now == 1//10`, `informed == 0`, `value == -1//10`, members positive) | `dilation_robust_evsi_negative` (T13) |
+| `test_credal.jl`: "a hedge that is never best: maximal but not E-admissible" | fixture `not_eadmissible_mixed.json` (the same instance) with `Certificate.RawNotEAdmissible.accepts_sound`; in general `IsMixedDominated.not_isEAdmissible` |
 | `test_fixtures.jl`: the three worked examples | `Finite/Examples.lean` (T9), every figure |
 | `test_certificates.jl`: exported claims recomputed | `Certificate.check_sound`, `Certificate.certificate_spec` |
 
-Tested in Julia but **not** proved here: the `2Bε` decision-loss bound (T10) and the claims
-about `deficiency` and `robust_evsi`; see `Roadmap.lean`. The linear programmes themselves
+Tested or documented in Julia but **not** proved here: that the programmes of `deficiency`
+and `robust_evpi` attain their optima, the identity `TV = max_A |p(A) − q(A)|`, and
+`robust_evsi` beyond the test instance; see `Roadmap.lean`. The linear programmes themselves
 (`eadmissibility_model`, `garbling_model`, `deficiency_model`, `evpi_envelope_model`, solved
-by the built-in simplex or by a JuMP optimiser) are not modelled: whatever solver produced
-it, a witness is checked exactly in Julia and then by the checkers below, whose soundness is
-what is proved.
+by the built-in simplex or by a JuMP optimiser) are not modelled as algorithms: whatever
+solver produced it, a witness is checked exactly in Julia and then by the checkers below,
+whose soundness is what is proved. For `deficiency_model` and `evpi_envelope_model` the
+theorems are about the feasible set and objective written in their docstrings.
+
+**Where the Julia text and the theorems differ** (details in `Roadmap.lean`): the docstring
+of `evpi` says noise in the table "biases EVPI upwards", which is false in general
+(`evpi_bias_sign_indefinite`); the `B` of `decision_loss_bound` and of the deficiency bound
+can each be smaller than the table range (largest row range, and largest regret,
+respectively); the constant `B δ` for `deficiency` is correct.
 
 ### By certificate
 
@@ -95,6 +115,8 @@ what is proved.
 | `decision-certificate/1` | `export_decision_certificate` | `Certificate.check` | `Certificate.certificate_spec`: every claim equals the verified definition; `bayes_actions` and `minimax_regret_actions` list exactly the optimal actions; `evpi ≥ 0` and is the minimum expected regret; `0 ≤ evsi ≤ evpi` |
 | `garbling-witness/1` | `export_garbling_witness`: the matrix returned by `is_garbling_of` (programme `garbling_model`, any `optimizer`; verified exactly before writing) | `Certificate.checkGarbling` | `Certificate.RawGarbling.accepts_sound`: `IsGarblingOf e′ e`, hence value(e′) ≤ value(e) for every problem |
 | `e-admissible-witness/1` | `export_eadmissible_witness`: weights and prior from the E-admissibility programme (`eadmissibility_model`, any `optimizer`; verified exactly before writing) | `Certificate.checkEAdmissible` | `Certificate.RawEAdmissible.accepts_sound`: `IsEAdmissible`, hence `IsMaximal` |
+| `not-e-admissible-witness/1` (proposed) | no exporter yet; the dual solution of `eadmissibility_model` | `Certificate.checkNotEAdmissible` | `Certificate.RawNotEAdmissible.accepts_sound`: `¬ IsEAdmissible`. Complete: `not_isEAdmissible_iff_isMixedDominated` |
+| `not-garbling-witness/1` (proposed) | no exporter yet; the Farkas multipliers of `garbling_model` | `Certificate.checkNotGarbling` | `Certificate.RawNotGarbling.accepts_sound`: `¬ IsGarblingOf e′ e`. Complete: `not_isGarblingOf_iff_exists_separating` |
 
 Numbers are JSON strings `"n/d"` or `"n"`; indices are JSON integers from zero; payoff rows are
 actions; likelihood rows are signals; `garbling[z′][z] = P(z′ | z)`. The witness schemas are
@@ -103,12 +125,19 @@ actions; likelihood rows are signals; `garbling[z′][z] = P(z′ | z)`. The wit
 {"schema": "garbling-witness/1", "experiment": [[...]], "garbled": [[...]], "garbling": [[...]]}
 {"schema": "e-admissible-witness/1", "payoff": [[...]], "priors": [[...]], "weights": [...],
  "prior": [...], "action": 0}
+{"schema": "not-e-admissible-witness/1", "payoff": [[...]], "priors": [[...]], "action": 0,
+ "mixed_action": [...]}
+{"schema": "not-garbling-witness/1", "experiment": [[...]], "garbled": [[...]],
+ "payoff": [[...]], "prior": [...]}
 ```
+
+The last two certify **negative** answers and are specified in `SCHEMAS-PROPOSED.md`, with
+where the Julia side finds each witness; they are not yet in `docs/src/certificates.md`.
 
 The checker recomputes each claim with the definitions of `Finite/Problem.lean` at `K = ℚ`
 and prints one line per claim. Exit code 0: accepted; 1: rejected; 2: cannot be decoded.
 Fixtures and their expected outcomes are in `certificate-fixtures/EXPECTED.md`; three of them
-were written by the Julia package itself.
+were written by the Julia package itself, and those for the two proposed schemas by hand.
 
 ### Modules
 
@@ -126,9 +155,17 @@ were written by the Julia package itself.
 | `Finite/Selection.lean` | Chosen sets and `first_choice` |
 | `Finite/MinimaxRegretIIA.lean` | T8 |
 | `Finite/Examples.lean` | T9 |
+| `Finite/Fidelity.lean` | T10: `totalVariation`, the `2Bε` bound and its tightness |
+| `Finite/Deficiency.lean` | T6a: deficiency bounds the value gap by `B δ` |
+| `Finite/SelectionBias.lean` | T16: bias from maximising estimated payoffs |
+| `Finite/Envelope.lean` | T15: the EVPI envelope and the programme of `evpi_envelope_model` |
+| `Finite/Farkas.lean` | Farkas' lemma and Ville's alternative over an ordered field |
+| `Finite/Alternative.lean` | T12b and S1: completeness of the "no" certificates |
+| `Finite/Dilation.lean` | T13: the negative robust EVSI of the Julia test |
 | `Theory/FiniteKernels.lean` | The link to `FiniteKernelsProofs` kernels at `K = ℝ` |
 | `Certificate/Check.lean` | The decision-certificate checker and its soundness |
 | `Certificate/Witness.lean` | The garbling and E-admissibility witness checkers and their soundness |
+| `Certificate/Refutation.lean` | The not-E-admissible and not-a-garbling witness checkers and their soundness |
 | `Roadmap.lean` | What remains; consequences for the package (prose only) |
 | `CheckCertificate.lean` | The executable: JSON decoding and printing (trusted) |
 
@@ -147,9 +184,18 @@ Proved results that suggest or constrain functionality (the full list is in `Roa
 * `signalValue_eq_zero`, `valueWithInformation_eq_posterior_form`: `value_with_information`
   needs no guard for zero-probability signals, and `bayes_invert` is right to return
   `nothing` for them.
-* `Certificate.RawEAdmissible.accepts_sound` needs the hull weights; the Julia result's
-  `details.witnesses` holds only the witness prior, so the weights should be exported.
-* T6 is for a single prior; `robust_evsi` must not assume it.
+* `Certificate.RawEAdmissible.accepts_sound` needs the hull weights. Done in the package:
+  `details.weights` carries them and `export_eadmissible_witness` writes them.
+* T6 is for a single prior; `robust_evsi` must not assume it
+  (`dilation_robust_evsi_negative`).
+* `not_isEAdmissible_iff_isMixedDominated`, `not_isGarblingOf_iff_exists_separating`: every
+  "no" of `decide(problem, EAdmissible())` and of `is_garbling_of` has a witness that can be
+  checked exactly, so a "no" from a floating-point optimiser need not stay numerical. To do
+  in the package: the two exporters of `SCHEMAS-PROPOSED.md`.
+* `evpi_bias_sign_indefinite`: the docstring of `evpi` should not say that noise biases EVPI
+  upwards; a selection-bias note belongs on the reported best value and the chosen action.
+* `IsBayes.decision_loss_le`, `IsDeficientWithin.valueWithInformation_le`: both bounds hold
+  with a smaller `B` than the table range; helpers for the two sharper ranges would be cheap.
 
 ## Design notes
 
@@ -161,9 +207,17 @@ Proved results that suggest or constrain functionality (the full list is in `Roa
   structures and the printing in `CheckCertificate.lean` are not proved. The verdict is the
   value of `Certificate.check` (or `checkGarbling`, `checkEAdmissible`), about which the
   soundness theorems are stated.
-* **Soundness, not completeness, for witnesses.** A rejected witness says nothing about
-  whether another exists. Certifying a negative answer needs the Blackwell converse (S1) and
-  the mixed-dominance characterisation of E-admissibility (T12b), both in `Roadmap.lean`.
+* **Witnesses in both directions.** A rejected witness says nothing about whether another
+  exists; a negative answer has its own witness instead. Each of the four checkers is sound,
+  and the two pairs are complete: an action is E-admissible or has a dominating mixed action
+  (`isEAdmissible_or_isMixedDominated`), and `e′` is a garbling of `e` or some decision
+  problem separates them (`not_isGarblingOf_iff_exists_separating`). Soundness of the
+  checkers does not depend on the duality argument (`Finite/Farkas.lean`); only completeness
+  does.
+* **No dependency for duality.** EconCSLib (Apache-2.0, same Mathlib commit) was tried for
+  Farkas and minimax; it is compatible, but its modules log deprecation warnings and
+  `lake build --wfail` fails on them, so Ville's alternative is proved in
+  `Finite/Farkas.lean`.
 * **Tolerances.** `decide` with nonzero `atol` or `rtol` is not modelled; certificates are
   exported with both set to zero.
 * **Weakest hypotheses.** T6 needs only the garbling kernel to be stochastic; T2, T3 and T7

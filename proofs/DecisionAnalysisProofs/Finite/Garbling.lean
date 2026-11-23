@@ -26,8 +26,10 @@ The proof is the simulation argument: the objective after a garbled signal is a 
 mixture of the objectives after the original signals, and a mixture of maxima dominates the
 maximum of the mixture (`maxOver_weighted_sum_le`).
 
-Not claimed: the converse (Blackwell's theorem proper, S1 in `Roadmap.lean`), and nothing
-about how `is_garbling_of` searches for `g` in Julia.
+The converse (Blackwell's theorem proper, S1) is
+`isGarblingOf_of_forall_valueWithInformation_le` in `Finite/Alternative.lean`.
+
+Not claimed: anything about how `is_garbling_of` searches for `g` in Julia.
 -/
 
 set_option autoImplicit false

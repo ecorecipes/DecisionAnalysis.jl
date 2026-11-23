@@ -15,6 +15,17 @@ Reads one JSON document, parses it with `Lean.Json.parse`, and dispatches on its
   table (rows are actions), the extreme points of the credal set (one per row), the convex
   weights, the witness prior and the zero-based action index; decided by
   `Certificate.checkEAdmissible` (theorem `RawEAdmissible.accepts_sound`).
+* `"not-e-admissible-witness/1"`: `{"payoff", "priors", "action", "mixed_action"}`, the payoff
+  table, the extreme points, the zero-based action index and a probability vector over actions
+  whose expected utility is strictly larger than the action's at every extreme point; decided
+  by `Certificate.checkNotEAdmissible`
+  (`DecisionAnalysisProofs/Certificate/Refutation.lean`, theorem
+  `RawNotEAdmissible.accepts_sound`: the action is not E-admissible).
+* `"not-garbling-witness/1"`: `{"experiment", "garbled", "payoff", "prior"}`, the two
+  likelihoods and a decision problem (payoff table, rows are actions; prior) in which deciding
+  after `garbled` is worth strictly more than after `experiment`; decided by
+  `Certificate.checkNotGarbling` (theorem `RawNotGarbling.accepts_sound`: `garbled` is not a
+  garbling of `experiment`).
 
 Every number is a JSON string `"n/d"` or `"n"` (a JSON integer is also accepted); indices are
 JSON integers counted from zero. The exit code is 0 exactly when the document is well formed
@@ -26,7 +37,7 @@ The parse, the decoding into `Raw*` structures and the printing below are truste
 The verdict is the value of the proved checker, and the per-claim lines are `decide`s of the
 conjuncts of `Certificate.CoreMatches` and `Certificate.InfoMatches`.
 -/
-import DecisionAnalysisProofs.Certificate.Witness
+import DecisionAnalysisProofs.Certificate.Refutation
 import Lean.Data.Json.Parser
 
 open Lean DecisionAnalysisProofs DecisionAnalysisProofs.Certificate
@@ -132,6 +143,24 @@ def decodeEAdmissible (j : Json) : Except String RawEAdmissible := do
       prior := ← ratList (← field j "prior")
       action := ← (← field j "action").getNat? }
 
+def decodeNotEAdmissible (j : Json) : Except String RawNotEAdmissible := do
+  let payoff ← ratMatrix (← field j "payoff")
+  pure
+    { nStates := (payoff.headD []).length
+      payoff
+      priors := ← ratMatrix (← field j "priors")
+      mixedAction := ← ratList (← field j "mixed_action")
+      action := ← (← field j "action").getNat? }
+
+def decodeNotGarbling (j : Json) : Except String RawNotGarbling := do
+  let experiment ← ratMatrix (← field j "experiment")
+  pure
+    { nStates := (experiment.headD []).length
+      experiment
+      garbled := ← ratMatrix (← field j "garbled")
+      payoff := ← ratMatrix (← field j "payoff")
+      prior := ← ratList (← field j "prior") }
+
 /-- The conjuncts of `CoreMatches` and `InfoMatches`, decided one by one (printing only). -/
 def components (I : Instance) (r : Raw) : List (String × Bool) :=
   let c := r.claims
@@ -212,6 +241,49 @@ def runEAdmissible (j : Json) : IO UInt32 := do
     else
       return 1
 
+def runNotEAdmissible (j : Json) : IO UInt32 := do
+  match decodeNotEAdmissible j with
+  | .error e => IO.eprintln s!"malformed not-E-admissible witness: {e}"; return 2
+  | .ok r =>
+    IO.println s!"schema: not-e-admissible-witness/1"
+    IO.println s!"actions: {r.mixedAction.length}, states: {r.nStates}, extreme points: {r.priors.length}, action: {r.action}"
+    let shapes := rect r.payoff r.mixedAction.length r.nStates &&
+      rect r.priors r.priors.length r.nStates
+    IO.println s!"shapes: {verdict shapes}"
+    IO.println s!"extreme points are probability vectors: {verdict (decide (∀ i, NonnegPrior (r.P i) ∧ NormalisedPrior (r.P i)))}"
+    let m := vec r.mixedAction r.mixedAction.length
+    IO.println s!"mixed action is a probability vector: {verdict (decide ((∀ b, 0 ≤ m b) ∧ ∑ b, m b = 1))}"
+    let ok := checkNotEAdmissible r
+    IO.println s!"mixed action strictly better at every extreme point: {verdict ok}"
+    IO.println s!"accepted: {if ok then "yes" else "no"}"
+    if ok then
+      IO.println "theorem Certificate.RawNotEAdmissible.accepts_sound: applies"
+      return 0
+    else
+      return 1
+
+def runNotGarbling (j : Json) : IO UInt32 := do
+  match decodeNotGarbling j with
+  | .error e => IO.eprintln s!"malformed not-a-garbling witness: {e}"; return 2
+  | .ok r =>
+    IO.println s!"schema: not-garbling-witness/1"
+    IO.println s!"states: {r.nStates}, signals: {r.experiment.length}, garbled signals: {r.garbled.length}, actions: {r.payoff.length}"
+    let shapes := rect r.payoff (r.payoff.tail.length + 1) r.nStates &&
+      rect r.experiment r.experiment.length r.nStates &&
+      rect r.garbled r.garbled.length r.nStates && r.prior.length == r.nStates
+    IO.println s!"shapes: {verdict shapes}"
+    IO.println s!"experiment column-stochastic: {verdict (decide (StochasticKernel r.e))}"
+    IO.println s!"garbled column-stochastic: {verdict (decide (StochasticKernel r.e'))}"
+    IO.println s!"prior is a probability vector: {verdict (decide (NonnegPrior r.p ∧ NormalisedPrior r.p))}"
+    IO.println s!"value(garbled) > value(experiment): {verdict (decide (valueWithInformation r.u r.p r.e < valueWithInformation r.u r.p r.e'))}"
+    let ok := checkNotGarbling r
+    IO.println s!"accepted: {if ok then "yes" else "no"}"
+    if ok then
+      IO.println "theorem Certificate.RawNotGarbling.accepts_sound: applies"
+      return 0
+    else
+      return 1
+
 def main (args : List String) : IO UInt32 := do
   match args with
   | [path] =>
@@ -225,6 +297,8 @@ def main (args : List String) : IO UInt32 := do
         | .ok "decision-certificate/1" => runCertificate j
         | .ok "garbling-witness/1" => runGarbling j
         | .ok "e-admissible-witness/1" => runEAdmissible j
+        | .ok "not-e-admissible-witness/1" => runNotEAdmissible j
+        | .ok "not-garbling-witness/1" => runNotGarbling j
         | .ok s => IO.eprintln s!"unknown schema {s.quote}"; return 2
         | .error e => IO.eprintln s!"malformed document: {e}"; return 2
   | _ =>
