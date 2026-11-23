@@ -4,8 +4,30 @@ using DecisionAnalysis
 DocMeta.setdocmeta!(DecisionAnalysis, :DocTestSetup, :(using DecisionAnalysis);
                     recursive=true)
 
+# Tutorials are rendered quarto vignettes copied into docs/src/tutorials by
+# scripts/sync_vignettes.jl. The page list is built from the files on disk so
+# it never has to be maintained by hand.
+function tutorial_pages()
+    dir = joinpath(@__DIR__, "src", "tutorials")
+    isdir(dir) || return Pair{String,String}[]
+    files = sort(filter(f -> endswith(f, ".md"), readdir(dir)))
+    map(files) do f
+        title = f
+        for line in eachline(joinpath(dir, f))
+            m = match(r"^#\s+(.*)", line)
+            if m !== nothing
+                title = String(strip(m.captures[1]))
+                break
+            end
+        end
+        return title => "tutorials/" * f
+    end
+end
+
 pages = Any["Home" => "index.md", "Certificates" => "certificates.md",
             "API Reference" => "api.md"]
+tutorials = tutorial_pages()
+isempty(tutorials) || push!(pages, "Tutorials" => tutorials)
 
 # Source links need a commit to point at. A checkout without commits (a fresh
 # scaffold, a tarball) builds without them instead of failing.

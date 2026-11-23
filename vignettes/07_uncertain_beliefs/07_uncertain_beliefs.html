@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Simon Frost" />
+  <title>Uncertain beliefs: sets of priors and scenarios</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">
+html { font-size: 17px; }
+body {
+font-family: "STIX Two Text", "Source Serif 4", Georgia, "Times New Roman", serif;
+line-height: 1.5; color: #1a1a1a; background: #fdfdfd;
+max-width: 50em; margin: 0 auto; padding: 2em 1.5em 4em;
+}
+h1, h2, h3, h4 { line-height: 1.25; margin-top: 1.6em; }
+h1.title { margin-top: 0.5em; }
+p.author { color: #555; }
+a { color: #1f5fa8; }
+code, pre {
+font-family: "JuliaMono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+font-size: 0.86em;
+}
+pre { background: #f4f4f2; padding: 0.8em 1em; overflow-x: auto; border-radius: 4px; }
+code { background: #f4f4f2; padding: 0.05em 0.25em; border-radius: 3px; }
+pre code { background: none; padding: 0; font-size: 1em; }
+table { border-collapse: collapse; margin: 1em 0; font-size: 0.95em; display: block; overflow-x: auto; }
+th, td { padding: 0.3em 0.8em; border-bottom: 1px solid #ddd; }
+thead th { border-bottom: 2px solid #888; }
+img { max-width: 100%; height: auto; }
+nav#TOC { background: #f4f4f2; padding: 0.6em 1em; border-radius: 4px; }
+nav#TOC ul { margin: 0.2em 0; padding-left: 1.2em; }
+@media (prefers-color-scheme: dark) {
+body { color: #e6e6e6; background: #1c1c1e; }
+a { color: #8ab4f8; }
+pre, code, nav#TOC { background: #2a2a2d; }
+th, td { border-bottom-color: #444; }
+img { background: #fff; }
+}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Uncertain beliefs: sets of priors and scenarios</h1>
+<p class="author">Simon Frost</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#motivation" id="toc-motivation">Motivation</a></li>
+<li><a href="#the-problem" id="toc-the-problem">The problem</a></li>
+<li><a href="#a-credal-set" id="toc-a-credal-set">A credal set</a></li>
+<li><a href="#rules-that-choose-one-action" id="toc-rules-that-choose-one-action">Rules that choose one
+action</a></li>
+<li><a href="#rules-that-return-a-set" id="toc-rules-that-return-a-set">Rules that return a set</a>
+<ul>
+<li><a href="#e-admissibility-is-not-a-check-of-the-stated-priors" id="toc-e-admissibility-is-not-a-check-of-the-stated-priors">E-admissibility
+is not a check of the stated priors</a></li>
+<li><a href="#the-three-sets-can-differ" id="toc-the-three-sets-can-differ">The three sets can differ</a></li>
+</ul></li>
+<li><a href="#the-value-of-information-under-a-set-of-priors" id="toc-the-value-of-information-under-a-set-of-priors">The value of
+information under a set of priors</a>
+<ul>
+<li><a href="#information-can-have-negative-value" id="toc-information-can-have-negative-value">Information can have
+negative value</a></li>
+</ul></li>
+<li><a href="#scenarios-without-probabilities" id="toc-scenarios-without-probabilities">Scenarios without
+probabilities</a></li>
+<li><a href="#robustness-metrics-from-the-same-pieces" id="toc-robustness-metrics-from-the-same-pieces">Robustness metrics from
+the same pieces</a></li>
+<li><a href="#how-far-apart-are-the-experts" id="toc-how-far-apart-are-the-experts">How far apart are the
+experts?</a></li>
+<li><a href="#what-to-take-away" id="toc-what-to-take-away">What to take
+away</a></li>
+<li><a href="#next" id="toc-next">Next</a></li>
+</ul>
+</nav>
+<h1 id="motivation">Motivation</h1>
+<p>A single probability for each state is often more than anyone can
+honestly supply. Experts disagree, models disagree, and for some states
+nobody will name a number. Two weaker forms of belief cover these
+cases.</p>
+<ul>
+<li>A <code>CredalSet</code> is a set of priors: all the probability
+vectors that are mixtures of a few stated ones. It says “the
+probabilities are somewhere in here”.</li>
+<li>A <code>ScenarioSet</code> is a list of states held to be possible,
+with no probabilities.</li>
+</ul>
+<p>With a set of priors each action has a range of expected outcomes
+instead of one, and several rules compete: some pick one action, others
+return the set of actions that cannot be ruled out. The value of
+information also changes character, and can be negative. This vignette
+goes through all of that on one table.</p>
+<h1 id="the-problem">The problem</h1>
+<p>The problem is the water-vole colony of the vignette on decision
+rules. Mink may be absent, transient or established, and the manager can
+do nothing, trap mink, build refuges, or translocate part of the colony.
+Outcomes are water voles alive in five years. <strong>All numbers are
+illustrative.</strong></p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">DecisionAnalysis</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">include</span>(<span class="fu">joinpath</span>(<span class="st">&quot;..&quot;</span>, <span class="st">&quot;_common.jl&quot;</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">Plots</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>actions <span class="op">=</span> [<span class="op">:</span>no_control, <span class="op">:</span>trap_mink, <span class="op">:</span>refuges, <span class="op">:</span>translocate]</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>states <span class="op">=</span> [<span class="op">:</span>absent, <span class="op">:</span>transient, <span class="op">:</span>established]</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>                     [<span class="fl">800</span> <span class="fl">400</span> <span class="fl">50</span>; <span class="fl">700</span> <span class="fl">600</span> <span class="fl">300</span>; <span class="fl">760</span> <span class="fl">480</span> <span class="fl">200</span>; <span class="fl">500</span> <span class="fl">450</span> <span class="fl">420</span>])</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(payoff)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;"><code>absent</code></th>
+<th style="text-align: right;"><code>transient</code></th>
+<th style="text-align: right;"><code>established</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_control</code></td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">50</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>trap_mink</code></td>
+<td style="text-align: right;">700</td>
+<td style="text-align: right;">600</td>
+<td style="text-align: right;">300</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>refuges</code></td>
+<td style="text-align: right;">760</td>
+<td style="text-align: right;">480</td>
+<td style="text-align: right;">200</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>translocate</code></td>
+<td style="text-align: right;">500</td>
+<td style="text-align: right;">450</td>
+<td style="text-align: right;">420</td>
+</tr>
+</tbody>
+</table>
+<p>Three ecologists give three different probabilities for the mink
+(illustrative).</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>experts <span class="op">=</span> [<span class="op">:</span>optimist <span class="op">=&gt;</span> [<span class="fl">4</span> <span class="op">//</span> <span class="fl">5</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">10</span>],</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>           <span class="op">:</span>moderate <span class="op">=&gt;</span> [<span class="fl">2</span> <span class="op">//</span> <span class="fl">5</span>, <span class="fl">2</span> <span class="op">//</span> <span class="fl">5</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>],</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>           <span class="op">:</span>pessimist <span class="op">=&gt;</span> [<span class="fl">1</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">2</span> <span class="op">//</span> <span class="fl">5</span>]]</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>(<span class="fu">vcat</span>(<span class="st">&quot;expert&quot;</span>, states), [<span class="fu">vcat</span>(n, <span class="fu">exact</span>.(q)) for (n, q) <span class="kw">in</span> experts])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">expert</th>
+<th style="text-align: right;"><code>absent</code></th>
+<th style="text-align: right;"><code>transient</code></th>
+<th style="text-align: right;"><code>established</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>optimist</code></td>
+<td style="text-align: right;">4/5</td>
+<td style="text-align: right;">1/10</td>
+<td style="text-align: right;">1/10</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>moderate</code></td>
+<td style="text-align: right;">2/5</td>
+<td style="text-align: right;">2/5</td>
+<td style="text-align: right;">1/5</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pessimist</code></td>
+<td style="text-align: right;">1/10</td>
+<td style="text-align: right;">1/2</td>
+<td style="text-align: right;">2/5</td>
+</tr>
+</tbody>
+</table>
+<p>Taken one at a time, each expert has an expected-utility choice and
+an expected gain over no control.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;expert&quot;</span>, <span class="st">&quot;expected-utility choice&quot;</span>, <span class="st">&quot;its expected gain over no control&quot;</span>, <span class="st">&quot;EVPI&quot;</span>],</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>         [begin</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>              single <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, q; baseline<span class="op">=:</span>no_control)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>              [n, <span class="fu">first_choice</span>(<span class="fu">decide</span>(single, <span class="fu">MaxExpectedUtility</span>())),</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>               <span class="fu">maximum</span>(<span class="fu">expected_gain_over_baseline</span>(single)), <span class="fu">evpi</span>(single)]</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>          <span class="kw">end</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>          for (n, q) <span class="kw">in</span> experts])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">expert</th>
+<th style="text-align: right;">expected-utility choice</th>
+<th style="text-align: right;">its expected gain over no control</th>
+<th style="text-align: right;">EVPI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>optimist</code></td>
+<td style="text-align: right;"><code>no_control</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">57</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>moderate</code></td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+<td style="text-align: right;">90</td>
+<td style="text-align: right;">64</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pessimist</code></td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+<td style="text-align: right;">190</td>
+<td style="text-align: right;">58</td>
+</tr>
+</tbody>
+</table>
+<h1 id="a-credal-set">A credal set</h1>
+<p>The credal set is the convex hull of the three priors: every weighted
+average of them is also in the set.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>credal <span class="op">=</span> <span class="fu">CredalSet</span>(states, <span class="fu">last</span>.(experts))</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>problem <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, credal; baseline<span class="op">=:</span>no_control)</span></code></pre></div>
+<pre><code>DecisionProblem(4 feasible of 4 actions × 3 states, CredalSet)</code></pre>
+<p>Each action now has a lower and an upper expected count over the set.
+The expectation is linear in the prior, so both ends are reached at one
+of the three stated priors.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>lower <span class="op">=</span> <span class="fu">aggregate</span>(<span class="fu">LowerExpectation</span>(), problem)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>upper <span class="op">=</span> <span class="fu">aggregate</span>(<span class="fu">UpperExpectation</span>(), problem)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;lower expectation&quot;</span>, <span class="st">&quot;upper expectation&quot;</span>],</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>         [[a, l, u] for (a, l, u) <span class="kw">in</span> <span class="fu">zip</span>(actions, lower, upper)])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">lower expectation</th>
+<th style="text-align: right;">upper expectation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_control</code></td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">685</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>trap_mink</code></td>
+<td style="text-align: right;">490</td>
+<td style="text-align: right;">650</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>refuges</code></td>
+<td style="text-align: right;">396</td>
+<td style="text-align: right;">676</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>translocate</code></td>
+<td style="text-align: right;">443</td>
+<td style="text-align: right;">487</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb7"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>mid <span class="op">=</span> <span class="fu">Float64</span>.(lower <span class="op">.+</span> upper) <span class="op">./</span> <span class="fl">2</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>half <span class="op">=</span> <span class="fu">Float64</span>.(upper <span class="op">.-</span> lower) <span class="op">./</span> <span class="fl">2</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>plt <span class="op">=</span> <span class="fu">scatter</span>(<span class="fl">1</span><span class="op">:</span><span class="fl">4</span>, mid; yerror<span class="op">=</span>half, xticks<span class="op">=</span>(<span class="fl">1</span><span class="op">:</span><span class="fl">4</span>, <span class="fu">String</span>.(actions)), legend<span class="op">=</span><span class="cn">false</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>              markersize<span class="op">=</span><span class="fl">0</span>, linewidth<span class="op">=</span><span class="fl">3</span>, xlims<span class="op">=</span>(<span class="fl">0.5</span>, <span class="fl">4.5</span>),</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>              ylabel<span class="op">=</span><span class="st">&quot;expected voles over the credal set&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>              title<span class="op">=</span><span class="st">&quot;Ranges of expected outcome (illustrative)&quot;</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">hline!</span>(plt, [<span class="fu">Float64</span>(<span class="fu">maximum</span>(lower))]; linestyle<span class="op">=:</span>dash, color<span class="op">=:</span>gray)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="fu">png_figure</span>(plt)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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5s2bV2zK6tWrDx8+LCKffPLJ/Pnz77///nr16k2ePHnr1q0ODg5xcXHvvfee5b4uAAAAAKieVBSAL126lJub6+zsXLdu3XKLmzRpIiKRkZGW6+eFF15ISEiYMmVKhw4dyij78ssvRaRWrVozZswoOv7II48MHTpURFatWpWZmVlySr169f71r38VHX/00UeffPJJEVmxYkVeXl4lfR0AAAAAABFVBeC0tDQRuX37dm5ubrnF6enppv9awi+//LJu3bqQkJD58+eXUZaYmBgRESEigwcPdnQsfkH1sGHDRCQ/P/+3334zDV6/fl25Wnjo0KEODsW//88884yIZGVl7dq1qzK+DgAAAADA/6eiABwcHCwiRqPx559/Lrvy9u3b27dvN02pdLdu3Zo8ebKILFq0yNvbu4zKEydOKBtEt23btuSjpu2viu53fezYMaPReKcp7du3LzkFAAAAAHDvVBSAGzduXKdOHRF56aWXoqOj71RmNBqnTZt29epVufO2zPdoxowZsbGxQ4cOHTBgQNmV586dUw5KjeJ+fn4uLi5Fy8qdEhgYqJwWLjoFAAAAAHDvVBSANRrNG2+8ISLx8fEPP/zwe++9FxsbW7RAOVicSEsAACAASURBVPH76KOPLlmyREQefPDB/v37V3obu3fvXrlypZ+f32effVZucXJysnLg7+9faoEybiord4pWq/Xx8Sk2BQAAAABw72x2H+BSjRs37tChQytWrLh169Ybb7zxxhtvhISEBAcH63S6zMzMCxcu3L59W6kMDg7+8ccfdTpd5TaQnZ09ceJEo9H40UcfBQYGlluflZWlHPj5+ZVa4Ofnd+PGDVNZBaekpqYWnWKWwsJCEalRo4ZGoyn5qLOz8zfffPPwww/f3SfH3cnOzi42kpuby3scQAWlp6enpKQ4OzvbuhHADty6davYSEFBAf/iABWUlpZmNBr1er2tG6mODAbDwIEDo6KiSn00JydHREreX/YuqCsAazSaZcuWNWvW7M0331R2To6Liyv5dfbq1Wvx4sXh4eGV3sArr7wSExPz+OOPjx49uiL1ygXAIlJyOyuFsjOWEkrvespdKPnvn0Kr1SYlJVVkmzFUooKCgmIjer2eVwGooNzc3JycHNMvTwBlMJ0qMCksLORfHKCC8vLycnNzK/0cGypCr9dfv3697E2OK+W3mboCsIho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dYSFhdEvSaJhB9XTJ598smfPnnv37r388sszZ84cOnSotbX1uXPnli9fnpiYqFKpvv/++zJe/CiNSqXavHlzz549MzIyvL29X3/99UGDBrm6usbHx0dHR2/atKl169ZKq5efn9/48eM3bdr0008/3b17d9q0aQ0aNLh169a3334rrxbTpk0zOE/MIxk6dGh4ePjevXt79uzZuXNneXIcM2aM/uTD+ry9vWfMmLF27dotW7bExcUFBAQ0atTozp07a9asOXbsmBBi3LhxgwYNesIIUeGGDh26Zs2awMDAe/fueXh4yKfIr7/+uuyTWTZ/f//atWunpaWNHz9+wYIFPj4+5ubmZ8+eXbFiRVJSUpcuXZSJIvR17tx55MiR8+bNGzp0qIWFRXBw8CeffJKammplZfXtt98+zV9Y+bRq1SooKKhfv363b9/u16/fwYMH5QsUMFpubm4//fTT2LFjw8PDPTw8pk6d2qtXL1dX16ysrJs3b54+ffqPP/5wdnaWDcUP1axZs4EDB+7bt2/NmjW5ubl+fn4ODg7h4eGrVq3Ky8vz8PDQf+zy6quv7t69e9u2bd99991ff/3l6+trbW199uzZ8+fP9+7dOzs7+8KFCzpp8Lx5844ePbp79+6lS5cePnx40qRJHh4eVlZWKSkply9fPnjw4NGjRz/99FPZwzkzM7N///6tWrUaMWKEp6dn/fr1S0pK7ty5s2HDhn379gkep1Y7Xl5ecvas0aNH+/v7u7m5mZmZ1ahR48MPPyzP6hMmTNizZ09cXNyLL774r3/9q0WLFllZWTt37ly3bp2Hh8f169dLm1+g/JYsWXL16tVhw4a9+OKLLVq0sLKySk5OPnTo0OrVq4UQ3bt3l7tuGRYuXLhz587o6OggqvOMAAAJgklEQVTJkycHBQWNHDnS1tY2LCxs+fLlcqaiVatW2dnZKfUbN2787bffTps2LSwszMPDIyAgoGfPntbW1jExMWFhYYGBgR9//PG0adOEEO3atevUqVNYWNiiRYsSExNfeukle3v7S5cuffnllxERET169NB/rKBSqfz9/bds2fLNN99ERUW1atVKjioXEBAg51z45ptvzp8/f+XKlfHjx2/evHn06NFNmzZVqVSJiYnh4eF79uy5cOHC/v37y077jYUGqPSWLl0qhLC3tze4dOzYsUKIPn366JTfunXL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" /></p>
+<p>The dashed line is the largest lower expectation. It is used by two
+of the rules below.</p>
+<p>An expectation under a credal set is not defined, and the package
+says so instead of picking a prior:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">decide</span>(problem, <span class="fu">MaxExpectedUtility</span>())</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<pre><code>BeliefFormError: Expectation is not defined for a CredalSet: it needs a single prior; use LowerExpectation, UpperExpectation or AlphaMaxmin over the set</code></pre>
+<h1 id="rules-that-choose-one-action">Rules that choose one action</h1>
+<p><strong>Γ-maximin</strong> maximises the lower expectation: the best
+guaranteed expected outcome.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>gamma <span class="op">=</span> <span class="fu">decide</span>(problem, <span class="fu">GammaMaximin</span>())</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">first_choice</span>(gamma), <span class="fu">maximum</span>(gamma.scores)</span></code></pre></div>
+<pre><code>(:trap_mink, 490//1)</code></pre>
+<p><strong>α-maxmin</strong> mixes the lower and upper expectations,
+with weight <code>α</code> on the lower one. <code>AlphaMaxmin(1)</code>
+is Γ-maximin and <code>AlphaMaxmin(0)</code> maximises the upper
+expectation. (The index of <code>Hurwicz</code> goes the other way: it
+puts its weight on the best state.)</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;α (weight on the lower expectation)&quot;</span>, <span class="st">&quot;choice&quot;</span>],</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>         [[<span class="fu">exact</span>(α), <span class="fu">decide</span>(problem, <span class="fu">DecisionRule</span>(<span class="fu">AlphaMaxmin</span>(α))).chosen]</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>          for α <span class="kw">in</span> <span class="fl">0</span><span class="op">:</span>(<span class="fl">1</span> <span class="op">//</span> <span class="fl">4</span>)<span class="op">:</span><span class="fl">1</span>])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">α (weight on the lower expectation)</th>
+<th style="text-align: right;">choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">0</td>
+<td style="text-align: right;"><code>no_control</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">1/4</td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">1/2</td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">3/4</td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+</tbody>
+</table>
+<p>The gain over no control has a range too.
+<code>gain_over_baseline</code> needs no prior, so the table of gains
+can be given the same credal set.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>gains <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">gain_over_baseline</span>(problem), credal)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;lowest expected gain over no control&quot;</span>, <span class="st">&quot;highest expected gain&quot;</span>],</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>         [[a, l, u]</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>          for (a, l, u) <span class="kw">in</span> <span class="fu">zip</span>(actions, <span class="fu">aggregate</span>(<span class="fu">LowerExpectation</span>(), gains),</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>                               <span class="fu">aggregate</span>(<span class="fu">UpperExpectation</span>(), gains))])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">lowest expected gain over no control</th>
+<th style="text-align: right;">highest expected gain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_control</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>trap_mink</code></td>
+<td style="text-align: right;">-35</td>
+<td style="text-align: right;">190</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>refuges</code></td>
+<td style="text-align: right;">-9</td>
+<td style="text-align: right;">96</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>translocate</code></td>
+<td style="text-align: right;">-198</td>
+<td style="text-align: right;">143</td>
+</tr>
+</tbody>
+</table>
+<p>Trapping gains between −35 and 190 voles over no control, depending
+on which prior in the set is right. Every intervention has an expected
+gain that is negative under the optimist’s prior and positive under the
+pessimist’s: whether to intervene at all is what the experts disagree
+about.</p>
+<h1 id="rules-that-return-a-set">Rules that return a set</h1>
+<p>Three rules do not pick a winner. They discard the actions that can
+be ruled out and return the rest.</p>
+<ul>
+<li><strong>E-admissible</strong>: optimal under at least one prior in
+the set.</li>
+<li><strong>Maximal</strong>: no other action is better under every
+prior in the set.</li>
+<li><strong>Interval dominance</strong>: its upper expectation reaches
+the largest lower expectation.</li>
+</ul>
+<p>Every E-admissible action is maximal, and every maximal action passes
+interval dominance, so the sets are nested.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>sets <span class="op">=</span> [<span class="st">&quot;E-admissible&quot;</span> <span class="op">=&gt;</span> <span class="fu">decide</span>(problem, <span class="fu">EAdmissible</span>()),</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;maximal&quot;</span> <span class="op">=&gt;</span> <span class="fu">decide</span>(problem, <span class="fu">Maximal</span>()),</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;interval dominance&quot;</span> <span class="op">=&gt;</span> <span class="fu">decide</span>(problem, <span class="fu">IntervalDominance</span>())]</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;actions kept&quot;</span>], [[n, r.chosen] for (n, r) <span class="kw">in</span> sets])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">rule</th>
+<th style="text-align: right;">actions kept</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">E-admissible</td>
+<td style="text-align: right;"><code>no_control</code>,
+<code>trap_mink</code>, <code>refuges</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">maximal</td>
+<td style="text-align: right;"><code>no_control</code>,
+<code>trap_mink</code>, <code>refuges</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">interval dominance</td>
+<td style="text-align: right;"><code>no_control</code>,
+<code>trap_mink</code>, <code>refuges</code></td>
+</tr>
+</tbody>
+</table>
+<p>Translocation is ruled out by all three: its best expected outcome
+over the set, 487 voles, is below the 490 that trapping guarantees.</p>
+<h2 id="e-admissibility-is-not-a-check-of-the-stated-priors">E-admissibility
+is not a check of the stated priors</h2>
+<p>No expert, taken alone, chooses refuges: the table above shows the
+optimist choosing no control and the other two trapping. Refuges are
+E-admissible all the same, because they are optimal under a prior
+<em>between</em> the experts. <code>decide</code> finds such a prior by
+linear programme and returns it, with the weights on the stated priors
+that produce it.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="cn">e</span> <span class="op">=</span> <span class="fu">decide</span>(problem, <span class="fu">EAdmissible</span>())</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>(<span class="fu">vcat</span>(<span class="st">&quot;action&quot;</span>, <span class="st">&quot;weights on the three experts&quot;</span>, <span class="st">&quot;witness prior&quot;</span>),</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>         [[a, <span class="fu">join</span>(<span class="fu">exact</span>.(<span class="cn">e</span>.details.weights[a]), <span class="st">&quot;, &quot;</span>),</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>           <span class="fu">join</span>(<span class="fu">exact</span>.(<span class="cn">e</span>.details.witnesses[a]), <span class="st">&quot;, &quot;</span>)] for a <span class="kw">in</span> <span class="cn">e</span>.chosen])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">weights on the three experts</th>
+<th style="text-align: right;">witness prior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_control</code></td>
+<td style="text-align: right;">46/55, 9/55, 0</td>
+<td style="text-align: right;">202/275, 41/275, 32/275</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>trap_mink</code></td>
+<td style="text-align: right;">22/35, 13/35, 0</td>
+<td style="text-align: right;">114/175, 37/175, 24/175</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>refuges</code></td>
+<td style="text-align: right;">22/35, 13/35, 0</td>
+<td style="text-align: right;">114/175, 37/175, 24/175</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb16"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>witness <span class="op">=</span> <span class="cn">e</span>.details.witnesses[<span class="op">:</span>refuges]</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>at_witness <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, witness)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="fu">aggregate</span>(<span class="fu">Expectation</span>(), at_witness), <span class="fu">decide</span>(at_witness, <span class="fu">MaxExpectedUtility</span>()).chosen</span></code></pre></div>
+<pre><code>(Rational{BigInt}[4288//7, 624, 624, 16746//35], [:trap_mink, :refuges])</code></pre>
+<p>At that prior refuges tie for the best. Checking only the three
+stated priors would have missed them.</p>
+<h2 id="the-three-sets-can-differ">The three sets can differ</h2>
+<p>Add a fifth action: half the traps and half the refuges, which does
+slightly worse in every state than the average of the two full
+measures.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>payoff5 <span class="op">=</span> <span class="fu">PayoffTable</span>(<span class="fu">vcat</span>(actions, <span class="op">:</span>half_measures), states,</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>                      <span class="fu">vcat</span>(payoff.Q, [<span class="fl">725</span> <span class="fl">535</span> <span class="fl">245</span>]))</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>problem5 <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff5, credal; baseline<span class="op">=:</span>no_control)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;actions kept&quot;</span>],</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;E-admissible&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">EAdmissible</span>()).chosen],</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;maximal&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">Maximal</span>()).chosen],</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;interval dominance&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">IntervalDominance</span>()).chosen]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">rule</th>
+<th style="text-align: right;">actions kept</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">E-admissible</td>
+<td style="text-align: right;"><code>no_control</code>,
+<code>trap_mink</code>, <code>refuges</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">maximal</td>
+<td style="text-align: right;"><code>no_control</code>,
+<code>trap_mink</code>, <code>refuges</code>,
+<code>half_measures</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">interval dominance</td>
+<td style="text-align: right;"><code>no_control</code>,
+<code>trap_mink</code>, <code>refuges</code>,
+<code>half_measures</code></td>
+</tr>
+</tbody>
+</table>
+<p>The half measures are never the best action under any prior in the
+set, so they are not E-admissible. They are maximal, because no single
+other action beats them under every prior. Interval dominance keeps the
+same four actions here; in general it keeps at least the maximal ones
+and often more. Which set to report depends on what “cannot be ruled
+out” is meant to mean.</p>
+<h1 id="the-value-of-information-under-a-set-of-priors">The value of
+information under a set of priors</h1>
+<p>With several priors there are two different things that “the value of
+perfect information” can mean, and <code>robust_evpi</code> returns
+both.</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>v <span class="op">=</span> <span class="fu">robust_evpi</span>(problem)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, v.act_now],</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value with perfect information&quot;</span>, v.informed],</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVPI (the difference)&quot;</span>, v.value],</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVPI under each expert&#39;s prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(v.members), <span class="st">&quot;, &quot;</span>)],</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;smallest EVPI over the credal set&quot;</span>, v.lower],</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;largest EVPI over the credal set&quot;</span>, v.upper]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">quantity</th>
+<th style="text-align: right;">voles</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Γ-maximin value of acting now</td>
+<td style="text-align: right;">490</td>
+</tr>
+<tr>
+<td style="text-align: left;">Γ-maximin value with perfect
+information</td>
+<td style="text-align: right;">548</td>
+</tr>
+<tr>
+<td style="text-align: left;">rule-specific EVPI (the difference)</td>
+<td style="text-align: right;">58</td>
+</tr>
+<tr>
+<td style="text-align: left;">EVPI under each expert’s prior</td>
+<td style="text-align: right;">57, 64, 58</td>
+</tr>
+<tr>
+<td style="text-align: left;">smallest EVPI over the credal set</td>
+<td style="text-align: right;">57</td>
+</tr>
+<tr>
+<td style="text-align: left;">largest EVPI over the credal set</td>
+<td style="text-align: right;">84.63</td>
+</tr>
+</tbody>
+</table>
+<p>The rule-specific value is what perfect information is worth to a
+Γ-maximin decision-maker. The envelope is the range of the ordinary
+single-prior EVPI as the prior moves over the set. The largest value is
+above the EVPI of every expert: it is reached at a prior between them,
+and is found by linear programme.</p>
+<p>For a survey, <code>robust_evsi</code> gives the rule-specific value
+and the single-prior EVSI of each stated prior. Take a search for field
+signs of mink, which a Γ-maximin manager values at 3.7 voles:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>signs <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">9</span><span class="op">//</span><span class="fl">10</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">1</span><span class="op">//</span><span class="fl">10</span>; <span class="fl">1</span><span class="op">//</span><span class="fl">10</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">9</span><span class="op">//</span><span class="fl">10</span>];</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>                   signals<span class="op">=</span>[<span class="op">:</span>no_sign, <span class="op">:</span>sign], states<span class="op">=</span>states)</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> <span class="fu">robust_evsi</span>(problem, signs)</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, s.act_now],</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of surveying first&quot;</span>, s.informed],</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVSI&quot;</span>, s.value],</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVSI under each expert&#39;s prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(s.members), <span class="st">&quot;, &quot;</span>)]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">quantity</th>
+<th style="text-align: right;">voles</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Γ-maximin value of acting now</td>
+<td style="text-align: right;">490</td>
+</tr>
+<tr>
+<td style="text-align: left;">Γ-maximin value of surveying first</td>
+<td style="text-align: right;">493.7</td>
+</tr>
+<tr>
+<td style="text-align: left;">rule-specific EVSI</td>
+<td style="text-align: right;">3.7</td>
+</tr>
+<tr>
+<td style="text-align: left;">EVSI under each expert’s prior</td>
+<td style="text-align: right;">24.5, 0, 3.7</td>
+</tr>
+</tbody>
+</table>
+<h2 id="information-can-have-negative-value">Information can have
+negative value</h2>
+<p>Under a single prior, information is never harmful: EVSI is at least
+zero. Under a set of priors that guarantee is lost. The package returns
+the value as computed and never rounds a negative value up to zero.</p>
+<p>An example. Mink are present on this stretch with probability 1/2:
+everyone agrees on that. A neighbouring catchment may or may not have
+mink, and nobody is willing to put a probability on it. So the credal
+set has two extreme priors, one in which the neighbouring catchment
+certainly has no mink and one in which it certainly has. A ranger’s note
+arrives that says only whether the two catchments have the <em>same</em>
+status or a <em>different</em> one.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>states2 <span class="op">=</span> [<span class="op">:</span>neither, <span class="op">:</span>here_only, <span class="op">:</span>there_only, <span class="op">:</span>both]</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>payoff2 <span class="op">=</span> <span class="fu">PayoffTable</span>([<span class="op">:</span>no_control, <span class="op">:</span>trap_mink, <span class="op">:</span>translocate], states2,</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>                      [<span class="fl">800</span>  <span class="fl">50</span> <span class="fl">800</span>  <span class="fl">50</span>      <span class="co"># the outcome depends only on mink here</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>                       <span class="fl">700</span> <span class="fl">300</span> <span class="fl">700</span> <span class="fl">300</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>                       <span class="fl">450</span> <span class="fl">420</span> <span class="fl">450</span> <span class="fl">420</span>])</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>credal2 <span class="op">=</span> <span class="fu">CredalSet</span>(states2, [[<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">0</span>, <span class="fl">0</span>],      <span class="co"># no mink in the other catchment</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>                              [<span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>]])     <span class="co"># mink in the other catchment</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>note <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">1</span> <span class="fl">0</span> <span class="fl">0</span> <span class="fl">1</span>      <span class="co"># &quot;same&quot;:      neither, or both</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>                   <span class="fl">0</span> <span class="fl">1</span> <span class="fl">1</span> <span class="fl">0</span>];    <span class="co"># &quot;different&quot;: here only, or there only</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>                  signals<span class="op">=</span>[<span class="op">:</span>same, <span class="op">:</span>different], states<span class="op">=</span>states2)</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>problem2 <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff2, credal2; baseline<span class="op">=:</span>no_control)</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> <span class="fu">robust_evsi</span>(problem2, note)</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin choice now&quot;</span>, <span class="fu">first_choice</span>(<span class="fu">decide</span>(problem2, <span class="fu">GammaMaximin</span>()))],</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, n.act_now],</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of reading the note first&quot;</span>, n.informed],</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVSI&quot;</span>, n.value],</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVSI under each extreme prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(n.members), <span class="st">&quot;, &quot;</span>)]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">quantity</th>
+<th style="text-align: right;">voles</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Γ-maximin choice now</td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Γ-maximin value of acting now</td>
+<td style="text-align: right;">500</td>
+</tr>
+<tr>
+<td style="text-align: left;">Γ-maximin value of reading the note
+first</td>
+<td style="text-align: right;">435</td>
+</tr>
+<tr>
+<td style="text-align: left;">rule-specific EVSI</td>
+<td style="text-align: right;">-65</td>
+</tr>
+<tr>
+<td style="text-align: left;">EVSI under each extreme prior</td>
+<td style="text-align: right;">110, 110</td>
+</tr>
+</tbody>
+</table>
+<p>Before the note, the probability of mink here is 1/2 under every
+prior in the set, and the Γ-maximin choice is to trap, with a guaranteed
+expectation of 500 voles. After the note, whichever way it reads, the
+probability of mink here is anything from 0 to 1, because its meaning
+depends on the unknown status of the other catchment. This is
+<em>dilation</em>. Faced with that, Γ-maximin retreats to translocation
+after either reading, and the plan “read the note, then act” is worth
+435 voles: 65 fewer than not reading it. Each extreme prior, taken
+alone, values the note at 110 voles. A Γ-maximin manager would prefer
+not to be told.</p>
+<p>The lesson is not that surveys are harmful. It is that “more
+information is always better” is a theorem about single priors, and that
+a robust rule applied after the fact need not form the plan the same
+rule would have chosen in advance.</p>
+<h1 id="scenarios-without-probabilities">Scenarios without
+probabilities</h1>
+<p>A <code>ScenarioSet</code> lists the states held possible. The
+state-wise rules then range over those states only, and regret is
+measured within them. Suppose mink have been seen upstream, so “absent”
+is no longer a scenario.</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>all_states <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, <span class="fu">ScenarioSet</span>(states); baseline<span class="op">=:</span>no_control)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>seen <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, <span class="fu">ScenarioSet</span>([<span class="op">:</span>transient, <span class="op">:</span>established]);</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>                       baseline<span class="op">=:</span>no_control)</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>statewise <span class="op">=</span> [<span class="st">&quot;maximin&quot;</span> <span class="op">=&gt;</span> <span class="fu">Maximin</span>(), <span class="st">&quot;maximax&quot;</span> <span class="op">=&gt;</span> <span class="fu">Maximax</span>(),</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>             <span class="st">&quot;Laplace&quot;</span> <span class="op">=&gt;</span> <span class="fu">DecisionRule</span>(<span class="fu">Laplace</span>()), <span class="st">&quot;minimax regret&quot;</span> <span class="op">=&gt;</span> <span class="fu">MinimaxRegret</span>()]</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;all three states&quot;</span>, <span class="st">&quot;mink seen upstream&quot;</span>],</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>         [[n, <span class="fu">first_choice</span>(<span class="fu">decide</span>(all_states, r)), <span class="fu">first_choice</span>(<span class="fu">decide</span>(seen, r))]</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>          for (n, r) <span class="kw">in</span> statewise])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">rule</th>
+<th style="text-align: right;">all three states</th>
+<th style="text-align: right;">mink seen upstream</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">maximin</td>
+<td style="text-align: right;"><code>translocate</code></td>
+<td style="text-align: right;"><code>translocate</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">maximax</td>
+<td style="text-align: right;"><code>no_control</code></td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Laplace</td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">minimax regret</td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+<td style="text-align: right;"><code>trap_mink</code></td>
+</tr>
+</tbody>
+</table>
+<p>Rules that need probabilities are not defined for a scenario set, and
+the value of information is not defined either.</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">evpi</span>(seen)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<pre><code>BeliefFormError: evpi is not defined for a ScenarioSet: a scenario set carries no probabilities; supply a FiniteBelief</code></pre>
+<h1 id="robustness-metrics-from-the-same-pieces">Robustness metrics from
+the same pieces</h1>
+<p>A rule is a transform of the table (none, regret or relative regret),
+a subset of scenarios, an aggregator and a selector. The first three
+without the selector are a <code>RobustnessMetric</code>: a score per
+action that can be tabulated without choosing. Named metrics exist for
+the common cases and any combination can be written down.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>metrics <span class="op">=</span> [<span class="st">&quot;worst case, `maximin_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">maximin_metric</span>(),</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;best case, `maximax_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">maximax_metric</span>(),</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;Hurwicz at 1/2, `hurwicz_metric(1 // 2)`&quot;</span> <span class="op">=&gt;</span> <span class="fu">hurwicz_metric</span>(<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>),</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;mean over states, `laplace_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">laplace_metric</span>(),</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest regret, `minimax_regret_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">minimax_regret_metric</span>(),</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest regret, mink seen upstream&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>               <span class="fu">minimax_regret_metric</span>(; scenarios<span class="op">=</span>[<span class="op">:</span>transient, <span class="op">:</span>established]),</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest expected regret over the priors&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>               <span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>(); transform<span class="op">=</span><span class="fu">RegretTransform</span>()),</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;lowest expected voles over the priors&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>               <span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>())]</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>(<span class="fu">vcat</span>(<span class="st">&quot;metric&quot;</span>, actions),</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>         [<span class="fu">vcat</span>(n, <span class="fu">robustness</span>(problem, m)) for (n, m) <span class="kw">in</span> metrics])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">metric</th>
+<th style="text-align: right;"><code>no_control</code></th>
+<th style="text-align: right;"><code>trap_mink</code></th>
+<th style="text-align: right;"><code>refuges</code></th>
+<th style="text-align: right;"><code>translocate</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">worst case,
+<code>maximin_metric()</code></td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">200</td>
+<td style="text-align: right;">420</td>
+</tr>
+<tr>
+<td style="text-align: left;">best case,
+<code>maximax_metric()</code></td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">700</td>
+<td style="text-align: right;">760</td>
+<td style="text-align: right;">500</td>
+</tr>
+<tr>
+<td style="text-align: left;">Hurwicz at 1/2,
+<code>hurwicz_metric(1 // 2)</code></td>
+<td style="text-align: right;">425</td>
+<td style="text-align: right;">500</td>
+<td style="text-align: right;">480</td>
+<td style="text-align: right;">460</td>
+</tr>
+<tr>
+<td style="text-align: left;">mean over states,
+<code>laplace_metric()</code></td>
+<td style="text-align: right;">416.67</td>
+<td style="text-align: right;">533.33</td>
+<td style="text-align: right;">480</td>
+<td style="text-align: right;">456.67</td>
+</tr>
+<tr>
+<td style="text-align: left;">largest regret,
+<code>minimax_regret_metric()</code></td>
+<td style="text-align: right;">370</td>
+<td style="text-align: right;">120</td>
+<td style="text-align: right;">220</td>
+<td style="text-align: right;">300</td>
+</tr>
+<tr>
+<td style="text-align: left;">largest regret, mink seen upstream</td>
+<td style="text-align: right;">370</td>
+<td style="text-align: right;">120</td>
+<td style="text-align: right;">220</td>
+<td style="text-align: right;">150</td>
+</tr>
+<tr>
+<td style="text-align: left;">largest expected regret over the
+priors</td>
+<td style="text-align: right;">248</td>
+<td style="text-align: right;">92</td>
+<td style="text-align: right;">152</td>
+<td style="text-align: right;">255</td>
+</tr>
+<tr>
+<td style="text-align: left;">lowest expected voles over the priors</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">490</td>
+<td style="text-align: right;">396</td>
+<td style="text-align: right;">443</td>
+</tr>
+</tbody>
+</table>
+<p>Metrics on a regret table are losses: lower is better, and the “lower
+expectation” of a loss is its worst case over the priors, the largest
+expected regret. Putting a selector on a metric makes it a rule
+again:</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>rule <span class="op">=</span> <span class="fu">DecisionRule</span>(<span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>(); transform<span class="op">=</span><span class="fu">RegretTransform</span>());</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>                    name<span class="op">=:</span>MinimaxExpectedRegret)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="fu">first_choice</span>(<span class="fu">decide</span>(problem, rule))</span></code></pre></div>
+<pre><code>:trap_mink</code></pre>
+<h1 id="how-far-apart-are-the-experts">How far apart are the
+experts?</h1>
+<p><code>total_variation</code> is the distance between two beliefs,
+half the sum of the absolute differences.
+<code>decision_loss_bound(B, ε)</code> bounds what can be lost by
+deciding under a belief that is within total-variation distance
+<code>ε</code> of the right one, when the payoffs span a range
+<code>B</code>: at most <code>2 B ε</code>.</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>B <span class="op">=</span> <span class="fu">maximum</span>(payoff.Q) <span class="op">-</span> <span class="fu">minimum</span>(payoff.Q)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>optimist, moderate <span class="op">=</span> <span class="fu">last</span>(experts[<span class="fl">1</span>]), <span class="fu">last</span>(experts[<span class="fl">2</span>])</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>ε <span class="op">=</span> <span class="fu">total_variation</span>(optimist, moderate)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>choice <span class="op">=</span> <span class="fu">first_choice</span>(<span class="fu">decide</span>(<span class="fu">DecisionProblem</span>(payoff, optimist), <span class="fu">MaxExpectedUtility</span>()))</span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>truth <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, moderate)</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>actual <span class="op">=</span> <span class="fu">act_now_value</span>(truth) <span class="op">-</span></span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>         <span class="fu">aggregate</span>(<span class="fu">Expectation</span>(), truth)[<span class="fu">findfirst</span>(<span class="op">==</span>(choice), actions)]</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;value&quot;</span>],</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;range of the payoffs, B&quot;</span>, B],</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;distance between optimist and moderate, ε&quot;</span>, <span class="fu">exact</span>(ε)],</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;bound on the loss, 2 B ε&quot;</span>, <span class="fu">decision_loss_bound</span>(B, ε)],</span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;actual loss from acting on the optimist&#39;s prior when the moderate is right&quot;</span>,</span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>           actual]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">quantity</th>
+<th style="text-align: right;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">range of the payoffs, B</td>
+<td style="text-align: right;">750</td>
+</tr>
+<tr>
+<td style="text-align: left;">distance between optimist and moderate,
+ε</td>
+<td style="text-align: right;">2/5</td>
+</tr>
+<tr>
+<td style="text-align: left;">bound on the loss, 2 B ε</td>
+<td style="text-align: right;">600</td>
+</tr>
+<tr>
+<td style="text-align: left;">actual loss from acting on the optimist’s
+prior when the moderate is right</td>
+<td style="text-align: right;">90</td>
+</tr>
+</tbody>
+</table>
+<p>The bound holds for any table with that range, so it is loose for
+this one. It is of most use when <code>ε</code> is small, for example
+when a belief has been rounded or comes from an approximate model: a
+distance of 1/100 bounds the loss here at
+<code>decision_loss_bound(750, 1 // 100)</code> = 15 voles.</p>
+<h1 id="what-to-take-away">What to take away</h1>
+<ul>
+<li>A <code>CredalSet</code> is a set of priors and a
+<code>ScenarioSet</code> a set of possible states. An operation that
+needs a single prior throws <code>BeliefFormError</code> on either; it
+never picks a prior for you.</li>
+<li><code>GammaMaximin</code> maximises the lower expectation and
+<code>DecisionRule(AlphaMaxmin(α))</code> mixes lower and upper.
+<code>AlphaMaxmin</code> puts <code>α</code> on the lower expectation;
+<code>Hurwicz</code> puts its index on the best state.</li>
+<li><code>EAdmissible</code>, <code>Maximal</code> and
+<code>IntervalDominance</code> return nested sets of actions that cannot
+be ruled out. E-admissibility is decided over the whole set of priors,
+and can admit an action that no stated prior chooses.</li>
+<li><code>robust_evpi</code> and <code>robust_evsi</code> keep the
+rule-specific value apart from the range of single-prior values. The
+rule-specific value of a survey can be negative, and is reported as
+such.</li>
+<li>A <code>RobustnessMetric</code> is a transform, a scenario subset
+and an aggregator; adding a selector makes a
+<code>DecisionRule</code>.</li>
+<li>Under every prior in the set considered here, the choice lies
+between no control, trapping and refuges. Translocation is ruled out by
+all three set-valued rules.</li>
+</ul>
+<h1 id="next">Next</h1>
+<p><a href="../08_several_objectives/08_several_objectives.html">Several
+objectives</a> keeps the single prior and instead declines to combine
+two outcomes into one number.</p>
+</body>
+</html>

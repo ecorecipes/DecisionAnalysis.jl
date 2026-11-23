@@ -87,6 +87,27 @@ decide(robust, EAdmissible()).chosen           # [:do_nothing, :raise_levee]
 DecisionReport(problem; credal=ensemble, experiment=gauge)
 ```
 
+## Vignettes
+
+Ten vignettes in [`vignettes/`](vignettes/) go from a first decision table to Lean-checked certificates,
+on ecological examples whose outcomes are counted in individuals and always compared with no intervention
+(all numbers illustrative). Each is rendered to Markdown, HTML and PDF beside its `.qmd`, with the code run
+once: `julia scripts/render_vignettes.jl` (see [`vignettes/README.md`](vignettes/README.md)). The Markdown
+is also published as the Tutorials of the documentation, copied by `julia scripts/sync_vignettes.jl`.
+
+| | Vignette | Topics |
+|---|---|---|
+| 1 | [A first decision table](vignettes/01_first_decision_table/01_first_decision_table.md) | Actions, states, a belief, expected number of individuals, the baseline and gain over it |
+| 2 | [Decision rules side by side](vignettes/02_decision_rules/02_decision_rules.md) | Expected utility, maximin, maximax, Hurwicz, Laplace, minimax regret, satisficing |
+| 3 | [Regret](vignettes/03_regret/03_regret.md) | Regret tables, the identity with EVPI, menu-dependence of minimax regret |
+| 4 | [Experiments and the value of sample information](vignettes/04_experiments_and_evsi/04_experiments_and_evsi.md) | Likelihoods, Bayesian inversion, EVSI, zero-value information, net benefit |
+| 5 | [Partial information](vignettes/05_partial_information/05_partial_information.md) | EVPPI over partitions of the states |
+| 6 | [Comparing experiments](vignettes/06_comparing_experiments/06_comparing_experiments.md) | Garbling, deficiency, incomparable designs |
+| 7 | [Uncertain beliefs](vignettes/07_uncertain_beliefs/07_uncertain_beliefs.md) | Credal sets, scenario sets, robust rules, robust value of information |
+| 8 | [Several objectives](vignettes/08_several_objectives/08_several_objectives.md) | The Pareto front, infected against uninfected counts |
+| 9 | [The decision report](vignettes/09_decision_report/09_decision_report.md) | `DecisionReport` and its Tables.jl form |
+| 10 | [Exact arithmetic and certificates](vignettes/10_exact_arithmetic_and_certificates/10_exact_arithmetic_and_certificates.md) | Rational problems, certificates and witnesses, the Lean checker |
+
 ## Conventions
 
 - Payoffs are utilities: higher is better. A regret table is a loss, and rules on it minimise.

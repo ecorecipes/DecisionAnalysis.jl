@@ -1,0 +1,27 @@
+project:
+  type: default
+  render:
+    - "*/*.qmd"
+
+# NOTE: quarto does not reliably apply a project-wide engine (quarto-cli#3157),
+# so every .qmd also sets `engine: julia` in its own front matter.
+engine: julia
+
+julia:
+  project: "."
+
+# Run once. Quarto executes the code for ONE format only, GitHub-flavoured Markdown.
+# HTML and PDF are then made by pandoc from that executed Markdown, without running
+# any code again: see scripts/render_vignettes.jl and README.md. Do not add `html` or
+# `pdf` here or in a vignette's front matter: Quarto would execute the code once per
+# format (its freeze cache is keyed by format, so it does not help either).
+format:
+  gfm:
+    toc: true
+    fig-format: png
+    fig-dpi: 200
+    df-print: default
+
+execute:
+  warning: true
+  error: false

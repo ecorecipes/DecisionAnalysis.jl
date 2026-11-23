@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Simon Frost" />
+  <title>Exact arithmetic and certificates</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">
+html { font-size: 17px; }
+body {
+font-family: "STIX Two Text", "Source Serif 4", Georgia, "Times New Roman", serif;
+line-height: 1.5; color: #1a1a1a; background: #fdfdfd;
+max-width: 50em; margin: 0 auto; padding: 2em 1.5em 4em;
+}
+h1, h2, h3, h4 { line-height: 1.25; margin-top: 1.6em; }
+h1.title { margin-top: 0.5em; }
+p.author { color: #555; }
+a { color: #1f5fa8; }
+code, pre {
+font-family: "JuliaMono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+font-size: 0.86em;
+}
+pre { background: #f4f4f2; padding: 0.8em 1em; overflow-x: auto; border-radius: 4px; }
+code { background: #f4f4f2; padding: 0.05em 0.25em; border-radius: 3px; }
+pre code { background: none; padding: 0; font-size: 1em; }
+table { border-collapse: collapse; margin: 1em 0; font-size: 0.95em; display: block; overflow-x: auto; }
+th, td { padding: 0.3em 0.8em; border-bottom: 1px solid #ddd; }
+thead th { border-bottom: 2px solid #888; }
+img { max-width: 100%; height: auto; }
+nav#TOC { background: #f4f4f2; padding: 0.6em 1em; border-radius: 4px; }
+nav#TOC ul { margin: 0.2em 0; padding-left: 1.2em; }
+@media (prefers-color-scheme: dark) {
+body { color: #e6e6e6; background: #1c1c1e; }
+a { color: #8ab4f8; }
+pre, code, nav#TOC { background: #2a2a2d; }
+th, td { border-bottom-color: #444; }
+img { background: #fff; }
+}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Exact arithmetic and certificates</h1>
+<p class="author">Simon Frost</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#motivation" id="toc-motivation">Motivation</a></li>
+<li><a href="#the-problem" id="toc-the-problem">The problem</a></li>
+<li><a href="#exact-in-exact-out" id="toc-exact-in-exact-out">Exact in,
+exact out</a>
+<ul>
+<li><a href="#ties-are-exact" id="toc-ties-are-exact">Ties are
+exact</a></li>
+<li><a href="#identities-hold-exactly" id="toc-identities-hold-exactly">Identities hold exactly</a></li>
+</ul></li>
+<li><a href="#a-decision-certificate" id="toc-a-decision-certificate">A
+decision certificate</a></li>
+<li><a href="#a-garbling-witness" id="toc-a-garbling-witness">A garbling
+witness</a></li>
+<li><a href="#an-e-admissibility-witness" id="toc-an-e-admissibility-witness">An E-admissibility witness</a></li>
+<li><a href="#checking-the-files-with-lean" id="toc-checking-the-files-with-lean">Checking the files with Lean</a>
+<ul>
+<li><a href="#a-wrong-claim-is-rejected" id="toc-a-wrong-claim-is-rejected">A wrong claim is rejected</a></li>
+</ul></li>
+<li><a href="#what-is-and-is-not-certified" id="toc-what-is-and-is-not-certified">What is and is not
+certified</a></li>
+<li><a href="#what-to-take-away" id="toc-what-to-take-away">What to take
+away</a></li>
+<li><a href="#the-series" id="toc-the-series">The series</a></li>
+</ul>
+</nav>
+<h1 id="motivation">Motivation</h1>
+<p>A decision analysis ends in comparisons: this action is better than
+that one, this survey is worth more than it costs. In floating point a
+comparison between two nearly equal numbers can come out either way.
+<code>DecisionAnalysis.jl</code> avoids the question for finite
+problems: give it integers and rationals and every number it returns is
+an exact rational, every tie is a true tie, and every linear programme
+is solved exactly.</p>
+<p>Exact results can also be <em>checked</em>. The package writes a
+problem and the numbers it claims for it as a certificate, a small JSON
+file, and a separate program recomputes the claims. The checker in
+<code>proofs/</code> is written in Lean 4, shares no code with the Julia
+package, and comes with machine-checked proofs that what it accepts is
+correct. This vignette writes the three kinds of file and checks
+them.</p>
+<h1 id="the-problem">The problem</h1>
+<p>The frog pond with Bd, as in the earlier vignettes: three states,
+three actions, and utility equal to uninfected frogs minus
+<code>w</code> times infected frogs. Infected but living frogs are not
+counted as population. The certificate below is for <code>w = 1</code>,
+and a second one is written for <code>w = 0</code>.</p>
+<p><strong>All numbers are illustrative</strong>, not data.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">DecisionAnalysis</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">Random</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">include</span>(<span class="fu">joinpath</span>(<span class="st">&quot;..&quot;</span>, <span class="st">&quot;_common.jl&quot;</span>))</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>actions <span class="op">=</span> [<span class="op">:</span>no_intervention, <span class="op">:</span>antifungal_baths, <span class="op">:</span>disinfect_pond]</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>states <span class="op">=</span> [<span class="op">:</span>absent, <span class="op">:</span>low_prevalence, <span class="op">:</span>high_prevalence]</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>uninfected <span class="op">=</span> [<span class="fl">500</span> <span class="fl">300</span> <span class="fl">100</span>; <span class="fl">470</span> <span class="fl">380</span> <span class="fl">250</span>; <span class="fl">350</span> <span class="fl">340</span> <span class="fl">320</span>]</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>infected <span class="op">=</span> [<span class="fl">0</span> <span class="fl">150</span> <span class="fl">250</span>; <span class="fl">0</span> <span class="fl">60</span> <span class="fl">120</span>; <span class="fl">0</span> <span class="fl">10</span> <span class="fl">20</span>]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>prior <span class="op">=</span> <span class="fu">FiniteBelief</span>(states, [<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>])</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">bd_problem</span>(w)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>(actions, states, uninfected <span class="op">.-</span> w <span class="op">.*</span> infected),</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>                           prior; baseline<span class="op">=:</span>no_intervention)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>problem <span class="op">=</span> <span class="fu">bd_problem</span>(<span class="fl">1</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>swab <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">19</span><span class="op">//</span><span class="fl">20</span> <span class="fl">2</span><span class="op">//</span><span class="fl">5</span> <span class="fl">1</span><span class="op">//</span><span class="fl">20</span>; <span class="fl">1</span><span class="op">//</span><span class="fl">20</span> <span class="fl">3</span><span class="op">//</span><span class="fl">5</span> <span class="fl">19</span><span class="op">//</span><span class="fl">20</span>];</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>                  signals<span class="op">=</span>[<span class="op">:</span>negative, <span class="op">:</span>positive], states<span class="op">=</span>states)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(problem.payoff; corner<span class="op">=</span><span class="st">&quot;uninfected − infected&quot;</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">uninfected − infected</th>
+<th style="text-align: right;"><code>absent</code></th>
+<th style="text-align: right;"><code>low_prevalence</code></th>
+<th style="text-align: right;"><code>high_prevalence</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">500</td>
+<td style="text-align: right;">150</td>
+<td style="text-align: right;">-150</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">470</td>
+<td style="text-align: right;">320</td>
+<td style="text-align: right;">130</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">350</td>
+<td style="text-align: right;">330</td>
+<td style="text-align: right;">300</td>
+</tr>
+</tbody>
+</table>
+<h1 id="exact-in-exact-out">Exact in, exact out</h1>
+<p>The payoffs are integers and the probabilities rationals, so the
+results are rationals.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;exact value&quot;</span>, <span class="st">&quot;as a decimal&quot;</span>],</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>         [[name, <span class="fu">exact</span>(x), <span class="fu">Float64</span>(x)]</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>          for (name, x) <span class="kw">in</span> [<span class="st">&quot;expected utility of the best action&quot;</span> <span class="op">=&gt;</span> <span class="fu">act_now_value</span>(problem),</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;its expected gain over no intervention&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>                                <span class="fu">maximum</span>(<span class="fu">expected_gain_over_baseline</span>(problem)),</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;EVPI&quot;</span> <span class="op">=&gt;</span> <span class="fu">evpi</span>(problem),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;value with the swab&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>                                <span class="fu">value_with_information</span>(problem, swab),</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;EVSI of the swab&quot;</span> <span class="op">=&gt;</span> <span class="fu">evsi</span>(problem, swab)]]; digits<span class="op">=</span><span class="fl">4</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">quantity</th>
+<th style="text-align: right;">exact value</th>
+<th style="text-align: right;">as a decimal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">expected utility of the best action</td>
+<td style="text-align: right;">357</td>
+<td style="text-align: right;">357</td>
+</tr>
+<tr>
+<td style="text-align: left;">its expected gain over no
+intervention</td>
+<td style="text-align: right;">92</td>
+<td style="text-align: right;">92</td>
+</tr>
+<tr>
+<td style="text-align: left;">EVPI</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">52</td>
+</tr>
+<tr>
+<td style="text-align: left;">value with the swab</td>
+<td style="text-align: right;">3881/10</td>
+<td style="text-align: right;">388.1</td>
+</tr>
+<tr>
+<td style="text-align: left;">EVSI of the swab</td>
+<td style="text-align: right;">311/10</td>
+<td style="text-align: right;">31.1</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb3"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">typeof</span>(<span class="fu">evsi</span>(problem, swab))</span></code></pre></div>
+<pre><code>Rational{Int64}</code></pre>
+<p>The same problem in floating point gives floating-point answers that
+agree to rounding error, which is what one wants for large problems. The
+exact form is for the cases where the comparison itself is the
+result.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>float_problem <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>(actions, states,</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>                                            <span class="fu">Float64</span>.(problem.payoff.Q)),</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>                                <span class="fu">Float64</span>.(<span class="fu">probabilities</span>(prior));</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>                                baseline<span class="op">=:</span>no_intervention)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>float_swab <span class="op">=</span> <span class="fu">Experiment</span>(<span class="fu">Float64</span>.(swab.likelihood); states<span class="op">=</span>states)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">evsi</span>(float_problem, float_swab), <span class="fu">Float64</span>(<span class="fu">evsi</span>(problem, swab))</span></code></pre></div>
+<pre><code>(31.099999999999966, 31.1)</code></pre>
+<h2 id="ties-are-exact">Ties are exact</h2>
+<p>At what weight <code>w</code> do the baths and disinfection have the
+same expected utility? The expected counts are 399 uninfected and 42
+infected for the baths, 341 and 7 for disinfection, so the two are level
+when 399 − 42w = 341 − 7w, at <code>w</code> = 58/35.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>tie <span class="op">=</span> <span class="fu">decide</span>(<span class="fu">bd_problem</span>(<span class="fl">58</span> <span class="op">//</span> <span class="fl">35</span>), <span class="fu">MaxExpectedUtility</span>())</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>tie.chosen, <span class="fu">first_choice</span>(tie), <span class="fu">exact</span>.(tie.scores)</span></code></pre></div>
+<pre><code>([:antifungal_baths, :disinfect_pond], :antifungal_baths, [&quot;1418/7&quot;, &quot;1647/5&quot;, &quot;1647/5&quot;])</code></pre>
+<p>Both actions are returned, and the first choice is the one that comes
+first in the table. In floating point the same weight does not give a
+tie unless a tolerance is allowed for, which <code>decide</code> does by
+default for floating-point problems (<code>rtol</code>).</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>w <span class="op">=</span> <span class="fl">58</span> <span class="op">/</span> <span class="fl">35</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>float_tie <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>(actions, states, uninfected <span class="op">.-</span> w <span class="op">.*</span> infected),</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">Float64</span>.(<span class="fu">probabilities</span>(prior)))</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(float_tie, <span class="fu">MaxExpectedUtility</span>(); rtol<span class="op">=</span><span class="fl">0</span>).chosen,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(float_tie, <span class="fu">MaxExpectedUtility</span>()).chosen</span></code></pre></div>
+<pre><code>([:antifungal_baths], [:antifungal_baths, :disinfect_pond])</code></pre>
+<h2 id="identities-hold-exactly">Identities hold exactly</h2>
+<p>The identities of the earlier vignettes can be tested with
+<code>==</code> on random rational problems. The package provides
+generators for that.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> <span class="fu">Xoshiro</span>(<span class="fl">2026</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>checks <span class="op">=</span> <span class="fu">map</span>(<span class="fl">1</span><span class="op">:</span><span class="fl">200</span>) <span class="cf">do</span> _</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    p <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">random_payoff_table</span>(rng, <span class="fl">4</span>, <span class="fl">5</span>; T<span class="op">=</span><span class="dt">Rational</span>{<span class="dt">Int</span>}),</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">random_belief</span>(rng, <span class="fl">5</span>; T<span class="op">=</span><span class="dt">Rational</span>{<span class="dt">Int</span>}))</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="cn">e</span> <span class="op">=</span> <span class="fu">random_experiment</span>(rng, <span class="fl">3</span>, <span class="fl">5</span>; T<span class="op">=</span><span class="dt">Rational</span>{<span class="dt">Int</span>})</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    noisy <span class="op">=</span> <span class="fu">garble</span>(<span class="cn">e</span>, <span class="fu">random_experiment</span>(rng, <span class="fl">3</span>, <span class="fl">3</span>; T<span class="op">=</span><span class="dt">Rational</span>{<span class="dt">Int</span>}).likelihood)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="fu">evpi</span>(p) <span class="op">==</span> <span class="fu">minimum</span>(<span class="fu">expected_regret</span>(p)),</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>            <span class="fl">0</span> <span class="op">&lt;=</span> <span class="fu">evsi</span>(p, noisy) <span class="op">&lt;=</span> <span class="fu">evsi</span>(p, <span class="cn">e</span>) <span class="op">&lt;=</span> <span class="fu">evpi</span>(p),</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>            <span class="fu">is_garbling_of</span>(noisy, <span class="cn">e</span>) <span class="op">!==</span> <span class="cn">nothing</span>)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;property, on 200 random rational problems&quot;</span>, <span class="st">&quot;holds in all&quot;</span>],</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;EVPI equals the smallest expected regret&quot;</span>, <span class="fu">all</span>(c <span class="op">-&gt;</span> c[<span class="fl">1</span>], checks)],</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;0 ≤ EVSI of a garbling ≤ EVSI ≤ EVPI&quot;</span>, <span class="fu">all</span>(c <span class="op">-&gt;</span> c[<span class="fl">2</span>], checks)],</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;the garbling is recognised as one&quot;</span>, <span class="fu">all</span>(c <span class="op">-&gt;</span> c[<span class="fl">3</span>], checks)]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">property, on 200 random rational
+problems</th>
+<th style="text-align: right;">holds in all</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">EVPI equals the smallest expected
+regret</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">0 ≤ EVSI of a garbling ≤ EVSI ≤ EVPI</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">the garbling is recognised as one</td>
+<td style="text-align: right;">yes</td>
+</tr>
+</tbody>
+</table>
+<h1 id="a-decision-certificate">A decision certificate</h1>
+<p><code>export_decision_certificate</code> writes the problem and the
+claims as JSON. Every number is a string <code>&quot;n/d&quot;</code> in lowest
+terms, and action indices count from zero.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>out <span class="op">=</span> <span class="fu">joinpath</span>(<span class="pp">@__DIR__</span>, <span class="st">&quot;_out&quot;</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkpath</span>(out)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>certificate <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w1.json&quot;</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="fu">export_decision_certificate</span>(certificate, problem; experiment<span class="op">=</span>swab)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(certificate, <span class="dt">String</span>))</span></code></pre></div>
+<pre><code>{
+  &quot;schema&quot;: &quot;decision-certificate/1&quot;,
+  &quot;actions&quot;: [&quot;no_intervention&quot;, &quot;antifungal_baths&quot;, &quot;disinfect_pond&quot;],
+  &quot;states&quot;: [&quot;absent&quot;, &quot;low_prevalence&quot;, &quot;high_prevalence&quot;],
+  &quot;payoff&quot;: [[&quot;500&quot;, &quot;150&quot;, &quot;-150&quot;], [&quot;470&quot;, &quot;320&quot;, &quot;130&quot;], [&quot;350&quot;, &quot;330&quot;, &quot;300&quot;]],
+  &quot;prior&quot;: [&quot;1/2&quot;, &quot;3/10&quot;, &quot;1/5&quot;],
+  &quot;signals&quot;: [&quot;negative&quot;, &quot;positive&quot;],
+  &quot;likelihood&quot;: [[&quot;19/20&quot;, &quot;2/5&quot;, &quot;1/20&quot;], [&quot;1/20&quot;, &quot;3/5&quot;, &quot;19/20&quot;]],
+  &quot;claims&quot;: {
+    &quot;expected_utility&quot;: [&quot;265&quot;, &quot;357&quot;, &quot;334&quot;],
+    &quot;act_now_value&quot;: &quot;357&quot;,
+    &quot;bayes_actions&quot;: [1],
+    &quot;regret&quot;: [[&quot;0&quot;, &quot;180&quot;, &quot;450&quot;], [&quot;30&quot;, &quot;10&quot;, &quot;170&quot;], [&quot;150&quot;, &quot;0&quot;, &quot;0&quot;]],
+    &quot;expected_regret&quot;: [&quot;144&quot;, &quot;52&quot;, &quot;75&quot;],
+    &quot;max_regret&quot;: [&quot;450&quot;, &quot;170&quot;, &quot;150&quot;],
+    &quot;minimax_regret_actions&quot;: [2],
+    &quot;evpi&quot;: &quot;52&quot;,
+    &quot;value_with_information&quot;: &quot;3881/10&quot;,
+    &quot;evsi&quot;: &quot;311/10&quot;
+  }
+}</code></pre>
+<p>The claims are the expected utility of every action, the value of
+acting now, the Bayes actions, the regret table with its expected and
+maximum regret, the minimax-regret actions, EVPI, and with an experiment
+the value with information and EVSI. The gain over the baseline is not a
+separate claim: it is the difference of two entries of
+<code>expected_utility</code>.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">export_decision_certificate</span>(<span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w0.json&quot;</span>), <span class="fu">bd_problem</span>(<span class="fl">0</span>); experiment<span class="op">=</span>swab)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>CERTIFICATE_SCHEMA</span></code></pre></div>
+<pre><code>&quot;decision-certificate/1&quot;</code></pre>
+<p>A certificate needs exact inputs. A floating-point problem is
+refused:</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">export_decision_certificate</span>(<span class="cn">devnull</span>, float_problem)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<pre><code>InexactCertificateError: the payoff has element type Float64; a certificate needs Rational or Integer entries</code></pre>
+<h1 id="a-garbling-witness">A garbling witness</h1>
+<p>The claim “pooled swabs are a garbling of the swab test” is proved by
+exhibiting the noise matrix. <code>export_garbling_witness</code> finds
+it by exact linear programme, checks it in exact arithmetic
+(nonnegative, columns summing to one, product equal to the garbled
+likelihood) and writes it.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>pooled <span class="op">=</span> <span class="fu">garble</span>(swab, [<span class="fl">9</span><span class="op">//</span><span class="fl">10</span> <span class="fl">1</span><span class="op">//</span><span class="fl">5</span>; <span class="fl">1</span><span class="op">//</span><span class="fl">10</span> <span class="fl">4</span><span class="op">//</span><span class="fl">5</span>]; signals<span class="op">=</span>[<span class="op">:</span>negative, <span class="op">:</span>positive])</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>garbling <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;pooled_is_garbling_of_swab.json&quot;</span>)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="fu">export_garbling_witness</span>(garbling, pooled, swab)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(garbling, <span class="dt">String</span>))</span></code></pre></div>
+<pre><code>{
+  &quot;schema&quot;: &quot;garbling-witness/1&quot;,
+  &quot;experiment&quot;: [[&quot;19/20&quot;, &quot;2/5&quot;, &quot;1/20&quot;], [&quot;1/20&quot;, &quot;3/5&quot;, &quot;19/20&quot;]],
+  &quot;garbled&quot;: [[&quot;173/200&quot;, &quot;12/25&quot;, &quot;47/200&quot;], [&quot;27/200&quot;, &quot;13/25&quot;, &quot;153/200&quot;]],
+  &quot;garbling&quot;: [[&quot;9/10&quot;, &quot;1/5&quot;], [&quot;1/10&quot;, &quot;4/5&quot;]]
+}</code></pre>
+<p>When there is no witness nothing is written:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">export_garbling_witness</span>(<span class="cn">devnull</span>, swab, pooled)</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<pre><code>WitnessError: the first experiment is not a garbling of the second: the deficiency is positive and there is no witness</code></pre>
+<h1 id="an-e-admissibility-witness">An E-admissibility witness</h1>
+<p>The claim “this action is optimal under some prior in the credal set”
+is proved by exhibiting the prior and the weights that place it in the
+set.</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>credal <span class="op">=</span> <span class="fu">CredalSet</span>(states, [[<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>],</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">7</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">10</span>],</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">2</span> <span class="op">//</span> <span class="fl">5</span>]])</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>robust <span class="op">=</span> <span class="fu">DecisionProblem</span>(problem.payoff, credal; baseline<span class="op">=:</span>no_intervention)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(robust, <span class="fu">EAdmissible</span>()).chosen</span></code></pre></div>
+<pre><code>2-element Vector{Symbol}:
+ :antifungal_baths
+ :disinfect_pond</code></pre>
+<div class="sourceCode" id="cb24"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>admissible <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;disinfect_is_e_admissible.json&quot;</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="fu">export_eadmissible_witness</span>(admissible, robust, <span class="op">:</span>disinfect_pond)</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(admissible, <span class="dt">String</span>))</span></code></pre></div>
+<pre><code>{
+  &quot;schema&quot;: &quot;e-admissible-witness/1&quot;,
+  &quot;payoff&quot;: [[&quot;500&quot;, &quot;150&quot;, &quot;-150&quot;], [&quot;470&quot;, &quot;320&quot;, &quot;130&quot;], [&quot;350&quot;, &quot;330&quot;, &quot;300&quot;]],
+  &quot;priors&quot;: [[&quot;1/2&quot;, &quot;3/10&quot;, &quot;1/5&quot;], [&quot;7/10&quot;, &quot;1/5&quot;, &quot;1/10&quot;], [&quot;3/10&quot;, &quot;3/10&quot;, &quot;2/5&quot;]],
+  &quot;weights&quot;: [&quot;35/58&quot;, &quot;0&quot;, &quot;23/58&quot;],
+  &quot;prior&quot;: [&quot;61/145&quot;, &quot;3/10&quot;, &quot;81/290&quot;],
+  &quot;action&quot;: 2
+}</code></pre>
+<p>No intervention is not E-admissible, so it has no witness:</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">export_eadmissible_witness</span>(<span class="cn">devnull</span>, robust, <span class="op">:</span>no_intervention)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<pre><code>WitnessError: no_intervention is not E-admissible: under every prior in the credal set some other action has a higher expected utility</code></pre>
+<h1 id="checking-the-files-with-lean">Checking the files with Lean</h1>
+<p>The Lean project in <code>proofs/</code> builds an executable,
+<code>check_certificate</code>, that reads one of these files,
+recomputes every claim over the rationals, and exits with code 0 when it
+accepts, 1 when it rejects, and 2 when the file cannot be decoded. It is
+run as</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> proofs</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> exe cache get                 <span class="co"># once: prebuilt Mathlib</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> build check_certificate       <span class="co"># once</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> exe check_certificate ../vignettes/10_exact_arithmetic_and_certificates/_out/bd_w1.json</span></code></pre></div>
+<p>The cell below runs the built executable when it is present, and says
+so when it is not. The output recorded in the rendered copies of this
+vignette was produced with the executable built.</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>checker <span class="op">=</span> <span class="fu">joinpath</span>(<span class="pp">@__DIR__</span>, <span class="st">&quot;..&quot;</span>, <span class="st">&quot;..&quot;</span>, <span class="st">&quot;proofs&quot;</span>, <span class="st">&quot;.lake&quot;</span>, <span class="st">&quot;build&quot;</span>, <span class="st">&quot;bin&quot;</span>,</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>                   <span class="st">&quot;check_certificate&quot;</span>)</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">lean_check</span>(file)</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">println</span>(<span class="st">&quot;check_certificate &quot;</span>, <span class="fu">basename</span>(file))</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> !<span class="fu">isfile</span>(checker)</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">println</span>(<span class="st">&quot;  not run: build the checker first (see proofs/README.md)&quot;</span>)</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="cn">nothing</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>    buffer <span class="op">=</span> <span class="fu">IOBuffer</span>()</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    process <span class="op">=</span> <span class="fu">run</span>(<span class="fu">pipeline</span>(<span class="fu">ignorestatus</span>(<span class="ss">`$checker $file`</span>); <span class="cn">stdout</span><span class="op">=</span>buffer, <span class="cn">stderr</span><span class="op">=</span>buffer))</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">foreach</span>(line <span class="op">-&gt;</span> <span class="fu">println</span>(<span class="st">&quot;  &quot;</span>, line), <span class="fu">split</span>(<span class="fu">chomp</span>(<span class="fu">String</span>(<span class="fu">take!</span>(buffer))), <span class="ch">&#39;\n&#39;</span>))</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">println</span>(<span class="st">&quot;  exit code: &quot;</span>, process.exitcode)</span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cn">nothing</span></span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(certificate)</span></code></pre></div>
+<pre><code>check_certificate bd_w1.json
+  schema: decision-certificate/1
+  actions: 3, states: 3
+  prior nonnegative: ok
+  prior sums to one: ok
+  expected_utility: ok
+  act_now_value: ok
+  bayes_actions: ok
+  regret: ok
+  expected_regret: ok
+  max_regret: ok
+  minimax_regret_actions: ok
+  evpi: ok
+  likelihood column-stochastic: ok
+  value_with_information: ok
+  evsi: ok
+  accepted: yes
+  theorem Certificate.certificate_spec: applies
+  exit code: 0</code></pre>
+<div class="sourceCode" id="cb31"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(<span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w0.json&quot;</span>))</span></code></pre></div>
+<pre><code>check_certificate bd_w0.json
+  schema: decision-certificate/1
+  actions: 3, states: 3
+  prior nonnegative: ok
+  prior sums to one: ok
+  expected_utility: ok
+  act_now_value: ok
+  bayes_actions: ok
+  regret: ok
+  expected_regret: ok
+  max_regret: ok
+  minimax_regret_actions: ok
+  evpi: ok
+  likelihood column-stochastic: ok
+  value_with_information: ok
+  evsi: ok
+  accepted: yes
+  theorem Certificate.certificate_spec: applies
+  exit code: 0</code></pre>
+<div class="sourceCode" id="cb33"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(garbling)</span></code></pre></div>
+<pre><code>check_certificate pooled_is_garbling_of_swab.json
+  schema: garbling-witness/1
+  states: 3, signals: 2, garbled signals: 2
+  shapes: ok
+  experiment column-stochastic: ok
+  garbling column-stochastic: ok
+  garbled = garbling * experiment: ok
+  accepted: yes
+  theorem Certificate.RawGarbling.accepts_sound: applies
+  exit code: 0</code></pre>
+<div class="sourceCode" id="cb35"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(admissible)</span></code></pre></div>
+<pre><code>check_certificate disinfect_is_e_admissible.json
+  schema: e-admissible-witness/1
+  actions: 3, states: 3, extreme points: 3, action: 2
+  accepted: yes
+  theorem Certificate.RawEAdmissible.accepts_sound: applies
+  exit code: 0</code></pre>
+<h2 id="a-wrong-claim-is-rejected">A wrong claim is rejected</h2>
+<p>To see the checker refuse, change one claim by hand. Here the EVSI in
+the certificate is replaced by a rounder number.</p>
+<div class="sourceCode" id="cb37"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>text <span class="op">=</span> <span class="fu">read</span>(certificate, <span class="dt">String</span>)</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>claimed <span class="op">=</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">evsi</span><span class="sc">\&quot;</span><span class="st">: </span><span class="sc">\&quot;</span><span class="st">&quot;</span> <span class="op">*</span> <span class="fu">exact</span>(<span class="fu">evsi</span>(problem, swab)) <span class="op">*</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">&quot;</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a><span class="fu">occursin</span>(claimed, text)</span></code></pre></div>
+<pre><code>true</code></pre>
+<div class="sourceCode" id="cb39"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>tampered <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w1_tampered.json&quot;</span>)</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write</span>(tampered, <span class="fu">replace</span>(text, claimed <span class="op">=&gt;</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">evsi</span><span class="sc">\&quot;</span><span class="st">: </span><span class="sc">\&quot;</span><span class="st">31</span><span class="sc">\&quot;</span><span class="st">&quot;</span>))</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(tampered)</span></code></pre></div>
+<pre><code>check_certificate bd_w1_tampered.json
+  schema: decision-certificate/1
+  actions: 3, states: 3
+  prior nonnegative: ok
+  prior sums to one: ok
+  expected_utility: ok
+  act_now_value: ok
+  bayes_actions: ok
+  regret: ok
+  expected_regret: ok
+  max_regret: ok
+  minimax_regret_actions: ok
+  evpi: ok
+  likelihood column-stochastic: ok
+  value_with_information: ok
+  evsi: FAIL
+  accepted: no
+  exit code: 1</code></pre>
+<h1 id="what-is-and-is-not-certified">What is and is not certified</h1>
+<p>An accepted certificate says that the claimed numbers are the correct
+expected utilities, regrets and values of information <em>for the table,
+prior and likelihood in the file</em>. It says nothing about whether the
+table is a good description of the pond. The numbers in this vignette
+are illustrative, and a certificate of an illustrative table certifies
+arithmetic about an illustration.</p>
+<p>The certificate covers a single prior. The witnesses cover one
+garbling and one E-admissible action each. Deficiency, robust value of
+information and the <code>2 B ε</code> bound are tested in Julia and are
+not covered by the Lean checker.</p>
+<h1 id="what-to-take-away">What to take away</h1>
+<ul>
+<li>Integer and <code>Rational</code> inputs give exact results: no
+rounding, true ties, and identities that hold with <code>==</code>.</li>
+<li><code>export_decision_certificate</code> writes a problem and its
+claimed numbers; <code>export_garbling_witness</code> and
+<code>export_eadmissible_witness</code> write the witnesses found by
+linear programme. All three refuse floating-point input, and the witness
+exporters refuse to write a false claim.</li>
+<li><code>lake exe check_certificate FILE.json</code> in
+<code>proofs/</code> recomputes a file independently and exits 0, 1 or 2
+for accepted, rejected and malformed.</li>
+<li>A certificate certifies the arithmetic, not the inputs.</li>
+</ul>
+<h1 id="the-series">The series</h1>
+<p>This is the last vignette of the series. The first is <a href="../01_first_decision_table/01_first_decision_table.html">A first
+decision table</a>.</p>
+</body>
+</html>

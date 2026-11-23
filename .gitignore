@@ -9,3 +9,13 @@ docs/Manifest-v*.toml
 *.cov
 *.mem
 *.jl.*.cov
+
+# LaTeX intermediates. Rendered documents are deliberate, committed outputs and stay
+# tracked: vignettes/*/*.{html,md,pdf}, vignettes/*/*_files/ and docs/src/tutorials/**.
+# vignettes/_pandoc/header.tex is a hand-written preamble, not an intermediate.
+*.tex
+*.aux
+*.log
+*.out
+*.toc
+!vignettes/_pandoc/header.tex

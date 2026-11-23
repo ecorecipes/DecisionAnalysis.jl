@@ -1,0 +1,8 @@
+% Preamble for the vignette PDFs (pandoc, lualatex). Wrap long source and output
+% lines: the vignettes print wide tables and reports that would otherwise overflow.
+\usepackage{fvextra}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},breaklines,breakanywhere,breaksymbolleft={},fontsize=\small}
+\RecustomVerbatimEnvironment{verbatim}{Verbatim}{breaklines,breakanywhere,breaksymbolleft={},fontsize=\small}
+% Figures stay where they are written and never exceed the text width.
+\usepackage{float}
+\floatplacement{figure}{H}

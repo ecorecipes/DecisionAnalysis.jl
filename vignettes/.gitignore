@@ -1,0 +1,13 @@
+/.quarto/
+/_freeze/
+**/*.quarto_ipynb
+# Files the vignettes write while they run (certificates and witnesses of vignette 10)
+*/_out/
+# LaTeX intermediates (rendered .html/.md/.pdf outputs and the figure
+# directories NN_name_files/ are committed)
+*/*.tex
+*/*.log
+*/*.aux
+*/*.toc
+*/*.out
+!_pandoc/header.tex

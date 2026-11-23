@@ -1,0 +1,214 @@
+---
+title: "The decision report"
+author: "Simon Frost"
+format: gfm
+engine: julia
+---
+
+## Motivation
+
+The earlier vignettes computed one thing at a time. A decision-maker needs them
+together: what each rule recommends, how each action compares with doing nothing, how
+much could be regretted, what information would be worth, and under which assumptions
+all of it holds. `DecisionReport` assembles that for one problem. Its purpose is to
+make a contested decision look contested, and an easy one look easy.
+
+## The problem
+
+The frog pond once more. Bd may be absent, at low prevalence or at high prevalence, and
+the manager can do nothing, give antifungal baths, or drain and disinfect the pond.
+Utility is uninfected frogs minus `w` times infected frogs, two years from now.
+Infected but living frogs are not counted as population: at `w = 0` they are ignored,
+and at `w = 1` each cancels one uninfected frog. The report is built at `w = 1` and
+compared with `w = 0` at the end.
+
+**All numbers are illustrative**, not data.
+
+```{julia}
+using DecisionAnalysis
+using Tables
+include(joinpath("..", "_common.jl"))
+
+actions = [:no_intervention, :antifungal_baths, :disinfect_pond]
+states = [:absent, :low_prevalence, :high_prevalence]
+uninfected = [500 300 100; 470 380 250; 350 340 320]
+infected = [0 150 250; 0 60 120; 0 10 20]
+prior = FiniteBelief(states, [1 // 2, 3 // 10, 1 // 5])
+
+function bd_problem(w)
+    return DecisionProblem(PayoffTable(actions, states, uninfected .- w .* infected),
+                           prior; baseline=:no_intervention)
+end
+
+problem = bd_problem(1)
+payoff_markdown(problem.payoff; corner="uninfected − infected")
+```
+
+Three further ingredients are optional. A credal set says how far the prior might be
+wrong: here the stated prior and two alternatives, one more hopeful and one less. An
+experiment is the swab test. The Hurwicz index is fixed at 1/2.
+
+```{julia}
+credal = CredalSet(states, [[1 // 2, 3 // 10, 1 // 5],
+                            [7 // 10, 1 // 5, 1 // 10],
+                            [3 // 10, 3 // 10, 2 // 5]])
+swab = Experiment([19//20 2//5 1//20; 1//20 3//5 19//20];
+                  signals=[:negative, :positive], states=states)
+```
+
+## The report
+
+```{julia}
+report = DecisionReport(problem; credal=credal, experiment=swab, hurwicz=1 // 2,
+                        assumptions=["All payoffs are illustrative.",
+                                     "Utility is uninfected minus infected frogs " *
+                                     "(w = 1); infected but living frogs are not " *
+                                     "counted as population."])
+```
+
+Reading it from the top:
+
+- **Scores by rule.** One column per rule, with a star on every chosen action. The
+  minimax-regret column is a loss, so its star is on the smallest number.
+- **First choice by rule.** The single choice of each rule, and whether it is the
+  baseline. Here maximax, which looks only at the best cell of each row, recommends
+  doing nothing, and no other rule does.
+- **Expected gain over the baseline.** What each action adds to no intervention, in
+  expectation under the stated prior.
+- **Regret profile.** Maximum and expected regret by action.
+- **Robust sets.** The actions that the credal set cannot rule out.
+- **Value of information.** EVPI and the EVSI of the swab under the stated prior, the
+  EVPI of a Γ-maximin decision-maker, and the range of EVPI over the credal set.
+- **Assumptions.** The conditions under which the numbers hold, including the two
+  supplied above.
+
+On this problem the rules split three ways. Expected utility under the stated prior
+favours the baths. Maximin, Laplace, Hurwicz at 1/2, minimax regret and Γ-maximin over
+the three priors favour disinfection. Maximax favours doing nothing. The baths and
+disinfection are both E-admissible, and doing nothing is not. The report does not
+settle the choice between them. It shows that the choice turns on how much weight the
+bad states get, and that information is worth having: EVPI is about a seventh of the
+expected utility of acting now.
+
+## The report as data
+
+The fields hold the same content as objects.
+
+```{julia}
+md_table(["rule", "first choice", "is the baseline"],
+         [[string(r.rule), first_choice(r), first_choice(r) == problem.baseline]
+          for r in report.results])
+```
+
+```{julia}
+md_table(["robust rule", "actions kept"],
+         [[string(nameof(typeof(r.rule))), r.chosen] for r in report.robust])
+```
+
+```{julia}
+report.evpi, report.evsi, report.robust_evpi
+```
+
+```{julia}
+bullet(report.assumptions)
+```
+
+## A Tables.jl table
+
+A report is a Tables.jl row table with one row per feasible action, so it can be passed
+to anything that accepts a table: a `DataFrame`, a CSV writer, a plotting package.
+
+```{julia}
+rows = Tables.rows(report)
+Tables.istable(report), length(rows), propertynames(first(rows))
+```
+
+```{julia}
+columns = Tables.columntable(report)
+md_table(["column", columns.action...],
+         [vcat("`$name`", collect(getproperty(columns, name)))
+          for name in keys(columns) if name != :action])
+```
+
+The table is shown here with one line per column because it is wide. Each scalar rule
+contributes its score and a `_chosen` flag, followed by the regret profile, the
+expected gain over the baseline and membership of each robust set.
+
+## What the report leaves out when it cannot be computed
+
+The content depends on the belief. With a scenario set there are no probabilities, so
+the report has the state-wise rules and the maximum regret, and no expected utility,
+no expected gain and no value of information.
+
+```{julia}
+scenario_report = DecisionReport(DecisionProblem(problem.payoff, ScenarioSet(states);
+                                                 baseline=:no_intervention))
+```
+
+With a credal set as the belief of the problem itself, the rules that need one prior
+are left out and the robust rules are kept.
+
+```{julia}
+credal_report = DecisionReport(DecisionProblem(problem.payoff, credal;
+                                               baseline=:no_intervention))
+[string(r.rule) for r in credal_report.results],
+credal_report.evpi === nothing, credal_report.expected_gain === nothing
+```
+
+## The weight on infected frogs
+
+The same report at `w = 0`, where only uninfected frogs count.
+
+```{julia}
+report0 = DecisionReport(bd_problem(0); credal=credal, experiment=swab, hurwicz=1 // 2)
+md_table(["rule", "first choice, w = 0", "first choice, w = 1"],
+         [[string(r0.rule), first_choice(r0), first_choice(r1)]
+          for (r0, r1) in zip(report0.results, report.results)])
+```
+
+```{julia}
+md_table(["quantity", "w = 0", "w = 1"],
+         vcat([["expected gain over no intervention: `$a`", report0.expected_gain[i],
+                report.expected_gain[i]] for (i, a) in enumerate(actions)],
+              [["EVPI", report0.evpi, report.evpi],
+               ["EVSI of the swab", report0.evsi, report.evsi],
+               ["E-admissible actions", report0.robust[1].chosen,
+                report.robust[1].chosen]]))
+```
+
+At `w = 0` disinfection has a negative expected gain: it is worse than doing nothing
+when the infected frogs it prevents are not counted. At `w = 1` it gains 69. A report is
+a statement about one utility, and the weight belongs among its assumptions.
+
+## A feasibility filter in a report
+
+Infeasible actions are left out of every part of a report, and the assumptions say so.
+If the pond cannot be drained this year:
+
+```{julia}
+restricted = DecisionProblem(problem.payoff, prior; baseline=:no_intervention,
+                             feasible=[:no_intervention, :antifungal_baths])
+r = DecisionReport(restricted)
+r.evpi, last(r.assumptions, 3)
+```
+
+Removing an action lowers EVPI here, because there is less to choose between once the
+state is known.
+
+## What to take away
+
+- `DecisionReport(problem; credal, experiment, hurwicz, assumptions)` puts every
+  applicable rule side by side with the regret profile, the gain of each action over
+  the baseline, the robust sets and the value of information.
+- It states its assumptions, and takes more through the `assumptions` keyword. Put the
+  utility there, including the weight on infected animals and the fact that the numbers
+  are illustrative.
+- It says for every rule whether the recommendation is the no-intervention baseline.
+- It is a Tables.jl table with one row per feasible action.
+- Parts that are not defined for the belief are left out, not guessed.
+
+## Next
+
+[Exact arithmetic and certificates](../10_exact_arithmetic_and_certificates/10_exact_arithmetic_and_certificates.md)
+shows that these numbers are exact, and how to have them checked by a program that
+shares no code with this package.
