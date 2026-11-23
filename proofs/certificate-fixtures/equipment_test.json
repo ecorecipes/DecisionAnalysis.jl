@@ -1,0 +1,21 @@
+{
+  "schema": "decision-certificate/1",
+  "actions": ["a1", "a2"],
+  "states": ["s1", "s2"],
+  "payoff": [["0", "-1000"], ["-200", "-200"]],
+  "prior": ["7/10", "3/10"],
+  "signals": ["z1", "z2"],
+  "likelihood": [["9/10", "1/5"], ["1/10", "4/5"]],
+  "claims": {
+    "expected_utility": ["-300", "-200"],
+    "act_now_value": "-200",
+    "bayes_actions": [1],
+    "regret": [["0", "800"], ["200", "0"]],
+    "expected_regret": ["240", "140"],
+    "max_regret": ["800", "200"],
+    "minimax_regret_actions": [1],
+    "evpi": "140",
+    "value_with_information": "-122",
+    "evsi": "78"
+  }
+}

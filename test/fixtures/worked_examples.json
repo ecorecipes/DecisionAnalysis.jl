@@ -1,0 +1,161 @@
+{
+  "schema": "decision-fixtures/1",
+  "description": "The three worked examples of lab/wiki/reviews/worked-examples.md as exact rationals. Numbers are strings n/d or n; action indices are zero-based. Payoff rows are actions, likelihood rows are signals, garbling[z', z] = P(z' | z). Shared with the Lean development: change neither side alone.",
+  "examples": [
+    {
+      "name": "flood",
+      "actions": ["do_nothing", "raise_levee", "relocate_assets"],
+      "states": ["low", "moderate", "high", "extreme"],
+      "baseline": "do_nothing",
+      "payoff": [
+        ["0", "-10", "-60", "-150"],
+        ["-20", "-20", "-25", "-90"],
+        ["-48", "-48", "-48", "-48"]
+      ],
+      "prior": ["1/2", "3/10", "3/20", "1/20"],
+      "credal": [
+        ["1/2", "3/10", "3/20", "1/20"],
+        ["7/20", "3/10", "1/4", "1/10"],
+        ["3/5", "1/4", "3/25", "3/100"]
+      ],
+      "experiments": {
+        "gauge": {
+          "signals": ["no_warning", "warning"],
+          "likelihood": [
+            ["9/10", "3/5", "1/5", "1/20"],
+            ["1/10", "2/5", "4/5", "19/20"]
+          ]
+        },
+        "garbled_gauge": {
+          "signals": ["no_warning", "warning"],
+          "likelihood": [
+            ["37/50", "14/25", "8/25", "23/100"],
+            ["13/50", "11/25", "17/25", "77/100"]
+          ],
+          "garbling": [
+            ["4/5", "1/5"],
+            ["1/5", "4/5"]
+          ],
+          "garbling_of": "gauge"
+        }
+      },
+      "expected": {
+        "expected_utility": ["-39/2", "-97/4", "-48"],
+        "act_now_value": "-39/2",
+        "bayes_actions": [0],
+        "maximin": ["-150", "-90", "-48"],
+        "maximin_actions": [2],
+        "regret": [
+          ["0", "0", "35", "102"],
+          ["20", "10", "0", "42"],
+          ["48", "38", "23", "0"]
+        ],
+        "expected_regret": ["207/20", "151/10", "777/20"],
+        "max_regret": ["102", "42", "48"],
+        "minimax_regret_actions": [1],
+        "evpi": "207/20",
+        "value_with_information": {
+          "gauge": "-293/20",
+          "garbled_gauge": "-877/50"
+        },
+        "evsi": {
+          "gauge": "97/20",
+          "garbled_gauge": "49/25"
+        },
+        "lower_expected_utility": ["-33", "-113/4", "-48"],
+        "gamma_maximin_actions": [1],
+        "e_admissible": [0, 1]
+      }
+    },
+    {
+      "name": "epidemic",
+      "actions": ["do_nothing", "intervene"],
+      "states": ["low", "high"],
+      "baseline": "do_nothing",
+      "payoff": [
+        ["0", "-100"],
+        ["-30", "-30"]
+      ],
+      "prior": ["3/5", "2/5"],
+      "experiments": {
+        "test": {
+          "signals": ["negative", "positive"],
+          "likelihood": [
+            ["4/5", "1/5"],
+            ["1/5", "4/5"]
+          ],
+          "cost": "3"
+        }
+      },
+      "expected": {
+        "expected_utility": ["-40", "-30"],
+        "act_now_value": "-30",
+        "bayes_actions": [1],
+        "maximin": ["-100", "-30"],
+        "maximin_actions": [1],
+        "regret": [
+          ["0", "70"],
+          ["30", "0"]
+        ],
+        "expected_regret": ["28", "18"],
+        "max_regret": ["70", "30"],
+        "minimax_regret_actions": [1],
+        "evpi": "18",
+        "value_with_information": {
+          "test": "-106/5"
+        },
+        "evsi": {
+          "test": "44/5"
+        },
+        "enbs": {
+          "test": "29/5"
+        }
+      }
+    },
+    {
+      "name": "equipment",
+      "actions": ["continue", "replace"],
+      "states": ["no_hazard", "hazard"],
+      "baseline": "continue",
+      "payoff": [
+        ["0", "-1000"],
+        ["-200", "-200"]
+      ],
+      "prior": ["7/10", "3/10"],
+      "experiments": {
+        "test": {
+          "signals": ["negative", "positive"],
+          "likelihood": [
+            ["9/10", "1/5"],
+            ["1/10", "4/5"]
+          ],
+          "cost": "30"
+        }
+      },
+      "expected": {
+        "expected_utility": ["-300", "-200"],
+        "act_now_value": "-200",
+        "bayes_actions": [1],
+        "maximin": ["-1000", "-200"],
+        "maximin_actions": [1],
+        "regret": [
+          ["0", "800"],
+          ["200", "0"]
+        ],
+        "expected_regret": ["240", "140"],
+        "max_regret": ["800", "200"],
+        "minimax_regret_actions": [1],
+        "evpi": "140",
+        "value_with_information": {
+          "test": "-122"
+        },
+        "evsi": {
+          "test": "78"
+        },
+        "enbs": {
+          "test": "48"
+        }
+      }
+    }
+  ]
+}

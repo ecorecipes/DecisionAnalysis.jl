@@ -1,0 +1,11 @@
+[deps]
+DecisionAnalysis = "6a9d793e-d09c-4461-8cb4-55c12d181024"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+FiniteKernels = "2ee73795-50db-4096-9573-22982ed4949b"
+
+[compat]
+Documenter = "1"
+
+[sources]
+DecisionAnalysis = {path = ".."}
+FiniteKernels = {path = "../../FiniteKernels.jl"}

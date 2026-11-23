@@ -1,0 +1,51 @@
+name: Lean
+# Checks the proofs in proofs/: the build, the axiom audit and the certificate fixtures.
+on:
+  push:
+    branches: [main]
+    paths: ['proofs/**', '.github/workflows/lean.yml']
+  pull_request:
+    paths: ['proofs/**', '.github/workflows/lean.yml']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # proofs/lakefile.toml has `[[require]] name = "finite_kernels_proofs", path =
+      # "../../FiniteKernels.jl/proofs"`, a Lake *path* dependency: a lone clone of this
+      # repository cannot `lake build`. Both repositories are checked out side by side. For
+      # reproducible releases, configure FINITE_KERNELS_PROOFS_REF to an immutable companion
+      # commit; main is the compatibility default.
+      - uses: actions/checkout@v4
+        with:
+          path: DecisionAnalysis.jl
+      - uses: actions/checkout@v4
+        with:
+          repository: ecorecipes/FiniteKernels.jl
+          ref: ${{ vars.FINITE_KERNELS_PROOFS_REF || 'main' }}
+          path: FiniteKernels.jl
+      - name: Use a local packages directory in CI (the shared one is a sibling path on developer machines)
+        working-directory: DecisionAnalysis.jl/proofs
+        # Lake reads the packages directory from lake-manifest.json, not from lakefile.toml
+        # (`Workspace.materializeDeps` in Lake/Load/Resolve.lean of leanprover/lean4:v4.30.0
+        # uses `manifest.packagesDir?.getD ws.relPkgsDir`), and logs "manifest out of date"
+        # when the two disagree, which --wfail turns into a failure. There is no environment
+        # variable override in this toolchain, so both files are rewritten.
+        run: |
+          sed -i 's#^packagesDir = .*#packagesDir = ".lake/packages"#' lakefile.toml
+          python3 -c 'import json; p = "lake-manifest.json"; m = json.load(open(p)); m["packagesDir"] = ".lake/packages"; json.dump(m, open(p, "w"), indent=1)'
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: DecisionAnalysis.jl/proofs
+          use-github-cache: false
+          # Always fetch Mathlib's prebuilt oleans instead of a ~7 GB Mathlib build.
+          use-mathlib-cache: 'true'
+          build-args: "--wfail"
+      - name: Axiom audit
+        working-directory: DecisionAnalysis.jl/proofs
+        run: |
+          python3 scripts/audit.py --self-test
+          make audit
+      - name: Certificate fixtures
+        working-directory: DecisionAnalysis.jl/proofs
+        run: make check-fixtures

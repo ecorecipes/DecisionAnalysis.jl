@@ -1,0 +1,105 @@
+{
+ "schema": "decision-certificate/1",
+ "actions": [
+  "do_nothing",
+  "raise_levee",
+  "relocate_assets"
+ ],
+ "states": [
+  "low",
+  "moderate",
+  "high",
+  "extreme"
+ ],
+ "payoff": [
+  [
+   "0",
+   "-10",
+   "-60",
+   "-150"
+  ],
+  [
+   "-20",
+   "-20",
+   "-25",
+   "-90"
+  ],
+  [
+   "-48",
+   "-48",
+   "-48",
+   "-48"
+  ]
+ ],
+ "prior": [
+  "1/2",
+  "3/10",
+  "3/20",
+  "1/20"
+ ],
+ "signals": [
+  "no_warning",
+  "warning"
+ ],
+ "likelihood": [
+  [
+   "9/10",
+   "3/5",
+   "1/5",
+   "1/20"
+  ],
+  [
+   "1/10",
+   "2/5",
+   "4/5",
+   "19/20"
+  ]
+ ],
+ "claims": {
+  "expected_utility": [
+   "-39/2",
+   "-97/4",
+   "-48"
+  ],
+  "act_now_value": "-39/2",
+  "bayes_actions": [
+   0
+  ],
+  "regret": [
+   [
+    "0",
+    "0",
+    "35",
+    "102"
+   ],
+   [
+    "20",
+    "10",
+    "0",
+    "42"
+   ],
+   [
+    "48",
+    "38",
+    "23",
+    "0"
+   ]
+  ],
+  "expected_regret": [
+   "207/20",
+   "151/10",
+   "777/20"
+  ],
+  "max_regret": [
+   "102",
+   "42",
+   "48"
+  ],
+  "minimax_regret_actions": [
+   1
+  ],
+  "evpi": "10",
+  "value_with_information": "-293/20",
+  "evsi": "97/20"
+ }
+}
