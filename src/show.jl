@@ -16,6 +16,13 @@ end
 
 Base.show(io::IO, b::ScenarioSet) = print(io, "ScenarioSet(", b.states, ")")
 
+function Base.show(io::IO, b::SampleBelief)
+    return print(io, "SampleBelief(", length(b), " draws, parameters ",
+                 isempty(b.draws) ? "none" : join(keys(b.draws), ", "),
+                 ", effective sample size ",
+                 round(Float64(effective_sample_size(b)); sigdigits=4), ")")
+end
+
 function Base.show(io::IO, t::PayoffTable)
     return print(io, "PayoffTable{", eltype(t), "}(", size(t, 1), " actions × ",
                  size(t, 2), " states)")
@@ -281,6 +288,11 @@ function _blocks(t::PayoffTable)
         push!(blocks, _Title("Standard errors"),
               _matrix_grid("action", t.actions, t.states, t.standard_errors))
     end
+    single_replicate(t) &&
+        push!(blocks,
+              _Para("Flag: some cells hold a single simulator run, not a conditional " *
+                    "expectation; the best reported value and the value with " *
+                    "information from this table are each biased upwards."))
     return blocks
 end
 
@@ -334,6 +346,8 @@ function _blocks(r::DecisionResult)
                     (length(r.chosen) > 1 ? " (tied: " * join(r.chosen, ", ") * ")" : "")))
     end
     haskey(r.details, :note) && push!(blocks, _Para("Note: " * r.details.note))
+    haskey(r.details, :sample_note) &&
+        push!(blocks, _Para("Note: " * r.details.sample_note))
     if haskey(r.details, :exact) && !all(values(r.details.exact))
         unsure = [a for a in actions if !r.details.exact[a]]
         push!(blocks,
@@ -379,6 +393,40 @@ function _blocks(r::DecisionReport)
           _Para("Minimax regret depends on the menu of actions: adding or removing " *
                 "an action, even one that is never chosen, can change its choice."))
 
+    mc = r.monte_carlo
+    if mc !== nothing
+        header = ["action", "expected utility", "standard error", "simulation only"]
+        mc.expected_gain === nothing ||
+            push!(header, "gain over baseline", "standard error of gain")
+        rows = map(eachindex(actions)) do i
+            e = mc.expected_utility[i]
+            row = [labels[i], _cell(e.value), _cell(e.standard_error),
+                   _cell(e.simulation_error)]
+            mc.expected_gain === nothing ||
+                push!(row, _cell(mc.expected_gain[i].value),
+                      _cell(mc.expected_gain[i].standard_error))
+            return row
+        end
+        push!(blocks,
+              _Title("Monte Carlo standard errors (shown beside the values, never " *
+                     "folded into them)"), _Grid(header, rows),
+              _Para("Standard error: the draws taken as a random sample of the " *
+                    "belief. Simulation only: the simulator's noise with the draws " *
+                    "held fixed (- when the table has no standard errors)."))
+        mc.single_replicate &&
+            push!(blocks,
+                  _Para("Flag: some cells hold a single simulator run, not a " *
+                        "conditional expectation; the act-now value and the value " *
+                        "with information are each biased upwards."))
+        if mc.variance !== nothing
+            push!(blocks, _Title("Variance of the payoff across draws"),
+                  _Grid(["action", "total", "simulation", "parameter", "parameter share"],
+                        [[String(v.action), _cell(v.total), _cell(v.simulation),
+                          _cell(v.parameter), _cell(v.parameter_share)]
+                         for v in mc.variance]))
+        end
+    end
+
     if r.expected_gain !== nothing
         push!(blocks, _Title("Expected gain over the baseline ($(p.baseline))"),
               _Grid(["action", "expected gain"],
@@ -412,6 +460,28 @@ function _blocks(r::DecisionReport)
     push!(blocks, _Title("Value of information"))
     rows = Vector{String}[]
     r.evpi === nothing || push!(rows, ["EVPI", _cell(r.evpi), ""])
+    if mc !== nothing
+        estimates = Any["EVPI" => mc.evpi]
+        mc.evpi_regression === nothing ||
+            push!(estimates, "EVPI, all-parameter regression" => mc.evpi_regression)
+        for q in mc.evppi
+            push!(estimates, "EVPPI of $(q.name) ($(q.estimate.method))" => q.estimate)
+        end
+        push!(blocks,
+              _Grid(["estimate", "value", "standard error", "act-now bias",
+                     "cell-noise bias"],
+                    [[name, _cell(e.value), _cell(e.standard_error),
+                      _cell(e.bias.act_now), _cell(e.bias.cells)]
+                     for (name, e) in estimates]; code=Int[]),
+              _Para("Errors and biases are beside the values, not in them. The " *
+                    "act-now bias is the upward bias of the best reported value " *
+                    "from maximising sample means: the chosen action is on average " *
+                    "worth less than its score. The cell-noise bias is the upward " *
+                    "bias of the perfect-information value from maximising noisy " *
+                    "cells. A value of information is a difference of two such " *
+                    "terms, so the sign of its bias is not determined."))
+        filter!(row -> row[1] != "EVPI", rows)
+    end
     for e in r.experiments
         push!(rows,
               ["EVSI of $(e.name)", _cell(e.evsi),
@@ -427,7 +497,7 @@ function _blocks(r::DecisionReport)
               ["EVPI envelope", "[" * _cell(v.lower) * ", " * _cell(v.upper) * "]", ""])
     end
     if isempty(rows)
-        push!(blocks, _Para("not defined without probabilities"))
+        mc === nothing && push!(blocks, _Para("not defined without probabilities"))
     else
         noted = any(row -> !isempty(row[3]), rows)
         push!(blocks,

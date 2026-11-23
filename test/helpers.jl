@@ -81,3 +81,50 @@ function exact_problem(rng, m, n)
     return DecisionProblem(random_payoff_table(rng, m, n; T=BigRat),
                            random_belief(rng, n; T=BigRat))
 end
+
+# Oracles for the sample-based layer, written from the definitions with explicit loops.
+
+# Weighted mean and standard error of the mean of the replicates of one cell, from a
+# plain vector of utilities.
+function oracle_cell(us)
+    n = length(us)
+    m = sum(us) / n
+    n == 1 && return m, nothing
+    ss = 0.0
+    for u in us
+        ss += (u - m)^2
+    end
+    return m, sqrt(ss / (n - 1) / n)
+end
+
+# Normal density and distribution function, and E max(0, X) for X ~ N(μ, σ²).
+normal_pdf(x) = exp(-x^2 / 2) / sqrt(2π)
+function normal_cdf(x)
+    # Abramowitz and Stegun 7.1.26 is too coarse; integrate the density instead.
+    x < -8 && return 0.0
+    x > 8 && return 1.0
+    n = 4000
+    h = (x + 8) / n
+    total = normal_pdf(-8.0) + normal_pdf(x)
+    for k in 1:(n - 1)
+        total += (isodd(k) ? 4 : 2) * normal_pdf(-8 + k * h)
+    end
+    return total * h / 3
+end
+expected_positive_part(μ, σ) = μ * normal_cdf(μ / σ) + σ * normal_pdf(μ / σ)
+
+# The R `voi` vignette's normal model: two actions with payoffs 0 and p1 − p2,
+# p1 ~ N(1, 1), p2 ~ N(0, 2²). Closed forms: E max(0, X) − max(0, E X).
+voi_normal_value(σ) = expected_positive_part(1.0, σ) - 1.0
+function voi_normal_sample(rng, n)
+    p1 = 1 .+ randn(rng, n)
+    p2 = 2 .* randn(rng, n)
+    Q = permutedims(hcat(zeros(n), p1 .- p2))
+    return DecisionProblem(PayoffTable(Q; actions=[:reference, :new]),
+                           SampleBelief((; p1, p2)))
+end
+
+# Upper envelope of lines by brute force on a grid of exact points.
+function oracle_best_on_grid(α, β, grid)
+    return [findall(==(maximum(α .+ t .* β)), α .+ t .* β) for t in grid]
+end

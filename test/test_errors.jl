@@ -16,7 +16,8 @@ end
     concrete = [InvalidBeliefError, InvalidPayoffError, InvalidExperimentError,
                 LabelMismatchError, BeliefFormError, NoFeasibleActionError,
                 InvalidBaselineError, MissingBaselineError, InexactCertificateError,
-                WitnessError, LinearProgramError, ExactVerificationError]
+                WitnessError, LinearProgramError, ExactVerificationError,
+                InvalidOutcomeError, MissingExtensionError]
 
     @testset "hierarchy" begin
         @test isabstracttype(DecisionAnalysisError)
@@ -69,6 +70,14 @@ end
                                                                                                        0 //
                                                                                                        1]),
                                                                                       :a2),
+                                     InvalidOutcomeError => () -> OutcomeTable([(;
+                                                                                 draw=1,
+                                                                                 action=:a,
+                                                                                 replicate=1,
+                                                                                 n=NaN)];
+                                                                               outcomes=[:n]),
+                                     MissingExtensionError => () -> throw(MissingExtensionError(:GAMRegression,
+                                                                                                :GAM)),
                                      LinearProgramError => () -> throw(LinearProgramError(:deficiency,
                                                                                           :unbounded)),
                                      ExactVerificationError => () -> deficiency(Experiment([4//5 1//5;

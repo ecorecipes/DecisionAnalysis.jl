@@ -70,14 +70,14 @@ Each line names a proved result and the Julia function or check it motivates.
 
 * `Certificate.RawNotEAdmissible.accepts_sound`, `not_isEAdmissible_iff_isMixedDominated`
   (T12b): every action that `decide(problem, EAdmissible())` leaves out has a checkable
-  witness, the dual solution of `eadmissibility_model`. **To do in Julia**: export it
-  (`"not-e-admissible-witness/1"`, `proofs/SCHEMAS-PROPOSED.md`), and mark a "no" from a
-  floating-point optimiser exact when the rounded dual passes the exact check.
+  witness, the dual solution of `eadmissibility_model`. **Done in Julia**: `export_not_eadmissible_witness`
+  (`"not-e-admissible-witness/1"`), and a "no" from a floating-point optimiser is marked exact
+  when the rounded witness passes the exact check.
 * `Certificate.RawNotGarbling.accepts_sound`, `not_isGarblingOf_iff_exists_separating` (S1):
   every `nothing` of `is_garbling_of` has a checkable witness, a decision problem with one
-  action per signal of `e′` and the uniform prior. **To do in Julia**: export it
-  (`"not-garbling-witness/1"`), from the Farkas multipliers of `garbling_model`; a
-  `GarblingResult` can then carry the separating problem, which is also the most useful thing
+  action per signal of `e′` and the uniform prior. **Done in Julia**: `export_not_garbling_witness`
+  (`"not-garbling-witness/1"`), from the programme `separating_payoff_model`. Still open: a
+  `GarblingResult` could carry the separating problem, which is also the most useful thing
   to show a user who asks why two experiments are not ordered.
 * `isMixedDominated_of_not_isMaximal`: an action rejected by `Maximal()` needs no programme
   to certify that it is not E-admissible; the pure dominating action is the witness.

@@ -2,8 +2,8 @@
 # Julia and Lean.
 
 """
-    PayoffTable(actions, states, Q; standard_errors=nothing)
-    PayoffTable(Q; actions, states, standard_errors=nothing)
+    PayoffTable(actions, states, Q; standard_errors=nothing, replicates=nothing)
+    PayoffTable(Q; actions, states, standard_errors=nothing, replicates=nothing)
 
 The payoff table of a decision problem: `Q[a, θ]` is the **conditional expected
 utility** of action `a` in state `θ`, with rows indexed by `actions` and columns by
@@ -13,7 +13,14 @@ better; costs enter as negative payoffs.
 The element type is generic, so a table of `Rational{BigInt}` is analysed exactly.
 `standard_errors`, when given, is a matrix of the same size holding the Monte Carlo
 standard error of each cell (a stochastic simulator must be averaged inside each
-cell); it is carried along and never folded into a payoff.
+cell); it is carried along and never folded into a payoff. `replicates`, when given,
+is a matrix of the same size holding the number of simulator runs averaged in each
+cell. A table with a cell built from **one** run is flagged
+([`single_replicate`](@ref)): its cells are single outcomes, not conditional
+expectations, its standard errors are unknown, and both the best reported value and
+the value with information computed from it are biased upwards by the noise.
+[`payoff_table`](@ref) fills both fields from an
+[`OutcomeTable`](@ref).
 
 Throws [`InvalidPayoffError`](@ref) for an empty table, a non-finite entry, or sizes
 that do not match the labels. The matrix is copied.
@@ -26,7 +33,7 @@ how a utility is assembled from tables of outcome counts: see
 [`combine_payoffs`](@ref), [`individuals_payoff`](@ref) and
 [`infection_payoff`](@ref). Standard errors are not carried through a sum or a
 difference (the error of a sum depends on how the cells were simulated); a multiple
-keeps them, scaled.
+keeps them, scaled. Replicate counts follow the same rule.
 
 **Display.** A table prints as a grid of actions against states; in a notebook or a
 Quarto document it renders as a Markdown or HTML table.
@@ -43,10 +50,12 @@ struct PayoffTable{T<:Real,S<:Union{Nothing,Matrix{<:Real}}}
     states::Vector{Symbol}
     Q::Matrix{T}
     standard_errors::S
+    replicates::Union{Nothing,Matrix{Int}}
     function PayoffTable{T,S}(actions::Vector{Symbol}, states::Vector{Symbol},
-                              Q::Matrix{T},
-                              standard_errors::S) where {T<:Real,
-                                                         S<:Union{Nothing,Matrix{<:Real}}}
+                              Q::Matrix{T}, standard_errors::S,
+                              replicates::Union{Nothing,Matrix{Int}}=nothing) where {T<:Real,
+                                                                                     S<:Union{Nothing,
+                                                                                              Matrix{<:Real}}}
         (isempty(actions) || isempty(states)) &&
             throw(InvalidPayoffError("a payoff table needs at least one action and one state"))
         size(Q) == (length(actions), length(states)) ||
@@ -69,20 +78,31 @@ struct PayoffTable{T<:Real,S<:Union{Nothing,Matrix{<:Real}}}
             all(x -> isfinite(x) && x >= 0, standard_errors) ||
                 throw(InvalidPayoffError("standard errors must be finite and nonnegative"))
         end
-        return new{T,S}(actions, states, Q, standard_errors)
+        if replicates !== nothing
+            size(replicates) == size(Q) ||
+                throw(InvalidPayoffError("replicate counts have size $(size(replicates)), " *
+                                         "the payoff matrix $(size(Q))"))
+            all(>=(1), replicates) ||
+                throw(InvalidPayoffError("every cell needs at least one replicate"))
+        end
+        return new{T,S}(actions, states, Q, standard_errors, replicates)
     end
 end
 
 function PayoffTable(actions, states, Q::AbstractMatrix{T};
-                     standard_errors::Union{Nothing,AbstractMatrix{<:Real}}=nothing) where {T<:Real}
+                     standard_errors::Union{Nothing,AbstractMatrix{<:Real}}=nothing,
+                     replicates::Union{Nothing,AbstractMatrix{<:Integer}}=nothing) where {T<:Real}
     se = standard_errors === nothing ? nothing : Matrix(standard_errors)
-    return PayoffTable{T,typeof(se)}(_labels(actions), _labels(states), Matrix{T}(Q), se)
+    reps = replicates === nothing ? nothing : Matrix{Int}(replicates)
+    return PayoffTable{T,typeof(se)}(_labels(actions), _labels(states), Matrix{T}(Q), se,
+                                     reps)
 end
 
 function PayoffTable(Q::AbstractMatrix{<:Real};
                      actions=_default_labels("a", size(Q, 1)),
-                     states=_default_labels("s", size(Q, 2)), standard_errors=nothing)
-    return PayoffTable(actions, states, Q; standard_errors)
+                     states=_default_labels("s", size(Q, 2)), standard_errors=nothing,
+                     replicates=nothing)
+    return PayoffTable(actions, states, Q; standard_errors, replicates)
 end
 
 Base.size(t::PayoffTable) = size(t.Q)
@@ -92,11 +112,28 @@ Base.eltype(::PayoffTable{T}) where {T} = T
 
 function Base.:(==)(a::PayoffTable, b::PayoffTable)
     return a.actions == b.actions && a.states == b.states && a.Q == b.Q &&
-           a.standard_errors == b.standard_errors
+           a.standard_errors == b.standard_errors && a.replicates == b.replicates
 end
 function Base.hash(t::PayoffTable, h::UInt)
-    return hash(t.standard_errors, hash(t.Q, hash(t.states, hash(t.actions, hash(:PT, h)))))
+    return hash(t.replicates,
+                hash(t.standard_errors,
+                     hash(t.Q, hash(t.states, hash(t.actions, hash(:PT, h))))))
 end
+
+"""
+    single_replicate(t::PayoffTable) -> Bool
+
+Whether some cell of the table was built from a single simulator run (its
+`replicates` entry is one). Such a cell is one outcome, not a conditional expected
+utility: every maximum over actions then picks up simulation noise, so the act-now
+value, the value with perfect information and the value with any information are
+each biased upwards, and the chosen action is on average worth less than its
+reported score. [`evpi`](@ref) is a difference of two such terms, so the sign of its
+bias is not determined. `false` for a
+table with no replicate counts, which is taken to hold exact conditional
+expectations.
+"""
+single_replicate(t::PayoffTable) = t.replicates !== nothing && any(==(1), t.replicates)
 
 state_labels(t::PayoffTable) = t.states
 
@@ -111,8 +148,9 @@ action_labels(t::PayoffTable) = t.actions
 # The table restricted to some rows and columns, standard errors included.
 function _subtable(t::PayoffTable, rows, cols)
     se = t.standard_errors === nothing ? nothing : t.standard_errors[rows, cols]
+    reps = t.replicates === nothing ? nothing : t.replicates[rows, cols]
     return PayoffTable(t.actions[rows], t.states[cols], t.Q[rows, cols];
-                       standard_errors=se)
+                       standard_errors=se, replicates=reps)
 end
 
 # Arithmetic on tables with the same labels
@@ -135,18 +173,20 @@ function Base.:-(a::PayoffTable, b::PayoffTable)
     return PayoffTable(a.actions, a.states, a.Q - b.Q)
 end
 function Base.:-(a::PayoffTable)
-    return PayoffTable(a.actions, a.states, -a.Q;
-                       standard_errors=a.standard_errors)
+    return PayoffTable(a.actions, a.states, -a.Q; standard_errors=a.standard_errors,
+                       replicates=a.replicates)
 end
 function Base.:*(c::Real, a::PayoffTable)
     se = a.standard_errors === nothing ? nothing : abs(c) .* a.standard_errors
-    return PayoffTable(a.actions, a.states, c .* a.Q; standard_errors=se)
+    return PayoffTable(a.actions, a.states, c .* a.Q; standard_errors=se,
+                       replicates=a.replicates)
 end
 Base.:*(a::PayoffTable, c::Real) = c * a
 function Base.:/(a::PayoffTable, c::Real)
     iszero(c) && throw(ArgumentError("a payoff table cannot be divided by zero"))
     se = a.standard_errors === nothing ? nothing : a.standard_errors ./ abs(c)
-    return PayoffTable(a.actions, a.states, a.Q ./ c; standard_errors=se)
+    return PayoffTable(a.actions, a.states, a.Q ./ c; standard_errors=se,
+                       replicates=a.replicates)
 end
 
 """
@@ -222,6 +262,7 @@ end
 """
     individuals_payoff(counts::PayoffTable) -> PayoffTable
     individuals_payoff(outcomes, name) -> PayoffTable
+    individuals_payoff(outcomes::OutcomeTable, name) -> PayoffTable
 
 The utility that counts individuals: the payoff of an action in a state is the
 (expected) number of individuals of the focal population, so the payoff table is the
@@ -231,7 +272,8 @@ value of information is read in individuals.
 
 The second form picks the table called `name` from `outcomes`, a named collection of
 outcome count tables: a named tuple, a dictionary, or a vector of `name => table`
-pairs.
+pairs. The third applies [`IndividualsUtility`](@ref) to an [`OutcomeTable`](@ref)
+(see [`payoff_table`](@ref)); all three share one implementation of the utility.
 
 ```jldoctest
 julia> counts = PayoffTable([:nothing, :fence], [:dry, :wet], [40 90; 60 85]);
@@ -240,12 +282,15 @@ julia> individuals_payoff((; toadlets=counts), :toadlets) == counts
 true
 ```
 """
-individuals_payoff(counts::PayoffTable) = _count_table(counts, "individuals")
+individuals_payoff(counts::PayoffTable) = _linear_payoff(IndividualsUtility(:n),
+                                                         _ -> counts)
 individuals_payoff(outcomes, name) = individuals_payoff(_named_table(outcomes, name))
 
 """
     infection_payoff(; uninfected::PayoffTable, infected::PayoffTable, weight=1)
     infection_payoff(outcomes; uninfected=:uninfected, infected=:infected, weight=1)
+    infection_payoff(outcomes::OutcomeTable; uninfected=:uninfected, infected=:infected,
+                     weight=1)
 
 The utility for an infectious disease, from two tables of counts with the same
 labels:
@@ -260,7 +305,10 @@ Whether infected but living individuals also count towards the population is a
 modelling choice made when the count tables are built, not here.
 
 The second form takes a named collection of outcome count tables (a named tuple, a
-dictionary, or `name => table` pairs) and the names of the two tables in it.
+dictionary, or `name => table` pairs) and the names of the two tables in it. The
+third applies [`InfectionUtility`](@ref) to the runs of an [`OutcomeTable`](@ref)
+and averages inside each cell (see [`payoff_table`](@ref)); the utility is the same
+object in all three.
 
 Both counts must be nonnegative ([`InvalidPayoffError`](@ref) otherwise) and share
 their labels ([`LabelMismatchError`](@ref) otherwise); a negative `weight` is an
@@ -281,9 +329,8 @@ true
 ```
 """
 function infection_payoff(; uninfected::PayoffTable, infected::PayoffTable, weight::Real=1)
-    weight >= 0 || throw(ArgumentError("the weight must be nonnegative, got $weight"))
-    return _count_table(uninfected, "uninfected") -
-           weight * _count_table(infected, "infected")
+    u = InfectionUtility(; weight)
+    return _linear_payoff(u, name -> name == u.uninfected ? uninfected : infected)
 end
 function infection_payoff(outcomes; uninfected=:uninfected, infected=:infected,
                           weight::Real=1)

@@ -8,10 +8,12 @@
     DecisionProgram{T}
 
 A linear programme of this package as a JuMP model, returned by the builders
-[`eadmissibility_model`](@ref), [`garbling_model`](@ref), [`deficiency_model`](@ref)
-and [`evpi_envelope_model`](@ref). Fields:
+[`eadmissibility_model`](@ref), [`garbling_model`](@ref), [`deficiency_model`](@ref),
+[`evpi_envelope_model`](@ref), [`mixed_dominance_model`](@ref) and
+[`separating_payoff_model`](@ref). Fields:
 
-- `name`: `:e_admissibility`, `:garbling`, `:deficiency` or `:evpi_envelope`.
+- `name`: `:e_admissibility`, `:garbling`, `:deficiency`, `:evpi_envelope`,
+  `:mixed_dominance` or `:separating_payoff`.
 - `model`: the `JuMP.GenericModel{T}`. `T` is `Rational{BigInt}` when the problem is
   exact (`Rational` or integer entries) and the floating-point type of the problem
   otherwise. No optimiser is attached.
@@ -220,4 +222,100 @@ function evpi_envelope_model(problem::DecisionProblem)
     best = [maximum(view(Q, :, j)) for j in axes(Q, 2)]
     return _evpi_envelope_program(_expectations(Q, v.priors),
                                   [dot(q, best) for q in v.priors])
+end
+
+# Certified "no" answers
+# ----------------------
+
+# `E[b, k]`: expected utility of action `b` at generating point `k`.
+function _mixed_dominance_program(E::AbstractMatrix, a::Integer)
+    n, K = size(E)
+    T = _program_type(eltype(E))
+    D = T.(E) .- T.(E[a:a, :])
+    model = JuMP.GenericModel{T}()
+    μ = JuMP.@variable(model, [1:n], lower_bound = zero(T), base_name = "μ")
+    s = JuMP.@variable(model, base_name = "s")
+    simplex = JuMP.@constraint(model, sum(μ) == one(T))
+    dominates = JuMP.@constraint(model, [k = 1:K],
+                                 sum(D[b, k] * μ[b] for b in 1:n) - s >= zero(T))
+    JuMP.@objective(model, Max, s)
+    return DecisionProgram(:mixed_dominance, model, (; μ, s), (; simplex, dominates))
+end
+
+"""
+    mixed_dominance_model(problem::DecisionProblem, action) -> DecisionProgram
+
+The linear programme that looks for a **mixed action that strictly beats** `action`
+at every generating point of the credal set of `problem`: the dual of
+[`eadmissibility_model`](@ref), stated as a programme of its own so that a "not
+E-admissible" answer has a witness that can be checked. With `E[b, k]` the expected
+utility of the feasible action `b` at the generating point `p_k`, `n` feasible
+actions and `K` generating points, it is
+
+    maximise    s
+    subject to  Σ_b μ_b = 1,                                         (simplex)
+                Σ_b μ_b (E[b, k] − E[a, k]) − s ≥ 0   for every k,    (dominates[k])
+                μ_b ≥ 0,  s free.
+
+Taking `μ` to be all on `a` gives `s = 0`, so the optimum is at least zero, and it is
+positive exactly when `a` is **not** E-admissible (linear-programming duality; Lean
+theorem `not_isEAdmissible_iff_isMixedDominated`). The mixture `μ` is then better
+than `a` by at least `s` under every prior of the set.
+
+Shape: `n + 1` variables (`variables.μ`, a vector of `n`, and `variables.s`) and
+`K + 1` constraints (`constraints.simplex` and `constraints.dominates`, a vector of
+`K`), plus the `n` lower bounds on `μ`.
+
+This is the programme behind [`export_not_eadmissible_witness`](@ref).
+"""
+function mixed_dominance_model(problem::DecisionProblem,
+                               action::Union{Symbol,AbstractString})
+    actions = feasible_actions(problem)
+    a = findfirst(==(Symbol(action)), actions)
+    a === nothing &&
+        throw(ArgumentError("$action is not among the feasible actions $actions"))
+    E, _ = _expectation_matrix(problem, EAdmissible())
+    return _mixed_dominance_program(E, a)
+end
+
+"""
+    separating_payoff_model(e′::Experiment, e::Experiment) -> DecisionProgram
+
+The linear programme that looks for a **decision problem in which `e′` is worth
+strictly more than `e`**, which exists exactly when `e′` is not a garbling of `e`
+(Blackwell's theorem; Lean theorem `not_isGarblingOf_iff_exists_separating`). The
+actions of the problem are the signals of `e′`, its prior is uniform, and its payoff
+table is the unknown `V[z′, θ]`. With `L` the likelihood of `e` (`nz` signals by `S`
+states) and `L′` that of `e′` (`nz′` signals),
+
+    maximise    Σ_{z′, θ} L′[z′, θ] V[z′, θ] − Σ_z u_z
+    subject to  u_z ≥ Σ_θ L[z, θ] V[z′, θ]     for every z and z′,   (best[z, z′])
+                −1 ≤ V[z′, θ] ≤ 1,  u_z free.
+
+At the optimum `u_z` is the best that can be done after signal `z` of `e`, so
+`Σ_z u_z` is `S` times the value of `e`, and the first sum is `S` times the value of
+taking action `z′` after signal `z′` of `e′`, a lower bound on the value of `e′`.
+`V = 0` gives zero, so the optimum is at least zero, and it is positive exactly when
+`e′` is not a garbling of `e`. The bounds on `V` only fix the scale.
+
+Shape: `nz′ · S + nz` variables (`variables.V`, a matrix, and `variables.u`, a
+vector) and `nz · nz′` constraints (`constraints.best`), plus the bounds on `V`.
+
+This is the programme behind [`export_not_garbling_witness`](@ref).
+"""
+function separating_payoff_model(e′::Experiment, e::Experiment)
+    _check_same_states(e, e′)
+    T = _program_type(promote_type(eltype(e), eltype(e′)))
+    L, Lt = T.(e.likelihood), T.(e′.likelihood)
+    nz, S = size(L)
+    nt = size(Lt, 1)
+    model = JuMP.GenericModel{T}()
+    V = JuMP.@variable(model, [1:nt, 1:S], lower_bound = -one(T), upper_bound = one(T),
+                       base_name = "V")
+    u = JuMP.@variable(model, [1:nz], base_name = "u")
+    best = JuMP.@constraint(model, [z = 1:nz, zt = 1:nt],
+                            u[z] - sum(L[z, θ] * V[zt, θ] for θ in 1:S) >= zero(T))
+    JuMP.@objective(model, Max,
+                    sum(Lt[zt, θ] * V[zt, θ] for zt in 1:nt, θ in 1:S) - sum(u))
+    return DecisionProgram(:separating_payoff, model, (; V, u), (; best))
 end

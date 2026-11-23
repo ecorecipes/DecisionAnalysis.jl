@@ -19,9 +19,10 @@ They fall into three families. State-wise aggregators (`WorstCase`, `BestCase`,
 `Hurwicz`, `Laplace`) ignore probabilities and range over the states the belief
 allows: the states of a [`ScenarioSet`](@ref), the one state of a
 [`PointBelief`](@ref), and **every** state of the table for a [`FiniteBelief`](@ref)
-or a [`CredalSet`](@ref), including states of probability zero. Single-prior
-aggregators (`Expectation`, `CVaR`, `Quantile`) need a `FiniteBelief` or a
-`PointBelief`. Prior-set aggregators (`LowerExpectation`, `UpperExpectation`,
+or a [`CredalSet`](@ref), including states of probability zero, and every draw of a
+[`SampleBelief`](@ref) (so their value depends on which draws were sampled; `Laplace`
+is not defined for a sample). Single-prior aggregators (`Expectation`, `CVaR`,
+`Quantile`) need a `FiniteBelief`, a `SampleBelief` or a `PointBelief`. Prior-set aggregators (`LowerExpectation`, `UpperExpectation`,
 `AlphaMaxmin`) range over the points of a `CredalSet` and reduce to the expectation
 for a single prior. An aggregator applied to a form it is not defined for throws
 [`BeliefFormError`](@ref).
@@ -186,7 +187,13 @@ _aggregate(::BestCase, M, ::_View) = [maximum(r) for r in _rows(M)]
 function _aggregate(agg::Hurwicz, M, ::_View)
     return [agg.α * maximum(r) + (1 - agg.α) * minimum(r) for r in _rows(M)]
 end
-_aggregate(::Laplace, M, ::_View) = [_mean(r) for r in _rows(M)]
+function _aggregate(agg::Laplace, M, v::_View)
+    v.form === :SampleBelief &&
+        throw(BeliefFormError(:Laplace, v.form,
+                              "an unweighted mean over the draws ignores their weights; " *
+                              "use Expectation"))
+    return [_mean(r) for r in _rows(M)]
+end
 # Integer payoffs keep an exact mean.
 _mean(r::AbstractVector{<:Integer}) = sum(r) // length(r)
 _mean(r::AbstractVector) = mean(r)

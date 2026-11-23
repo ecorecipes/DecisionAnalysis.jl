@@ -8,7 +8,8 @@ Checkers for certified **"no"** answers. `decide(problem, EAdmissible())` and
 it comes from an exact route; from a floating-point optimiser it is flagged numerical. With
 the witnesses below, a negative answer is checked in exact arithmetic whatever produced it,
 exactly as positive answers already are. The schemas are specified in
-`proofs/SCHEMAS-PROPOSED.md`; the Julia exporters do not exist yet.
+`docs/src/certificates.md`; the package writes them with `export_not_eadmissible_witness` and
+`export_not_garbling_witness`.
 
 ## `"not-e-admissible-witness/1"`
 

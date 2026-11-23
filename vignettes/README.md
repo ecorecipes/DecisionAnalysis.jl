@@ -1,6 +1,6 @@
 # Vignettes
 
-Ten vignettes, ordered from basic to advanced, that together cover the package. Each
+Fourteen vignettes, ordered from basic to advanced, that together cover the package. Each
 lives in its own directory `NN_name/NN_name.qmd` and is rendered to GitHub-flavoured
 Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTML
 (`NN_name.html`) and PDF (`NN_name.pdf`). All rendered files are kept next to the
@@ -18,6 +18,10 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 | 08 | [Several objectives](08_several_objectives/08_several_objectives.md) | `ParetoFront` over named payoff tables, arithmetic on tables, the weight sweep |
 | 09 | [The decision report](09_decision_report/09_decision_report.md) | `DecisionReport` with named experiments, partitions and objectives, its Markdown and 80-column text forms, Tables.jl output |
 | 10 | [Exact arithmetic and certificates](10_exact_arithmetic_and_certificates/10_exact_arithmetic_and_certificates.md) | rational problems, the three exporters, the Lean checker |
+| 11 | [Sample beliefs and outcome tables](11_sample_beliefs_and_outcome_tables/11_sample_beliefs_and_outcome_tables.md) | `SampleBelief`, the adapter verbs and `outcomes`, `OutcomeTable` from a table of runs, `crn_correlation`, `IndividualsUtility`, `InfectionUtility`, `payoff_table` with standard errors, `single_replicate`, rules on a sample, `policy_regions`, `weight_sweep`, `evpi` with a method, `variance_components`, the sample-based report |
+| 12 | [EVPPI from a sample](12_evppi_methods/12_evppi_methods.md) | `evppi` with `Grouping`, `StrongOakley`, `Sadatsafavi`, `SplineRegression`, `GAMRegression`; `conditional_problem`, bootstrap standard errors, closed-form check on the normal model of the R `voi` vignette |
+| 13 | [EVSI from a sample](13_evsi_methods/13_evsi_methods.md) | `evsi` with `SummaryStatistics`, `ImportanceSampling` (`importance_loglikelihoods`) and `GaussianApproximation`; `enbs` in animals; closed-form check |
+| 14 | [Bd epizootic response](14_bd_epizootic_response/14_bd_epizootic_response.md) | The cached Drawert et al. (2017) outcome table of `Chytridiomycosis.jl`: count and infection utilities, gains with standard errors, groups as scenarios, the weight sweep, EVPI, EVPPI, and the EVSI of a pre-intervention survey by importance sampling |
 
 ## Conventions of the examples
 
@@ -29,12 +33,18 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 - **Every vignette has a no-intervention action**, sets it as the `baseline` of the
   `DecisionProblem`, and reports each action's gain over it.
 - **All numbers are illustrative.** They are not data and not estimates for any real
-  system, and each vignette says so.
+  system, and each vignette says so. Vignette 14 reads a cached table of runs of a
+  published model; the numbers read from that table are labelled as such, and
+  everything computed from them is illustrative.
+- **Vignettes 11 to 13 share a toy simulator**, `_toy_pond.jl`. **Vignette 14 needs
+  `Chytridiomycosis.jl`** cloned beside this package (the vignette environment finds it
+  through a `[sources]` path, `../../Chytridiomycosis.jl`); the package itself does not
+  depend on it. Vignette 12 loads GAM.jl for the optional regression backend.
 
 ## Rendering: the code runs once
 
 ```sh
-julia scripts/render_vignettes.jl                # from the package root: all ten
+julia scripts/render_vignettes.jl                # from the package root: all of them
 julia scripts/render_vignettes.jl 04 07          # only some
 julia scripts/render_vignettes.jl --no-execute   # HTML and PDF again from the .md on disk
 julia scripts/sync_vignettes.jl                  # copy the Markdown into docs/src/tutorials

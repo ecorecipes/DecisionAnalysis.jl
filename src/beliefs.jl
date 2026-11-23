@@ -1,4 +1,4 @@
-# The four finite belief forms of version 0.1, and the small helpers on labels and
+# The belief forms (four finite ones and the sample), and the small helpers on labels and
 # probability vectors that every other file uses.
 
 # Labels
@@ -45,7 +45,7 @@ end
     AbstractBelief
 
 Supertype of the belief forms: [`PointBelief`](@ref), [`FiniteBelief`](@ref),
-[`CredalSet`](@ref) and [`ScenarioSet`](@ref). A belief says what is known about the
+[`SampleBelief`](@ref), [`CredalSet`](@ref) and [`ScenarioSet`](@ref). A belief says what is known about the
 state; which rules and which value-of-information quantities are defined depends on
 its form, and an operation that is not defined for a form throws
 [`BeliefFormError`](@ref) instead of guessing.
@@ -236,8 +236,10 @@ state_labels(b::ScenarioSet) = b.states
 
 """
     probabilities(b::FiniteBelief) -> Vector
+    probabilities(b::SampleBelief) -> Vector
 
-The probability vector of a finite belief, in [`state_labels`](@ref) order.
+The probability vector of a finite belief, in [`state_labels`](@ref) order; for a
+[`SampleBelief`](@ref), the normalised weights of the draws.
 """
 probabilities(b::FiniteBelief) = b.probabilities
 
@@ -289,4 +291,170 @@ function random_credal_set(rng::AbstractRNG, n::Integer, k::Integer;
                            T::Type{<:Real}=Float64, states=_default_labels("s", n))
     k >= 1 || throw(ArgumentError("a credal set needs at least one point, got k = $k"))
     return CredalSet(states, [_random_probabilities(rng, T, n) for _ in 1:k])
+end
+
+# Sample beliefs
+# --------------
+
+# Weights as a probability vector: exact for integer and rational weights.
+function _normalise_weights(w::AbstractVector{<:Real})
+    isempty(w) && throw(InvalidBeliefError("a sample needs at least one draw"))
+    for (i, v) in enumerate(w)
+        isfinite(v) || throw(InvalidBeliefError("the weight of draw $i is $v, which is " *
+                                                "not finite"))
+        v >= 0 ||
+            throw(InvalidBeliefError("the weight of draw $i is $v, which is negative"))
+    end
+    total = sum(w)
+    total > 0 || throw(InvalidBeliefError("the weights of a sample sum to zero"))
+    return _is_exact(eltype(w)) ? [v // total for v in w] : float.(w) ./ float(total)
+end
+
+# A Tables.jl table as a named tuple of plain vectors.
+function _column_table(table)
+    table isa NamedTuple && isempty(table) && return (;)
+    Tables.istable(table) ||
+        throw(ArgumentError("expected a Tables.jl table (for example a named tuple of " *
+                            "vectors or a vector of named tuples), got $(typeof(table))"))
+    columns = Tables.columntable(table)
+    return map(collect, columns)
+end
+
+"""
+    SampleBelief(draws; weights=nothing, labels=nothing)
+    SampleBelief(n::Integer; weights=nothing, labels=nothing)
+
+A belief held as a sample: `draws` is a Tables.jl table with one row per draw and
+one column per **named parameter** (a named tuple of vectors, a vector of named
+tuples, a data frame), and `weights` gives each draw's weight. The states of the
+belief are the draws, so a [`PayoffTable`](@ref) used with it has one column per draw,
+in row order. The second form is a sample of `n` draws with no recorded parameters.
+
+- `weights`: `nothing` (equal weights, the exact `1 // n`), a vector of nonnegative
+  numbers, or the name of a column of `draws` that holds them (the column is then
+  taken out of the parameters). Weights are normalised to sum to one: exactly for
+  integer or rational weights, in floating point otherwise. A negative or
+  non-finite weight, or weights that sum to zero, throw [`InvalidBeliefError`](@ref).
+- `labels`: the state labels of the draws: `nothing` (`:s1, :s2, ...`, the default
+  state labels of a payoff table), a vector, or
+  the name of a column of `draws` that identifies them (taken out of the parameters).
+
+**What a sample supports.** A sample is a single prior, the weighted empirical
+distribution of the draws, so [`Expectation`](@ref), [`CVaR`](@ref),
+[`Quantile`](@ref), regret, [`evpi`](@ref) and [`evppi`](@ref) by partition apply to it
+as they do to a [`FiniteBelief`](@ref), and they are **estimates** of the quantities
+for the distribution the draws came from. [`WorstCase`](@ref), [`BestCase`](@ref) and
+[`Hurwicz`](@ref) range over the draws that happen to be in the sample; the results
+of rules built on them say so (`details.sample_dependent`), because a larger sample
+can only make the worst case worse. Operations that have no meaning for a sample
+throw [`BeliefFormError`](@ref): [`Laplace`](@ref) (an unweighted mean over draws
+ignores the weights; use the expectation), [`total_variation`](@ref),
+[`bayes_invert`](@ref) and the certificate exports (a certificate states exact
+numbers for a finite problem; convert with `FiniteBelief(sample)` if the draws are
+the whole population and not a sample of it).
+
+The estimators with standard errors are [`evpi`](@ref), [`evppi`](@ref) and
+[`evsi`](@ref) called with a method ([`SampleAverage`](@ref),
+[`SplineRegression`](@ref), ...). See also [`parameter_draws`](@ref),
+[`draw_weights`](@ref) and [`effective_sample_size`](@ref).
+
+```jldoctest
+julia> b = SampleBelief((; growth=[0.1, 0.3, 0.2], weight=[1, 1, 2]); weights=:weight);
+
+julia> probabilities(b)
+3-element Vector{Rational{Int64}}:
+ 1//4
+ 1//4
+ 1//2
+
+julia> effective_sample_size(b)
+8//3
+```
+"""
+struct SampleBelief{T<:Real,C<:NamedTuple} <: AbstractBelief
+    states::Vector{Symbol}
+    draws::C
+    weights::Vector{T}
+    function SampleBelief(states::Vector{Symbol}, draws::C,
+                          weights::Vector{T}) where {T<:Real,C<:NamedTuple}
+        n = length(weights)
+        length(states) == n ||
+            throw(InvalidBeliefError("$(length(states)) labels for $n draws"))
+        allunique(states) ||
+            throw(InvalidBeliefError("the labels of the draws must be distinct"))
+        for (name, column) in pairs(draws)
+            length(column) == n ||
+                throw(InvalidBeliefError("parameter $name has $(length(column)) values " *
+                                         "for $n draws"))
+        end
+        defect = _probability_defect(weights, _default_atol(T))
+        defect === nothing ||
+            throw(InvalidBeliefError("the weight vector of the sample $defect"))
+        return new{T,C}(states, draws, weights)
+    end
+end
+
+function SampleBelief(draws; weights=nothing, labels=nothing)
+    columns = _column_table(draws)
+    function take(name::Symbol, what)
+        haskey(columns, name) ||
+            throw(ArgumentError("the draws have no column $name to use as $what; " *
+                                "columns: $(collect(keys(columns)))"))
+        column = columns[name]
+        columns = Base.structdiff(columns, NamedTuple{(name,)})
+        return column
+    end
+    w = weights isa Symbol ? take(weights, "weights") : weights
+    l = labels isa Symbol ? take(labels, "labels") : labels
+    n = w !== nothing ? length(w) :
+        l !== nothing ? length(l) :
+        isempty(columns) ?
+        throw(ArgumentError("draws with no column: give the number of draws, " *
+                            "SampleBelief(n)")) : length(first(columns))
+    return _sample_belief(columns, n, w, l)
+end
+
+function SampleBelief(n::Integer; weights=nothing, labels=nothing)
+    n >= 1 || throw(InvalidBeliefError("a sample needs at least one draw"))
+    return _sample_belief((;), n, weights, labels)
+end
+
+function _sample_belief(columns::NamedTuple, n::Integer, weights, labels)
+    w = weights === nothing ? fill(1 // n, n) : _normalise_weights(collect(weights))
+    states = labels === nothing ? _default_labels("s", n) : _labels(labels)
+    return SampleBelief(states, columns, w)
+end
+
+"""
+    FiniteBelief(b::SampleBelief)
+
+The weighted empirical distribution of a sample as a finite belief over its draws.
+Use it when the draws are the whole population of states (so that nothing is being
+estimated), for example to export a certificate.
+"""
+FiniteBelief(b::SampleBelief) = FiniteBelief(b.states, b.weights)
+
+state_labels(b::SampleBelief) = b.states
+probabilities(b::SampleBelief) = b.weights
+Base.length(b::SampleBelief) = length(b.weights)
+
+function Base.:(==)(a::SampleBelief, b::SampleBelief)
+    return a.states == b.states && a.weights == b.weights && isequal(a.draws, b.draws)
+end
+function Base.hash(b::SampleBelief, h::UInt)
+    return hash(b.draws, hash(b.weights, hash(b.states, hash(:SB, h))))
+end
+
+"""
+    effective_sample_size(b::SampleBelief)
+    effective_sample_size(weights::AbstractVector)
+
+Kish's effective sample size of a weighted sample, `(Σ w)² / Σ w²`: the number of
+equally weighted draws that would give a mean the same variance. It equals the
+number of draws for equal weights and falls towards one as the weights concentrate.
+"""
+effective_sample_size(b::SampleBelief) = effective_sample_size(b.weights)
+function effective_sample_size(weights::AbstractVector{<:Real})
+    isempty(weights) && throw(ArgumentError("no weights"))
+    return sum(weights)^2 / sum(abs2, weights)
 end

@@ -273,6 +273,7 @@ end
 
     @testset "garbling: three routes agree" begin
         rng = Random.Xoshiro(20261127)
+        certified_no, all_no = 0, 0
         yes = 0
         for trial in 1:60
             nz, S = rand(rng, 2:4), rand(rng, 2:3)
@@ -308,11 +309,23 @@ end
                 @test float.exact
                 @test oracle_is_garbling_witness(float.witness, L, Lt)
             else
-                # A "no" from a floating-point optimiser is numerical, and says so.
-                @test !float.exact && float.witness === nothing
+                # A "no" from a floating-point optimiser is exact only when a separating
+                # payoff table passed the exact check; then that table can be exported
+                # and stands up to an independent check.
+                @test float.witness === nothing
+                if float.exact
+                    check_not_garbling_witness(sprint(io -> export_not_garbling_witness(io,
+                                                                                        f,
+                                                                                        e;
+                                                                                        optimizer=HIGHS)))
+                end
+                certified_no += float.exact
+                all_no += 1
             end
         end
         @test 30 <= yes < 60
+        # Most "no" answers of the floating-point route are certified on these problems.
+        @test certified_no >= (9 * all_no) ÷ 10
         # Floating-point likelihoods: numerical by every route.
         e = Experiment([0.8 0.2; 0.2 0.8])
         noisy = garble(e, [0.75 0.25; 0.25 0.75])
@@ -429,6 +442,128 @@ end
         @test occursin("deficiency", sprint(showerror, err))
     end
 
+    @testset "certified no: mixed dominance and separating payoffs" begin
+        rng = Xoshiro(20261124)
+        @testset "model shapes" begin
+            problem = DecisionProblem(random_payoff_table(rng, 4, 3; T=BigRat),
+                                      random_credal_set(rng, 3, 5; T=BigRat))
+            prog = mixed_dominance_model(problem, :a2)
+            @test prog.name === :mixed_dominance
+            @test JuMP.num_variables(prog.model) == 4 + 1
+            @test length(prog.constraints.dominates) == 5
+            @test_throws ArgumentError mixed_dominance_model(problem, :nope)
+            e = Experiment(random_stochastic(rng, BigRat, 3, 4))
+            f = Experiment(random_stochastic(rng, BigRat, 2, 4))
+            sep = separating_payoff_model(f, e)
+            @test sep.name === :separating_payoff
+            @test JuMP.num_variables(sep.model) == 2 * 4 + 3
+            @test size(sep.constraints.best) == (3, 2)
+        end
+        @testset "not E-admissible: a witness exactly when the answer is no" begin
+            no = 0
+            for _ in 1:40
+                m, n, K = rand(rng, 2:5), rand(rng, 2:4), rand(rng, 1:4)
+                problem = DecisionProblem(random_payoff_table(rng, m, n; T=BigRat),
+                                          random_credal_set(rng, n, K; T=BigRat))
+                admitted = decide(problem, EAdmissible()).chosen
+                for a in feasible_actions(problem)
+                    if a in admitted
+                        @test_throws WitnessError sprint(io -> export_not_eadmissible_witness(io,
+                                                                                              problem,
+                                                                                              a))
+                        continue
+                    end
+                    no += 1
+                    for opt in (nothing, CDD, HIGHS)
+                        function export_no()
+                            return sprint(io -> export_not_eadmissible_witness(io, problem,
+                                                                               a;
+                                                                               optimizer=opt))
+                        end
+                        # Only the floating-point route may refuse (and is counted).
+                        text = opt === HIGHS ? float_route(export_no) : export_no()
+                        text === nothing && continue
+                        w = check_not_eadmissible_witness(text)
+                        @test w["action"] + 1 == findfirst(==(a), feasible_actions(problem))
+                    end
+                    # The optimum of the dual programme is minus that of the primal.
+                    primal = solve_program(eadmissibility_model(problem, a))
+                    dual = solve_program(mixed_dominance_model(problem, a))
+                    @test dual.objective == -primal.objective > 0
+                end
+                # A "no" of the floating-point route is exact when certified.
+                float = float_route(() -> decide(problem, EAdmissible(); optimizer=HIGHS))
+                float === nothing && continue
+                @test float.chosen == admitted
+            end
+            @test no > 20
+            # The hedge that is maximal and still not E-admissible: the witness of the
+            # Lean fixture, a half-half mixture of the two pure actions.
+            weak = DecisionProblem(PayoffTable([:left, :right, :hedge], [:s1, :s2],
+                                               [1//1 0; 0 1; 2//5 2//5]),
+                                   CredalSet([:s1, :s2],
+                                             [[1 // 1, 0 // 1], [0 // 1, 1 // 1]]))
+            w = check_not_eadmissible_witness(sprint(io -> export_not_eadmissible_witness(io,
+                                                                                          weak,
+                                                                                          :hedge)))
+            @test rational_vector(w["mixed_action"]) == [1 // 2, 1 // 2, 0]
+            r = decide(weak, EAdmissible(); optimizer=HIGHS)
+            @test r.chosen == [:left, :right] && r.details.exact[:hedge]
+            @test_throws InexactCertificateError export_not_eadmissible_witness(IOBuffer(),
+                                                                                DecisionProblem(PayoffTable([1.0 0.0;
+                                                                                                             0.0 1.0]),
+                                                                                                [0.5,
+                                                                                                 0.5]),
+                                                                                :a1)
+            @test_throws ArgumentError export_not_eadmissible_witness(IOBuffer(), weak,
+                                                                      :nope)
+            @test_throws BeliefFormError export_not_eadmissible_witness(IOBuffer(),
+                                                                        DecisionProblem(weak.payoff,
+                                                                                        SampleBelief(2)),
+                                                                        :hedge)
+        end
+        @testset "not a garbling: a witness exactly when the answer is no" begin
+            no = 0
+            for _ in 1:40
+                S = rand(rng, 2:4)
+                e = Experiment(random_stochastic(rng, BigRat, rand(rng, 2:3), S))
+                f = rand(rng, Bool) ?
+                    garble(e, random_stochastic(rng, BigRat, 2, size(e.likelihood, 1))) :
+                    Experiment(random_stochastic(rng, BigRat, rand(rng, 2:3), S))
+                if garbling_result(f, e).is_garbling
+                    @test_throws WitnessError sprint(io -> export_not_garbling_witness(io,
+                                                                                       f, e))
+                    @test iszero(solve_program(separating_payoff_model(f, e)).objective)
+                    continue
+                end
+                no += 1
+                @test solve_program(separating_payoff_model(f, e)).objective > 0
+                for opt in (nothing, CDD, HIGHS)
+                    function export_no()
+                        return sprint(io -> export_not_garbling_witness(io, f, e;
+                                                                        optimizer=opt))
+                    end
+                    text = opt === HIGHS ? float_route(export_no) : export_no()
+                    text === nothing && continue
+                    w = check_not_garbling_witness(text)
+                    @test rational_matrix(w["garbled"]) == f.likelihood
+                    @test rational_matrix(w["experiment"]) == e.likelihood
+                end
+            end
+            @test no > 10
+            @test_throws InexactCertificateError export_not_garbling_witness(IOBuffer(),
+                                                                             Experiment([0.8 0.2;
+                                                                                         0.2 0.8]),
+                                                                             Experiment([0.6 0.4;
+                                                                                         0.4 0.6]))
+            path = joinpath(mktempdir(), "no.json")
+            e = Experiment([4//5 1//5; 1//5 4//5])
+            @test export_not_garbling_witness(path, e, garble(e, [3//4 1//4; 1//4 3//4])) ==
+                  path
+            check_not_garbling_witness(read(path, String))
+        end
+    end
+
     @testset "witnesses by every route accepted by the Lean checker" begin
         proofs = joinpath(dirname(@__DIR__), "proofs")
         built = isdir(joinpath(proofs, ".lake", "build"))
@@ -447,7 +582,14 @@ end
                              export_eadmissible_witness(joinpath(dir,
                                                                  "eadmissible_$name.json"),
                                                         robust, :raise_levee;
-                                                        optimizer=opt)]
+                                                        optimizer=opt),
+                             export_not_eadmissible_witness(joinpath(dir,
+                                                                     "not_eadmissible_$name.json"),
+                                                            robust, :relocate_assets;
+                                                            optimizer=opt),
+                             export_not_garbling_witness(joinpath(dir,
+                                                                  "not_garbling_$name.json"),
+                                                         gauge, garbled; optimizer=opt)]
                     for file in files
                         code = run(Cmd(ignorestatus(`lake exe check_certificate $file`);
                                        dir=proofs)).exitcode

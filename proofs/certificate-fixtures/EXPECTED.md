@@ -43,7 +43,7 @@ Each is `flood_gauge.json` with one change.
 | `reject_eadmissible_negative_weight.json` | weights `1/2, 1, -1/2` | rejected (exit 1) |
 | `reject_eadmissible_prior_not_mixture.json` | the stated prior is not the stated mixture | rejected (exit 1) |
 
-## Certified "no" answers (written by hand; schemas in `../SCHEMAS-PROPOSED.md`)
+## Certified "no" answers (written by hand; schemas in `../../docs/src/certificates.md`)
 
 No Julia exporter writes these yet.
 

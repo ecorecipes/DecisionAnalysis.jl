@@ -7,10 +7,10 @@
 
 A decision problem under uncertainty: choose a row of `payoff` given `belief` about
 its columns. `belief` is a [`PointBelief`](@ref), a [`FiniteBelief`](@ref), a
-[`CredalSet`](@ref) or a [`ScenarioSet`](@ref); a plain probability vector is read as
-a `FiniteBelief` over the states of the table.
+[`SampleBelief`](@ref), a [`CredalSet`](@ref) or a [`ScenarioSet`](@ref); a plain
+probability vector is read as a `FiniteBelief` over the states of the table.
 
-The states of a `FiniteBelief` or `CredalSet` must equal the states of the table, in
+The states of a `FiniteBelief`, `SampleBelief` or `CredalSet` must equal the states of the table, in
 order; the state of a `PointBelief` and the states of a `ScenarioSet` must be among
 them. A mismatch throws [`LabelMismatchError`](@ref).
 
@@ -88,7 +88,7 @@ function _feasibility_mask(payoff::PayoffTable, keep)
     return Bool[a in wanted for a in payoff.actions]
 end
 
-function _check_belief(payoff::PayoffTable, b::Union{FiniteBelief,CredalSet})
+function _check_belief(payoff::PayoffTable, b::Union{FiniteBelief,SampleBelief,CredalSet})
     b.states == payoff.states ||
         throw(LabelMismatchError("states of the belief against the payoff table",
                                  payoff.states, b.states))
@@ -150,6 +150,10 @@ function _condition(probabilities::AbstractVector, cols)
 end
 function _restrict_belief(b::FiniteBelief, states, cols)
     return FiniteBelief(states[cols], _condition(b.probabilities, cols))
+end
+function _restrict_belief(b::SampleBelief, states, cols)
+    return SampleBelief(states[cols], map(c -> c[cols], b.draws),
+                        _condition(b.weights, cols))
 end
 function _restrict_belief(b::CredalSet, states, cols)
     return CredalSet(states[cols], [_condition(q, cols) for q in b.points])
@@ -216,7 +220,8 @@ end
 The gain of every feasible action over the baseline action (no intervention), in
 [`feasible_actions`](@ref) order. What is returned depends on the belief.
 
-- **A single prior** ([`FiniteBelief`](@ref) or [`PointBelief`](@ref)): a vector, the
+- **A single prior** ([`FiniteBelief`](@ref), [`SampleBelief`](@ref) or
+  [`PointBelief`](@ref)): a vector, the
   expected gain `Σ_θ p(θ) (Q[a, θ] − Q[baseline, θ])` of each action, which is its
   expected utility minus that of no intervention.
 - **A [`CredalSet`](@ref)**: a named tuple `(lower = ..., upper = ...)` of two
@@ -247,7 +252,8 @@ function expected_gain_over_baseline(p::DecisionProblem)
     return _expected_gain(p.belief, p, G)
 end
 
-function _expected_gain(::Union{FiniteBelief,PointBelief}, p::DecisionProblem, G)
+function _expected_gain(::Union{FiniteBelief,SampleBelief,PointBelief}, p::DecisionProblem,
+                        G)
     return G * _prior(p, :expected_gain_over_baseline)
 end
 function _expected_gain(b::CredalSet, ::DecisionProblem, G)
@@ -272,6 +278,9 @@ end
 function _view(p::DecisionProblem{T,<:FiniteBelief}) where {T}
     return _View(p.payoff.Q[p.feasible, :], [p.belief.probabilities], :FiniteBelief)
 end
+function _view(p::DecisionProblem{T,<:SampleBelief}) where {T}
+    return _View(p.payoff.Q[p.feasible, :], [p.belief.weights], :SampleBelief)
+end
 function _view(p::DecisionProblem{T,<:CredalSet}) where {T}
     return _View(p.payoff.Q[p.feasible, :], p.belief.points, :CredalSet)
 end
@@ -288,6 +297,9 @@ end
 # has none. `operation` names the caller in the error.
 function _prior(p::DecisionProblem{T,<:FiniteBelief}, ::Symbol) where {T}
     return p.belief.probabilities
+end
+function _prior(p::DecisionProblem{T,<:SampleBelief}, ::Symbol) where {T}
+    return p.belief.weights
 end
 function _prior(p::DecisionProblem{T,PointBelief}, ::Symbol) where {T}
     return Int[s == p.belief.state for s in p.payoff.states]

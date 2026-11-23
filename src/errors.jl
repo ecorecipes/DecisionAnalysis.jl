@@ -15,7 +15,8 @@ Abstract supertype of every exception that DecisionAnalysis defines:
 [`BeliefFormError`](@ref), [`NoFeasibleActionError`](@ref),
 [`InvalidBaselineError`](@ref), [`MissingBaselineError`](@ref),
 [`InexactCertificateError`](@ref), [`WitnessError`](@ref),
-[`LinearProgramError`](@ref) and [`ExactVerificationError`](@ref). It marks the
+[`LinearProgramError`](@ref), [`ExactVerificationError`](@ref),
+[`InvalidOutcomeError`](@ref) and [`MissingExtensionError`](@ref). It marks the
 package that introduced an error, not a kind of failure. Invalid arguments and
 keywords raise Base's `ArgumentError` instead, which is outside this root.
 """
@@ -222,4 +223,38 @@ end
 
 function Base.showerror(io::IO, e::ExactVerificationError)
     return print(io, "ExactVerificationError: the ", e.problem, " programme: ", e.msg)
+end
+
+"""
+    InvalidOutcomeError(msg)
+
+Thrown when an [`OutcomeTable`](@ref) cannot be built or used as asked: a run that
+appears twice, an outcome that is not a finite number in a run whose status is
+acceptable, a cell (draw × action) with no usable run when a payoff is asked of it,
+or an outcome name that the table does not have.
+"""
+struct InvalidOutcomeError <: DecisionAnalysisError
+    msg::String
+end
+
+function Base.showerror(io::IO, e::InvalidOutcomeError)
+    return print(io, "InvalidOutcomeError: ", e.msg)
+end
+
+"""
+    MissingExtensionError(method, package)
+
+Thrown when a method that lives in a weak-dependency extension is used before the
+package that triggers the extension has been loaded: for example
+[`GAMRegression`](@ref) without `using GAM`. `method` names the method and `package`
+the package to load.
+"""
+struct MissingExtensionError <: DecisionAnalysisError
+    method::Symbol
+    package::Symbol
+end
+
+function Base.showerror(io::IO, e::MissingExtensionError)
+    return print(io, "MissingExtensionError: ", e.method, " needs the package ", e.package,
+                 "; load it with `using ", e.package, "` first")
 end

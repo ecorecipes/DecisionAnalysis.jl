@@ -2,8 +2,10 @@
 
 Standard decision analysis on finite problems, with no category theory required: a
 payoff table, a belief about its states, rules for choosing, Savage regret, and the
-value of information. Version 0.1 is finite and exact: give it `Rational` inputs and
-every number it returns is a rational.
+value of information. Finite problems are exact: give the package `Rational` inputs
+and every number it returns is a rational. Draws and simulator runs are analysed by
+sample-based estimators of the same quantities, each with its Monte Carlo standard
+error in a separate field.
 
 | object | meaning |
 |---|---|
@@ -15,6 +17,9 @@ every number it returns is a rational.
 | [`evpi`](@ref), [`evppi`](@ref), [`evsi`](@ref), [`enbs`](@ref) | the value of information |
 | [`information_can_change_decision`](@ref) | whether an experiment can change what is done (exactly when its EVSI is positive) |
 | [`DecisionReport`](@ref) | every applicable rule side by side |
+| [`SampleBelief`](@ref), [`OutcomeTable`](@ref) | draws of named parameters with weights; model output by draw × action × replicate |
+| [`payoff_table`](@ref) | outcomes and a utility counted in individuals, to a payoff table with standard errors |
+| [`VOIEstimate`](@ref) | a sample-based value of information with its standard error and selection biases |
 
 ## Quick start
 
@@ -109,6 +114,39 @@ julia> decide((; uninfected, fewer_infected=-infected), [1 // 2, 1 // 2], Pareto
  :baths
 ```
 
+## From model runs to a decision
+
+A model package writes a table of runs, one row per run. Naming its columns gives an
+[`OutcomeTable`](@ref); a utility counted in individuals gives a payoff table whose
+standard errors are kept apart; and [`evpi`](@ref), [`evppi`](@ref) and [`evsi`](@ref)
+called with a method return estimates with their errors.
+
+```jldoctest
+julia> using DecisionAnalysis
+
+julia> runs = [(; draw=d, action=a, replicate=r, site=isodd(d) ? "pond" : "stream",
+                uninfected=30 + 4d + r + (a == "treat") * (isodd(d) ? 9 : -3), infected=r)
+               for d in 1:6 for a in ("none", "treat") for r in 1:3];
+
+julia> table = OutcomeTable(runs; outcomes=[:uninfected, :infected], parameters=[:site]);
+
+julia> problem = DecisionProblem(table, InfectionUtility(; weight=1); baseline=:none);
+
+julia> expected_gain_over_baseline(problem)
+2-element Vector{Rational{Int64}}:
+ 0
+ 3
+
+julia> estimate = evppi(problem, :site);
+
+julia> (estimate.method, estimate.value)
+(:Grouping, 3//2)
+```
+
+Knowing the site is worth a frog and a half here: treatment gains nine at a pond and
+loses three at a stream. See the tutorials on sample beliefs, EVPPI and EVSI, and the
+[Sample-based analysis](api/samples.md) reference.
+
 ## Conventions
 
 - **Payoffs are utilities**: higher is better. Costs enter as negative payoffs. A
@@ -133,6 +171,12 @@ julia> decide((; uninfected, fewer_infected=-infected), [1 // 2, 1 // 2], Pareto
 - **What is learned is named.** [`evppi`](@ref) takes the partition of the states
   whose cell is learned; [`evsi`](@ref) takes the experiment. `EVSI ≤ EVPI` is a
   statement about the same states and a single prior.
+- **Monte Carlo error is a separate field.** A sample-based estimate
+  ([`VOIEstimate`](@ref)) carries its value, its standard error and its selection
+  biases side by side; none is folded into another. Selection bias belongs to the
+  best reported value and the chosen action; the sign of the bias of EVPI is not
+  determined in general.
+- **No monetary costs.** Utility is counted in individuals of the focal species.
 - **Robust value of information may be negative** and is returned as computed.
 - **Minimax regret depends on the menu of actions.** Adding or removing an action,
   even one that is never chosen, can change its choice; the result of

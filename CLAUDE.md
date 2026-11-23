@@ -1,7 +1,8 @@
 # DecisionAnalysis.jl
 
-Standard decision analysis on finite problems: payoff tables, beliefs, rules, Savage regret, experiments
-and the exact value of information. The Catlab-free core of the decision layer of the ecorecipes ecosystem.
+Standard decision analysis: payoff tables, beliefs, rules, Savage regret, experiments and the value of
+information, exact on finite problems and estimated, with separate standard errors, from draws and
+simulator runs. The Catlab-free core of the decision layer of the ecorecipes ecosystem.
 
 ## Place in the ecosystem
 
@@ -12,7 +13,10 @@ FiniteKernels (finite spaces, kernels and states) through a `[sources]` path to 
 ResilienceCore and StructuredPopulationCore by URL; Pkg follows the sources of a path dependency, so they
 are not listed here. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
 generics, forwards to this package and re-exports its names (ADR 0009). No model package depends on this
-one; adapters will be weak-dependency extensions on this side.
+one: a model package writes a table of runs (or the user gives methods to the adapter verbs), and any
+package-specific adapter is a weak-dependency extension on this side. `GAM` (ecorecipes/GAM.jl, by URL
+source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl`) and a test dependency;
+`Chytridiomycosis` appears only in the vignette environment, by path.
 
 ## Invariants that must not be broken
 
@@ -28,7 +32,8 @@ one; adapters will be weak-dependency extensions on this side.
   of probability zero contributes zero), `V0 = max_a Σ_θ p(θ) Q[a, θ]`, `EVSI = value(e) − V0`,
   `EVPI = Σ_θ p(θ) max_a Q[a, θ] − V0`, `EVPPI = Σ_cells max_a Σ_{θ ∈ cell} p(θ) Q[a, θ] − V0`, and regret
   `R[a, θ] = max_a′ Q[a′, θ] − Q[a, θ]`. Change neither side alone.
-- **The schemas `decision-certificate/1`, `garbling-witness/1` and `e-admissible-witness/1` and the fixture
+- **The schemas `decision-certificate/1`, `garbling-witness/1`, `e-admissible-witness/1`,
+  `not-e-admissible-witness/1` and `not-garbling-witness/1` and the fixture
   file `test/fixtures/worked_examples.json` are the same kind of contract.** The schemas are written down in
   `docs/src/certificates.md` and checked by `proofs/` (`lake exe check_certificate`). A witness is verified
   in exact arithmetic before it is written. A change of meaning needs a new schema string.
@@ -63,6 +68,26 @@ one; adapters will be weak-dependency extensions on this side.
   `evsi_eq_zero_iff`); a property test holds the two together. Minimax regret depends on the menu of
   actions (`minimaxRegret_violates_iia`); the rule's result (`details.note`) and the report say so.
 - Types are immutable. Constructors copy their arrays and check them.
+- **Sample-based estimators estimate the quantities defined in `src/voi.jl`**; they define nothing new.
+  Every one has the form `Σ_i w_i max_a g[a, i] − max_a Σ_i w_i Q[a, i]` with `g` the fitted conditional
+  means (top of `src/voi_sample.jl`), and each is tested against exact enumeration on a finite problem
+  turned into a sample and against the closed forms of the R `voi` normal model (analytic EVPI 0.4798107).
+- **Monte Carlo error is a separate field, never folded into a value**: `PayoffTable.standard_errors` and
+  `.replicates`, and `VOIEstimate.standard_error` and `.bias`. A table with one run in a cell is flagged
+  (`single_replicate`) and gets no invented standard error.
+- **Selection bias is stated as proved, no more.** With noisy cells or sampled draws the act-now value,
+  the perfect-information value and the value with information are each biased upwards, and the chosen
+  action is on average worth less than its reported score; with exact payoffs and a sampled belief EVPI is
+  biased downwards; in general **the sign of the bias of EVPI is indefinite** (Lean
+  `evpi_bias_sign_indefinite`). Never write that noise "biases EVPI upwards".
+- **No monetary costs anywhere.** Utility is counted in individuals; `enbs` on an estimate takes a cost in
+  individuals and is for additive payoffs only.
+- A `SampleBelief` is a single prior over its draws (weights normalised, exactly for integer and rational
+  weights; default `1 // n`). State-wise rules on it are flagged `details.sample_dependent`; `Laplace`,
+  `total_variation`, `bayes_invert` and the certificate exports throw `BeliefFormError`.
+- `OutcomeTable.values[action, draw, replicate, outcome]`. Failed runs are kept and counted
+  (`run_counts`, `failed_runs`) and left out of means. `outcomes` seeds the run of `(draw, replicate)`
+  identically for every action (common random numbers); every random number is a seeded `Xoshiro`.
 
 ## Layout
 
@@ -70,12 +95,19 @@ one; adapters will be weak-dependency extensions on this side.
 - `src/lp.jl`: internal dense two-phase simplex in exact rational arithmetic (Bland's rule); the fallback
   solver, for small problems.
 - `src/programs.jl`: `DecisionProgram` and the builders `eadmissibility_model`, `garbling_model`,
-  `deficiency_model`, `evpi_envelope_model` (JuMP models).
+  `deficiency_model`, `evpi_envelope_model`, and `mixed_dominance_model` and `separating_payoff_model`
+  for certified "no" answers (JuMP models).
 - `src/solve.jl`: `solve_program` and `ProgramSolution`: the three routes, rounding, and the exact
   primal-dual check.
-- `src/beliefs.jl`: `PointBelief`, `FiniteBelief`, `CredalSet`, `ScenarioSet`; label and tolerance helpers.
-- `src/payoff.jl`: `PayoffTable`, arithmetic on tables with matching labels, `combine_payoffs`,
-  `individuals_payoff`, `infection_payoff`.
+- `src/beliefs.jl`: `PointBelief`, `FiniteBelief`, `SampleBelief`, `CredalSet`, `ScenarioSet`; label and
+  tolerance helpers.
+- `src/payoff.jl`: `PayoffTable` (with optional standard errors and replicate counts), arithmetic on tables
+  with matching labels, `combine_payoffs`, `individuals_payoff`, `infection_payoff`.
+- `src/adapters.jl`: the method-less adapter verbs `with_parameters`, `apply_action`, `simulate`, `outcome`,
+  and `parameter_draws`, `draw_weights`.
+- `src/outcomes.jl`: `OutcomeTable` (from any Tables.jl table of runs) and the driver `outcomes`.
+- `src/utilities.jl`: `IndividualsUtility`, `InfectionUtility`, `FunctionUtility`, `payoff_table`,
+  `crn_correlation`; the count utilities are the implementation behind the matrix helpers of `payoff.jl`.
 - `src/problem.jl`: `DecisionProblem`, feasibility filter, baseline and gains over it,
   `restrict_scenarios`, and the internal `_View` that aggregators act on.
 - `src/aggregators.jl`: the ten aggregators and `aggregate`.
@@ -86,25 +118,41 @@ one; adapters will be weak-dependency extensions on this side.
   `deficiency`.
 - `src/voi.jl`: `evpi`, `evppi`, `evsi`, `enbs`, `value_with_information`,
   `information_can_change_decision`, `robust_evpi`, `robust_evsi`.
+- `src/voi_sample.jl`: `VOIEstimate`, the methods (`SampleAverage`, `Grouping`, `StrongOakley`,
+  `Sadatsafavi`, `SplineRegression`, `GAMRegression`), the studies (`SummaryStatistics`,
+  `ImportanceSampling`, `GaussianApproximation`), the method-taking `evpi`, `evppi`, `evsi`, `enbs`,
+  `variance_components`, `expected_utility_estimates`, `expected_gain_estimates`, `conditional_problem`.
+  A regression backend subtypes `AbstractRegression` and implements `fitted_conditional_means`.
+- `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `weight_sweep`, `rank_reversals`.
+- `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`.
 - `src/report.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives), its
   Tables.jl rows, and printing. A display is a list of blocks (titles, grids, paragraphs, lists) rendered as
   plain text within 80 columns, Markdown or HTML, for `PayoffTable`, `RegretTable`, `DecisionResult` and
   `DecisionReport`.
 - `src/certificates.jl`: `export_decision_certificate`, `export_garbling_witness`,
-  `export_eadmissible_witness` and their hand-written JSON encoder.
+  `export_eadmissible_witness`, `export_not_eadmissible_witness`, `export_not_garbling_witness` and their
+  hand-written JSON encoder.
 - `proofs/`: the Lean 4 / Mathlib project `DecisionAnalysisProofs` and its `check_certificate` executable;
   see `proofs/README.md`.
 - `test/helpers.jl`: the fixture reader and the slow oracles; `test/test_*.jl`: the suite, seeded
   `Random.Xoshiro` only; `test/test_programs.jl`: model shapes and the three routes agreeing (CDDLib and
   HiGHS are test dependencies); `test/test_lean_mirror.jl`: Julia mirrors of Lean lemmas; `test/fixtures/worked_examples.json`: the three worked examples.
-- `docs/`: Documenter manual (`index.md`, `api.md`, `certificates.md`, and `tutorials/`, the synced vignettes).
-- `vignettes/NN_name/NN_name.qmd`: ten Quarto vignettes (Julia engine), basic to advanced, each rendered to
+- `docs/`: Documenter manual (`index.md`, `certificates.md`, the API reference split over `api/*.md` so that
+  no page nears Documenter's 200 KiB limit, and `tutorials/`, the synced vignettes).
+- `test/test_sample.jl`, `test_outcomes.jl`, `test_voi_sample.jl`, `test_sensitivity.jl`: the sample-based
+  layer; `test_outcomes.jl` defines the toy simulator that the driver is tested on, and
+  `test_voi_sample.jl` checks `MissingExtensionError` before it loads GAM.
+- `vignettes/NN_name/NN_name.qmd`: fourteen Quarto vignettes (Julia engine), basic to advanced (1 to 10 the
+  finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
+  application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for
   ad hoc summaries; package objects display themselves), `vignettes/_pandoc/`
   (HTML style, LaTeX preamble). Vignette rules: utility is counted in individuals, never money (for a disease,
   uninfected − w × infected, shown at w = 0 and 1); every vignette has a no-intervention action as the
-  `baseline` and reports gains over it; examples are ecological and every number is labelled illustrative.
+  `baseline` and reports gains over it; examples are ecological and every number is labelled illustrative
+  (in vignette 14, every number not read from the cached table, and nothing is presented as a published
+  result).
 - `scripts/render_vignettes.jl` (run-once render) and `scripts/sync_vignettes.jl` (copy to `docs/src/tutorials`).
 
 ## Commands

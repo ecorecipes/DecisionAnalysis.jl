@@ -11,13 +11,21 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
+[weakdeps]
+GAM = "f5b95e24-6450-466f-92b1-fee0c65c0d6b"
+
+[extensions]
+DecisionAnalysisGAMExt = "GAM"
+
 [sources]
 FiniteKernels = {path = "../FiniteKernels.jl"}
+GAM = {url = "https://github.com/ecorecipes/GAM.jl"}
 
 [compat]
 Aqua = "0.8"
 CDDLib = "0.10"
 FiniteKernels = "0.1"
+GAM = "0.3"
 HiGHS = "1"
 JSON = "0.21, 1"
 JuMP = "1.32"
@@ -31,9 +39,10 @@ julia = "1.12"
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 CDDLib = "3391f64e-dcde-5f30-b752-e11513730f60"
+GAM = "f5b95e24-6450-466f-92b1-fee0c65c0d6b"
 HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "CDDLib", "HiGHS", "JSON", "Test"]
+test = ["Aqua", "CDDLib", "GAM", "HiGHS", "JSON", "Test"]

@@ -172,6 +172,40 @@ function check_eadmissible_witness(text)
     return w
 end
 
+# Independent checks of the two "no" witnesses, from the definitions with explicit loops.
+function check_not_eadmissible_witness(text)
+    w = JSON.parse(text)
+    @test w["schema"] == "not-e-admissible-witness/1" == NOT_EADMISSIBLE_WITNESS_SCHEMA
+    Q = rational_matrix(w["payoff"])
+    P = rational_matrix(w["priors"])
+    μ = rational_vector(w["mixed_action"])
+    a = w["action"] + 1
+    @test size(P, 2) == size(Q, 2) && length(μ) == size(Q, 1) && 1 <= a <= size(Q, 1)
+    @test all(>=(0), P) && all(==(1), sum(P; dims=2))
+    @test all(>=(0), μ) && sum(μ) == 1
+    for k in axes(P, 1)
+        E = [sum(P[k, t] * Q[b, t] for t in axes(Q, 2)) for b in axes(Q, 1)]
+        @test sum(μ[b] * E[b] for b in axes(Q, 1)) > E[a]
+    end
+    return w
+end
+
+function check_not_garbling_witness(text)
+    w = JSON.parse(text)
+    @test w["schema"] == "not-garbling-witness/1" == NOT_GARBLING_WITNESS_SCHEMA
+    L = rational_matrix(w["experiment"])
+    Lt = rational_matrix(w["garbled"])
+    Q = rational_matrix(w["payoff"])
+    p = rational_vector(w["prior"])
+    @test size(L, 2) == size(Lt, 2) == size(Q, 2) == length(p)
+    @test all(>=(0), L) && all(==(1), sum(L; dims=1))
+    @test all(>=(0), Lt) && all(==(1), sum(Lt; dims=1))
+    @test all(>(0), p) && sum(p) == 1
+    # A garbling is never worth more, so a strictly larger value refutes it.
+    @test oracle_value_with_information(Q, p, Lt) > oracle_value_with_information(Q, p, L)
+    return w
+end
+
 lean_available() = get(ENV, "DECISIONANALYSIS_LEAN", "") == "1"
 
 @testset "witnesses" begin

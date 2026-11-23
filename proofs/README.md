@@ -131,8 +131,8 @@ actions; likelihood rows are signals; `garbling[z′][z] = P(z′ | z)`. The wit
  "payoff": [[...]], "prior": [...]}
 ```
 
-The last two certify **negative** answers and are specified in `SCHEMAS-PROPOSED.md`, with
-where the Julia side finds each witness; they are not yet in `docs/src/certificates.md`.
+The last two certify **negative** answers. Their schemas are in `docs/src/certificates.md`, and
+the package writes them with `export_not_eadmissible_witness` and `export_not_garbling_witness`.
 
 The checker recomputes each claim with the definitions of `Finite/Problem.lean` at `K = ℚ`
 and prints one line per claim. Exit code 0: accepted; 1: rejected; 2: cannot be decoded.
@@ -190,10 +190,10 @@ Proved results that suggest or constrain functionality (the full list is in `Roa
   (`dilation_robust_evsi_negative`).
 * `not_isEAdmissible_iff_isMixedDominated`, `not_isGarblingOf_iff_exists_separating`: every
   "no" of `decide(problem, EAdmissible())` and of `is_garbling_of` has a witness that can be
-  checked exactly, so a "no" from a floating-point optimiser need not stay numerical. To do
-  in the package: the two exporters of `SCHEMAS-PROPOSED.md`.
-* `evpi_bias_sign_indefinite`: the docstring of `evpi` should not say that noise biases EVPI
-  upwards; a selection-bias note belongs on the reported best value and the chosen action.
+  checked exactly, so a "no" from a floating-point optimiser need not stay numerical. Done
+  in the package: `export_not_eadmissible_witness` and `export_not_garbling_witness`.
+* `evpi_bias_sign_indefinite`: the docstring of `evpi` no longer says that noise biases EVPI
+  upwards; the selection-bias note is on the reported best value and the chosen action.
 * `IsBayes.decision_loss_le`, `IsDeficientWithin.valueWithInformation_le`: both bounds hold
   with a smaller `B` than the table range; helpers for the two sharper ranges would be cheap.
 

@@ -36,9 +36,26 @@ the built-in exact simplex, otherwise with the `optimizer` given, exact or float
 point. No solver is trusted: witnesses are verified in exact arithmetic before they
 are returned.
 
-Version 0.1 is finite and exact; sample-based methods come later. The package depends
+Sample-based analysis sits on the same definitions. A [`SampleBelief`](@ref) holds
+draws of named parameters with weights; an [`OutcomeTable`](@ref) holds what a model
+produced by draw × action × replicate, built from any table of runs or by
+[`outcomes`](@ref) through the adapter verbs ([`with_parameters`](@ref),
+[`apply_action`](@ref), [`simulate`](@ref), [`outcome`](@ref)); a utility counted in
+individuals ([`IndividualsUtility`](@ref), [`InfectionUtility`](@ref)) turns it into a
+payoff table with its Monte Carlo standard errors kept apart ([`payoff_table`](@ref)).
+[`evpi`](@ref), [`evppi`](@ref) and [`evsi`](@ref) called with a method
+([`SampleAverage`](@ref), [`Grouping`](@ref), [`StrongOakley`](@ref),
+[`Sadatsafavi`](@ref), [`SplineRegression`](@ref), [`SummaryStatistics`](@ref),
+[`ImportanceSampling`](@ref), [`GaussianApproximation`](@ref)) return a
+[`VOIEstimate`](@ref): the value, its standard error and its selection biases, never
+folded together. [`policy_regions`](@ref), [`weight_sweep`](@ref) and
+[`rank_reversals`](@ref) show how the choice moves with a weight.
+
+Finite problems are exact; sample-based results are estimates of the same quantities.
+The package depends
 on FiniteKernels for kernels and states, on JuMP for stating linear programmes (and on
-no solver), and never on Catlab, GATlab or ACSets. It
+no solver), and never on Catlab, GATlab or ACSets. GAM.jl is an optional regression
+backend through a weak-dependency extension ([`GAMRegression`](@ref)). It
 defines none of `compose`, `otimes`, `id`, `mcopy`, `delete`, `braid`, `dom`, `codom`,
 and exports no `regret` or `regrets`.
 """
@@ -47,8 +64,8 @@ module DecisionAnalysis
 using JuMP: JuMP
 using FiniteKernels: FiniteKernels, FiniteKernel, FiniteSpace, axis_names, factors,
                      joint_states, kernel_matrix
-using LinearAlgebra: dot
-using Random: AbstractRNG
+using LinearAlgebra: ColumnNorm, Symmetric, dot, eigen, qr
+using Random: AbstractRNG, Xoshiro, randn!
 using Statistics: mean
 using Tables: Tables
 
@@ -57,10 +74,16 @@ export DecisionAnalysisError, InvalidBeliefError, InvalidPayoffError,
        InvalidExperimentError, LabelMismatchError, BeliefFormError,
        NoFeasibleActionError, InvalidBaselineError, MissingBaselineError,
        InexactCertificateError, WitnessError, LinearProgramError,
-       ExactVerificationError
+       ExactVerificationError, InvalidOutcomeError, MissingExtensionError
 # Beliefs
-export AbstractBelief, PointBelief, FiniteBelief, CredalSet, ScenarioSet, state_labels,
-       probabilities, extreme_points, random_belief, random_credal_set
+export AbstractBelief, PointBelief, FiniteBelief, SampleBelief, CredalSet, ScenarioSet,
+       state_labels, probabilities, extreme_points, random_belief, random_credal_set,
+       effective_sample_size
+# Outcome tables, adapter verbs and utilities
+export OutcomeTable, outcomes, outcome_names, replicate_counts, run_counts, failed_runs,
+       with_parameters, apply_action, simulate, outcome, parameter_draws, draw_weights,
+       AbstractUtility, IndividualsUtility, InfectionUtility, FunctionUtility,
+       payoff_table, single_replicate, crn_correlation
 # Payoff tables and problems
 export PayoffTable, action_labels, random_payoff_table, combine_payoffs,
        individuals_payoff, infection_payoff, DecisionProblem,
@@ -85,26 +108,42 @@ export Experiment, signal_labels, random_experiment, BayesianInversion, bayes_in
 export act_now_value, value_with_information, evpi, evppi, evsi, enbs,
        information_can_change_decision, RobustVOI,
        robust_evpi, robust_evsi
+# Sample-based value of information
+export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Grouping,
+       StrongOakley, Sadatsafavi, SplineRegression, GAMRegression,
+       fitted_conditional_means, SummaryStatistics, ImportanceSampling,
+       importance_loglikelihoods, GaussianApproximation, variance_components,
+       expected_utility_estimates, expected_gain_estimates, conditional_problem
+# Sensitivity
+export policy_regions, one_way_thresholds, weight_sweep, rank_reversals
 # Linear programmes as JuMP models
 export DecisionProgram, ProgramSolution, solve_program, eadmissibility_model,
-       garbling_model, deficiency_model, evpi_envelope_model
+       garbling_model, deficiency_model, evpi_envelope_model, mixed_dominance_model,
+       separating_payoff_model
 # Fidelity
 export total_variation, decision_loss_bound
 # Reports and certificates
 export DecisionReport, CERTIFICATE_SCHEMA, export_decision_certificate,
        GARBLING_WITNESS_SCHEMA, export_garbling_witness, EADMISSIBLE_WITNESS_SCHEMA,
-       export_eadmissible_witness
+       export_eadmissible_witness, NOT_EADMISSIBLE_WITNESS_SCHEMA,
+       export_not_eadmissible_witness, NOT_GARBLING_WITNESS_SCHEMA,
+       export_not_garbling_witness
 
 include("errors.jl")
 include("lp.jl")
 include("beliefs.jl")
 include("payoff.jl")
+include("adapters.jl")
+include("outcomes.jl")
 include("problem.jl")
+include("utilities.jl")
 include("aggregators.jl")
 include("regret.jl")
 include("rules.jl")
 include("experiments.jl")
 include("voi.jl")
+include("voi_sample.jl")
+include("sensitivity.jl")
 include("programs.jl")
 include("solve.jl")
 include("fidelity.jl")

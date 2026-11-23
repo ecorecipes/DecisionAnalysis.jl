@@ -1,7 +1,7 @@
 # Certificates
 
 A certificate is a JSON document in exact rational arithmetic that an independent
-checker can confirm without trusting this package. There are three kinds, each with
+checker can confirm without trusting this package. There are five kinds, each with
 its own schema string:
 
 | schema | written by | what it establishes |
@@ -9,6 +9,8 @@ its own schema string:
 | `decision-certificate/1` | [`export_decision_certificate`](@ref) | the numbers claimed for one decision problem |
 | `garbling-witness/1` | [`export_garbling_witness`](@ref) | one experiment is a garbling of another |
 | `e-admissible-witness/1` | [`export_eadmissible_witness`](@ref) | an action is E-admissible over a credal set |
+| `not-e-admissible-witness/1` | [`export_not_eadmissible_witness`](@ref) | an action is **not** E-admissible over a credal set |
+| `not-garbling-witness/1` | [`export_not_garbling_witness`](@ref) | one experiment is **not** a garbling of another |
 
 The checker is the Lean executable in `proofs/`
 (`cd proofs && lake exe check_certificate FILE.json`), which dispatches on `schema`
@@ -16,8 +18,9 @@ and exits with 0 when it accepts, 1 when it rejects and 2 when the file cannot b
 decoded. This page is the definition of the formats; they are a contract, and a
 change of meaning needs a new schema string.
 
-The two witnesses come from linear programmes, stated as JuMP models by
-[`garbling_model`](@ref) and [`eadmissibility_model`](@ref). By default the package
+The witnesses come from linear programmes, stated as JuMP models by
+[`garbling_model`](@ref), [`eadmissibility_model`](@ref),
+[`mixed_dominance_model`](@ref) and [`separating_payoff_model`](@ref). By default the package
 solves them exactly for rational problems with its built-in simplex; the exporters
 also take an `optimizer` keyword (see [`solve_program`](@ref)), so the programme can
 be solved by an exact optimiser such as `CDDLib.Optimizer{Rational{BigInt}}` or by a
@@ -200,6 +203,103 @@ not only the prior: they are what places the prior inside the credal set.
 Here the third action is best at neither generating point and is E-admissible only
 through an interior prior. [`WitnessError`](@ref) is thrown, and nothing is written,
 when the action is not E-admissible.
+
+## Schema `not-e-admissible-witness/1`
+
+Establishes that one action is **not** E-admissible over a credal set: no prior in the
+convex hull of the generating points makes it a Bayes action. With it a "no" is
+verified in exact arithmetic whatever found it, as a "yes" already is.
+
+| member | type | meaning |
+|---|---|---|
+| `schema` | string | always `"not-e-admissible-witness/1"` |
+| `payoff` | `m` arrays of `n` numbers | `Q[a][θ]`, rows = feasible actions, columns = states |
+| `priors` | `K` arrays of `n` numbers | the generating points of the credal set, one per row |
+| `action` | integer in `0 … m−1` | the action claimed not to be E-admissible |
+| `mixed_action` | array of `m` numbers | `μ[b]`, a probability vector over the actions |
+| `actions`, `states` | arrays of strings | labels, ignored by the checker |
+
+**What a checker should verify.**
+
+1. `payoff` is `m × n` with `m` the length of `mixed_action`; `priors` is `K × n`.
+2. Every row of `priors` is nonnegative and sums to one.
+3. `mixed_action` is nonnegative and sums to one, and `action < m`.
+4. For **every** generating point `k`, strictly,
+   `Σ_b μ[b] · E[b, k] > E[action, k]`, with `E[b, k] = Σ_θ priors[k][θ] · payoff[b][θ]`.
+
+Strict dominance at every generating point is strict dominance at every prior of the
+hull, so under every such prior some pure action is strictly better than `action`.
+The witness is complete: every action that is not E-admissible has such a mixed
+action (linear-programming duality; Lean `not_isEAdmissible_iff_isMixedDominated`).
+The package finds it with the programme of [`mixed_dominance_model`](@ref), the dual
+of the E-admissibility programme, and checks condition 4 exactly before writing.
+
+```json
+{
+  "schema": "not-e-admissible-witness/1",
+  "actions": ["left", "right", "hedge"],
+  "states": ["s1", "s2"],
+  "payoff": [["1", "0"], ["0", "1"], ["2/5", "2/5"]],
+  "priors": [["1", "0"], ["0", "1"]],
+  "action": 2,
+  "mixed_action": ["1/2", "1/2", "0"]
+}
+```
+
+Here the third action is maximal (no pure action beats it at both generating points)
+and still not E-admissible: the even mixture of the other two beats it at both.
+[`WitnessError`](@ref) is thrown, and nothing is written, when the action is
+E-admissible.
+
+## Schema `not-garbling-witness/1`
+
+Establishes that the experiment `garbled` is **not** a garbling of `experiment`, by
+exhibiting a decision problem in which deciding after `garbled` is worth strictly
+more. The roles of the two members are those of `garbling-witness/1`: the positive
+certificate says `garbled = G · experiment`; this one says that no such `G` exists.
+
+| member | type | meaning |
+|---|---|---|
+| `schema` | string | always `"not-garbling-witness/1"` |
+| `experiment` | `k` arrays of `n` numbers | `L[z][θ]`, the likelihood of `e` |
+| `garbled` | `k′` arrays of `n` numbers | `L′[z′][θ]`, the likelihood of `e′` |
+| `payoff` | `m ≥ 1` arrays of `n` numbers | the separating payoff table `Q[a][θ]` |
+| `prior` | array of `n` numbers | the prior of the separating problem |
+
+**What a checker should verify.**
+
+1. Shapes: `experiment`, `garbled` and `payoff` have `n` columns; `prior` has `n`
+   entries; `payoff` has at least one row.
+2. Both likelihoods are column-stochastic; the prior is nonnegative and sums to one.
+3. `value(garbled) > value(experiment)`, strictly, both recomputed as
+   `Σ_z max_a Σ_θ prior[θ] · L[z][θ] · payoff[a][θ]`.
+
+A garbling is never worth more, for any payoff table and any prior, so a strictly
+larger value refutes it; no duality is involved in the check. The witness is
+complete (Blackwell's theorem; Lean `not_isGarblingOf_iff_exists_separating`):
+whenever `e′` is not a garbling of `e`, a separating table exists with one action
+per signal of `e′` under any prior of full support. The package uses the uniform
+prior, finds the table with the programme of [`separating_payoff_model`](@ref), and
+checks condition 3 exactly before writing; any table that passes is a valid witness,
+whatever rounding it went through.
+
+```json
+{
+  "schema": "not-garbling-witness/1",
+  "experiment": [["37/50", "14/25", "8/25", "23/100"], ["13/50", "11/25", "17/25", "77/100"]],
+  "garbled": [["9/10", "3/5", "1/5", "1/20"], ["1/10", "2/5", "4/5", "19/20"]],
+  "payoff": [["1", "1", "-1", "-1"], ["-1", "-1", "1", "1"]],
+  "prior": ["1/4", "1/4", "1/4", "1/4"]
+}
+```
+
+[`WitnessError`](@ref) is thrown, and nothing is written, when `e′` is a garbling of
+`e`.
+
+**Exact "no" answers.** With these two witnesses, a negative answer found by a
+floating-point optimiser is reported as exact (`details.exact[action]` of an
+`EAdmissible` result, `GarblingResult.exact`) whenever the rounded witness passes the
+exact check, and as numerical otherwise.
 
 ## The fixture file
 

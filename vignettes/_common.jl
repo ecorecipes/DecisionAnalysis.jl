@@ -111,3 +111,22 @@ end
 png_figure(plot) = PNGFigure(plot)
 Base.show(io::IO, m::MIME"image/png", f::PNGFigure) = show(io, m, f.plot)
 Base.show(io::IO, ::MIME"text/plain", ::PNGFigure) = print(io, "figure")
+
+"""
+    voi_table(named_estimates; digits=3, truth=nothing)
+
+A Markdown table of sample-based estimates (`name => VOIEstimate` pairs): the value,
+its standard error and the two selection biases, each in its own column, so that no
+error is folded into a value. `truth`, when given, adds a column of reference values.
+"""
+function voi_table(named; digits=3, truth=nothing)
+    header = ["estimate", "value", "standard error", "act-now bias", "cell-noise bias"]
+    truth === nothing || push!(header, "reference")
+    rows = map(enumerate(named)) do (k, (name, e))
+        row = Any[name, Float64(e.value), e.standard_error, e.bias.act_now,
+                  e.bias.cells === nothing ? "-" : e.bias.cells]
+        truth === nothing || push!(row, truth[k])
+        return row
+    end
+    return md_table(header, rows; digits)
+end

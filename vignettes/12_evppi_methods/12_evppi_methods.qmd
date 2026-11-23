@@ -1,0 +1,248 @@
+---
+title: "EVPPI from a sample: which parameter is worth learning"
+author: "Simon Frost"
+format: gfm
+engine: julia
+---
+
+## Motivation
+
+The expected value of partial perfect information (EVPPI) is the value of learning one
+parameter, or one group of parameters, exactly and nothing else.
+[Partial information](../05_partial_information/05_partial_information.md) computed it
+exactly on a finite problem from a partition of the states. With draws of continuous
+parameters there is no partition to read off. The EVPPI needs the **conditional mean**
+of each action's payoff given the focal parameter, and that has to be estimated.
+
+`DecisionAnalysis.jl` has several estimators, which share one formula and differ only
+in how they get the conditional means `g`:
+
+    EVPPI ≈ Σ_i w_i max_a g[a, i] − max_a Σ_i w_i Q[a, i].
+
+| method | for | how the conditional mean is obtained |
+|:--|:--|:--|
+| `Grouping()` | a discrete parameter | the mean within each cell |
+| `StrongOakley()` | one numeric parameter | the mean within blocks of the sorted parameter |
+| `Sadatsafavi()` | one numeric parameter | the best one or two cut points along the parameter |
+| `SplineRegression()` | up to about four parameters | an additive regression spline, built in |
+| `GAMRegression()` | up to about four parameters | penalised smooths from GAM.jl, an optional extension |
+
+Each returns a `VOIEstimate`: the value, its standard error and the selection biases,
+in separate fields.
+
+**All numbers are illustrative.**
+
+## The problem
+
+The pond of newts of
+[the previous vignette](../11_sample_beliefs_and_outcome_tables/11_sample_beliefs_and_outcome_tables.md):
+no intervention (the baseline), an antifungal treatment, or removal of animals that test
+positive. Utility is the number of newts alive at the end of the season. The uncertain
+parameters are the transmission rate `contact`, the number of `newts` and the `habitat`.
+
+```{julia}
+using DecisionAnalysis
+using GAM: GAM          # loads the extension behind GAMRegression
+using Random: Xoshiro
+include(joinpath("..", "_common.jl"))
+include(joinpath("..", "_toy_pond.jl"))
+
+belief = SampleBelief(toy_draws(Xoshiro(12), 600))
+table = outcomes(ToyPond(), TOY_ACTIONS, belief; replicates=10, seed=2026)
+alive = IndividualsUtility(:alive)
+problem = DecisionProblem(table, alive; baseline=:none)
+md_table(["action", "expected newts alive", "expected gain over no intervention"],
+         [[a, Float64(e), Float64(g)]
+          for (a, e, g) in zip(action_labels(problem), aggregate(Expectation(), problem),
+                               expected_gain_over_baseline(problem))])
+```
+
+## One numeric parameter
+
+The transmission rate is the obvious candidate. All five methods estimate the same
+quantity.
+
+```{julia}
+contact = ["additive spline (built in)" => evppi(problem, :contact, SplineRegression()),
+           "Strong and Oakley, blocks" => evppi(problem, :contact, StrongOakley()),
+           "Sadatsafavi, one cut" => evppi(problem, :contact, Sadatsafavi()),
+           "Sadatsafavi, two cuts" => evppi(problem, :contact, Sadatsafavi(; separators=2)),
+           "ten bins of equal weight" => evppi(problem, :contact, Grouping(; bins=10)),
+           "GAM.jl smooth" => evppi(problem, :contact, GAMRegression())]
+voi_table(contact)
+```
+
+The estimates agree to within about two standard errors (they share one sample, so
+their errors are correlated). Learning the transmission rate is worth about a newt and a
+half per pond.
+
+The methods differ in what they assume. The cut-point method is right when the best
+action changes at most once (or twice) along the parameter. The blocks and bins assume
+nothing about shape, but each block mean is noisy, and a maximum over noisy means is too
+high; more blocks follow the curve better and make that worse. The regressions borrow
+strength along the parameter. The fitted conditional means show why one cut is enough
+here:
+
+```{julia}
+#| output: asis
+Q = Float64.(problem.payoff.Q)
+w = Float64.(probabilities(belief))
+x = parameter_draws(belief).contact
+fit = fitted_conditional_means(SplineRegression(), (; contact=x), Q, w)
+order = sortperm(x)
+plt = Plots.plot(; xlabel="weekly transmission rate", ylabel="gain over no intervention (newts)",
+                 title="Fitted conditional mean gain (illustrative)", xscale=:log10)
+for (i, a) in enumerate(TOY_ACTIONS)
+    Plots.plot!(plt, x[order], fit[i, order] .- fit[1, order]; label=String(a))
+end
+png_figure(plt)
+```
+
+At low transmission the outbreak fades out by itself, and catching animals only costs
+some. Above a threshold, treatment pays.
+
+### The standard error
+
+The default standard error comes from the per-draw gains of following the fitted policy
+instead of the act-now action, evaluated on the payoffs themselves. To first order it
+includes the uncertainty of the fit. A bootstrap over draws, with the fit redone each
+time, is the check:
+
+```{julia}
+boot = evppi(problem, :contact, SplineRegression(); bootstrap=200, seed=1)
+md_table(["standard error", "value"],
+         [["linearised (default)", contact[1][2].standard_error],
+          ["bootstrap, 200 resamples", boot.standard_error]]; digits=3)
+```
+
+## A discrete parameter
+
+`habitat` takes two values. The conditional mean is the mean within each group, which is
+what `Grouping()` computes, and it is the default for a non-numeric parameter.
+
+```{julia}
+habitat = evppi(problem, :habitat)
+voi_table(["EVPPI of habitat (" * String(habitat.method) * ")" => habitat])
+```
+
+`conditional_problem` gives the table behind that number: the expected payoff of each
+action in each group, with the weight of each group as a finite belief. It is the table
+a manager would look at if the group were known.
+
+```{julia}
+by_habitat = conditional_problem(problem, :habitat)
+gain_over_baseline(by_habitat)
+```
+
+```{julia}
+md_table(["habitat", "share of draws", "best action"],
+         [[s, Float64(p),
+           first_choice(decide(restrict_scenarios(by_habitat, [s]), MaxExpectedUtility()))]
+          for (s, p) in zip(state_labels(by_habitat), probabilities(by_habitat.belief))])
+```
+
+In an open pond infections clear faster and no intervention holds its own. The EVPPI of
+`habitat` is exactly the EVPI of this small table:
+
+```{julia}
+(evpi(by_habitat), habitat.value)
+```
+
+## All three, and groups of parameters
+
+```{julia}
+single = ["contact" => evppi(problem, :contact), "newts" => evppi(problem, :newts),
+          "habitat" => evppi(problem, :habitat)]
+voi_table(single)
+```
+
+The number of newts is uncertain, and the payoff depends on it strongly: a pond with
+twice the animals ends with about twice the survivors. Its EVPPI is still small,
+because knowing it would seldom change the action. Value of information is about the
+decision, not about the variance of the outcome.
+
+The EVPPI of a group of parameters is the value of learning them together. It is at
+least the largest single value and can exceed the sum.
+
+```{julia}
+groups = ["contact and habitat, spline" => evppi(problem, (:contact, :habitat), SplineRegression()),
+          "contact and habitat, spline with interaction" =>
+              evppi(problem, (:contact, :habitat), SplineRegression(; interactions=true)),
+          "contact and habitat, GAM.jl" => evppi(problem, (:contact, :habitat), GAMRegression()),
+          "all three: the regression EVPI" => evpi(problem, SplineRegression()),
+          "EVPI, plain sample average" =>
+              evpi(problem, SampleAverage(); noise_correlation=crn_correlation(table, alive))]
+voi_table(groups)
+```
+
+Transmission and habitat together account for most of the value of perfect information
+about the parameters. The plain sample average also counts the simulator's own
+randomness as something to be learned, which no study of the parameters can deliver;
+its cell-noise bias column says how much its perfect-information term is inflated by
+that.
+
+```{julia}
+#| output: asis
+labels = ["newts", "habitat", "contact", "contact + habitat", "all parameters"]
+values = [single[2][2], single[3][2], single[1][2], groups[2][2], groups[4][2]]
+plt = Plots.bar(labels, [Float64(v.value) for v in values];
+                yerror=[v.standard_error for v in values], legend=false,
+                ylabel="value of information (newts per pond)",
+                title="What is worth learning (illustrative; bars: ± 1 standard error)",
+                xrotation=20, bottom_margin=10Plots.mm)
+png_figure(plt)
+```
+
+## A check against closed forms
+
+The estimators are tested against exact enumeration on finite problems in the package's
+test suite. A second check is a model with a closed-form answer. The R package `voi`
+uses this one in its vignette: two actions with payoffs 0 and p₁ − p₂, where
+p₁ ~ N(1, 1) and p₂ ~ N(0, 2²). For X normal with mean μ and standard deviation σ,
+E max(0, X) = μΦ(μ/σ) + σφ(μ/σ), which gives EVPI = 0.4798107, EVPPI(p₁) = 0.0833155
+and EVPPI(p₂) = 0.3955931.
+
+```{julia}
+rng = Xoshiro(20261123)
+n = 40_000
+p1, p2 = 1 .+ randn(rng, n), 2 .* randn(rng, n)
+normal = DecisionProblem(PayoffTable(permutedims(hcat(zeros(n), p1 .- p2));
+                                     actions=[:reference, :new]),
+                         SampleBelief((; p1, p2)); baseline=:reference)
+checks = ["EVPI, sample average" => evpi(normal, SampleAverage()),
+          "EVPI, regression on p1 and p2" => evpi(normal, SplineRegression()),
+          "EVPPI(p1), spline" => evppi(normal, :p1),
+          "EVPPI(p1), Strong and Oakley" => evppi(normal, :p1, StrongOakley()),
+          "EVPPI(p1), Sadatsafavi" => evppi(normal, :p1, Sadatsafavi()),
+          "EVPPI(p2), spline" => evppi(normal, :p2),
+          "EVPPI(p2), Strong and Oakley" => evppi(normal, :p2, StrongOakley()),
+          "EVPPI(p2), Sadatsafavi" => evppi(normal, :p2, Sadatsafavi())]
+voi_table(checks; digits=4,
+          truth=[0.4798107, 0.4798107, 0.0833155, 0.0833155, 0.0833155, 0.3955931, 0.3955931,
+                 0.3955931])
+```
+
+Every estimate is within about two standard errors of its closed form. The estimates
+share one sample, so their errors are correlated: they miss on the same side.
+
+## What to take away
+
+- `evppi(problem, focal, method)` estimates the value of learning the named parameters
+  of the draws. Without a method, a non-numeric parameter uses `Grouping()` and numeric
+  ones `SplineRegression()`.
+- `Grouping`, `StrongOakley` and `Sadatsafavi` need no regression, and are cross-checks
+  on it. `GAMRegression` needs `using GAM`; GAM.jl is not a dependency of the package.
+- `conditional_problem(problem, :group)` is the payoff table by group, and its EVPI is
+  the EVPPI of the group.
+- A parameter can drive the outcome and be worth nothing to learn. EVPPI ranks
+  uncertainties by what resolving them does for the decision.
+- The standard error is beside the value, never in it. `bootstrap = B` checks it by
+  refitting on resampled draws.
+- Regression EVPI, on all the parameters, is the value of information about the
+  parameters. The plain sample average also counts simulation noise.
+
+## Next
+
+Learning a parameter exactly is an ideal. A real study gives data.
+[EVSI from a sample](../13_evsi_methods/13_evsi_methods.md) values a study before it is
+run.

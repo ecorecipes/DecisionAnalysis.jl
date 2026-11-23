@@ -24,8 +24,14 @@ function tutorial_pages()
     end
 end
 
+# The API reference is split over several pages: one page of every docstring was close
+# to Documenter's size limit for a page of HTML.
 pages = Any["Home" => "index.md", "Certificates" => "certificates.md",
-            "API Reference" => "api.md"]
+            "API Reference" => ["Beliefs, payoff tables and problems" => "api/problems.md",
+                                "Aggregators, regret and rules" => "api/rules.md",
+                                "Experiments and exact value of information" => "api/information.md",
+                                "Sample-based analysis" => "api/samples.md",
+                                "Linear programmes, reports, certificates and exceptions" => "api/programmes.md"]]
 tutorials = tutorial_pages()
 isempty(tutorials) || push!(pages, "Tutorials" => tutorials)
 

@@ -4,12 +4,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Standard decision analysis on the output of any model, with no category theory required: a payoff table,
-a belief about its states, rules for choosing, Savage regret, and the value of information. Version 0.1 is
-the finite core, and it is exact: give it `Rational` inputs and every number it returns is a rational.
+a belief about its states, rules for choosing, Savage regret, and the value of information. Finite
+problems are exact: give the package `Rational` inputs and every number it returns is a rational. Model
+output held as draws and simulator runs is analysed by sample-based estimators of the same quantities,
+each reported with its Monte Carlo standard error in a separate field.
 
 The package depends on [FiniteKernels.jl](https://github.com/ecorecipes/FiniteKernels.jl),
 [JuMP](https://jump.dev) (to state its linear programmes; no solver is a dependency), `LinearAlgebra`,
-`Random`, `Statistics` and `Tables`, and on no Catlab, GATlab or ACSets.
+`Random`, `Statistics` and `Tables`, and on no Catlab, GATlab or ACSets. [GAM.jl](https://github.com/ecorecipes/GAM.jl)
+is an optional regression backend, loaded as a weak-dependency extension.
 
 ## Features
 
@@ -54,6 +57,27 @@ The package depends on [FiniteKernels.jl](https://github.com/ecorecipes/FiniteKe
   `CDDLib.Optimizer{Rational{BigInt}}`, or a floating-point optimiser such as `HiGHS.Optimizer`, whose
   solution is rounded to rationals and verified exactly (`ExactVerificationError` if it does not verify).
   The solver is never trusted: every witness is re-checked in exact arithmetic before it is returned.
+- **Sample beliefs and outcome tables.** `SampleBelief` holds draws of named parameters (any Tables.jl
+  table) with weights, and is a single prior: expectation, CVaR, quantiles, regret and EVPI apply to it,
+  worst and best cases over the draws are flagged as sample-dependent, and operations with no meaning for
+  a sample throw `BeliefFormError`. `OutcomeTable` holds model output by draw × action × replicate × named
+  outcome, built from any table of runs by naming its columns (failed runs are kept and counted) or by
+  `outcomes(prob, actions, draws; replicates, seed)`, which drives a model through four adapter verbs
+  (`with_parameters`, `apply_action`, `simulate`, `outcome`) with common random numbers across actions.
+- **Utilities on outcomes, in individuals.** `IndividualsUtility`, `InfectionUtility(; uninfected, infected,
+  weight)` and `FunctionUtility`; `payoff_table(outcomes, utility)` gives the conditional expected utility
+  of each cell with its standard error and replicate count in separate fields, and with `baseline` the
+  paired gains over no intervention. A table built from one run per cell is flagged. No monetary costs.
+- **Sample-based value of information.** `evpi`, `evppi` and `evsi` called with a method return a
+  `VOIEstimate`: the value, its standard error, and the two selection biases, never folded together.
+  EVPI by sample average or by all-parameter regression, with `variance_components` for the split between
+  parameter and simulation variance; EVPPI by `Grouping` (discrete parameters), `StrongOakley` and
+  `Sadatsafavi` (one parameter, no regression), `SplineRegression` (built-in additive regression spline)
+  and `GAMRegression` (GAM.jl extension); EVSI by `SummaryStatistics` (regression on summaries),
+  `ImportanceSampling` (from a log-likelihood) and `GaussianApproximation` (curves over sample size).
+  Every estimator is tested against exact enumeration on finite problems and against closed forms.
+- **Sensitivity.** `policy_regions` and `one_way_thresholds` (exact switch points of a weight, such as the
+  weight on infected individuals), `weight_sweep`, `rank_reversals`.
 - **Fidelity.** `total_variation` and `decision_loss_bound(B, ε) = 2Bε`.
 - **Reports and certificates.** `DecisionReport` puts every applicable rule side by side with the regret
   profile, EVPI, the EVSI of several named experiments (and whether each can change the decision), the
@@ -119,7 +143,8 @@ information_can_change_decision(problem, gauge)                       # true: EV
 
 ## Vignettes
 
-Ten vignettes in [`vignettes/`](vignettes/) go from a first decision table to Lean-checked certificates,
+Fourteen vignettes in [`vignettes/`](vignettes/) go from a first decision table to Lean-checked
+certificates, sample-based analysis and an application to chytridiomycosis,
 on ecological examples whose outcomes are counted in individuals and always compared with no intervention
 (all numbers illustrative). Each is rendered to Markdown, HTML and PDF beside its `.qmd`, with the code run
 once: `julia scripts/render_vignettes.jl` (see [`vignettes/README.md`](vignettes/README.md)). The Markdown
@@ -137,6 +162,10 @@ is also published as the Tutorials of the documentation, copied by `julia script
 | 8 | [Several objectives](vignettes/08_several_objectives/08_several_objectives.md) | The Pareto front, infected against uninfected counts |
 | 9 | [The decision report](vignettes/09_decision_report/09_decision_report.md) | `DecisionReport` and its Tables.jl form |
 | 10 | [Exact arithmetic and certificates](vignettes/10_exact_arithmetic_and_certificates/10_exact_arithmetic_and_certificates.md) | Rational problems, certificates and witnesses, the Lean checker |
+| 11 | [Sample beliefs and outcome tables](vignettes/11_sample_beliefs_and_outcome_tables/11_sample_beliefs_and_outcome_tables.md) | Draws, a toy simulator behind the adapter verbs, common random numbers, payoffs with standard errors |
+| 12 | [EVPPI from a sample](vignettes/12_evppi_methods/12_evppi_methods.md) | Grouping, Strong and Oakley, Sadatsafavi, regression splines, GAM.jl; a check against closed forms |
+| 13 | [EVSI from a sample](vignettes/13_evsi_methods/13_evsi_methods.md) | Regression on summaries, importance sampling, the Gaussian approximation, net benefit in animals |
+| 14 | [Bd epizootic response](vignettes/14_bd_epizootic_response/14_bd_epizootic_response.md) | The Drawert et al. (2017) model from a cached table of runs: gains, rules, groups, EVPI, EVPPI and the EVSI of a survey |
 
 ## Conventions
 
@@ -157,11 +186,11 @@ for maximum expected utility and `CategoricalInfluenceDiagrams.jl` composes them
 table such a model produces. It exports no `regret` or `regrets` (the latter is a best-response gap in
 `CategoricalInfluenceDiagrams.jl`).
 
-## Not in version 0.1
+## Not in this version
 
-Sample-based beliefs and Monte Carlo value of information, outcome tables and model adapters, utility
-functions and multi-attribute utility, decision sensitivity, and anything sequential. See the roadmap in
-the lab wiki.
+Risk-averse utility functions and multi-attribute utility, moment-matching EVSI, multilevel Monte Carlo,
+Gaussian-process regression for many focal parameters, and anything sequential. See the roadmap in the
+lab wiki.
 
 ## Licence
 

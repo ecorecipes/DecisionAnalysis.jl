@@ -190,6 +190,11 @@ julia> probabilities(inv.posteriors[2])
  8//11
 ```
 """
+function bayes_invert(prior::SampleBelief, ::Experiment)
+    throw(BeliefFormError(:bayes_invert, :SampleBelief,
+                          "a sample is updated by reweighting its draws; see " *
+                          "ImportanceSampling for the value of a study"))
+end
 function bayes_invert(prior::FiniteBelief, experiment::Experiment)
     _check_states(experiment, prior.states, "prior")
     joint = experiment.likelihood .* permutedims(prior.probabilities)
@@ -282,7 +287,10 @@ pairs of experiments have both `δ(e, e′) > 0` and `δ(e′, e) > 0`: they are
 incomparable in Blackwell's order. The deficiency still bounds the value gap: for a
 payoff table with range `B` (largest minus smallest payoff), the value of acting on
 `e′` exceeds that of acting on `e` by at most `B δ(e, e′)`, for every prior (simulate
-`e′` from `e` through the minimising `G` and act as if the result were `e′`).
+`e′` from `e` through the minimising `G` and act as if the result were `e′`). The
+bound also holds with the sharper constant `B` = the largest entry of the
+[`regret_table`](@ref), which is never more than the range (proved in the Lean
+development).
 
 Computed by the linear programme of [`deficiency_model`](@ref), solved by
 [`solve_program`](@ref) with the keywords `optimizer` and `rounding_tol`: by default
@@ -372,8 +380,13 @@ function garbling_result(e′::Experiment, e::Experiment;
         return GarblingResult(true, Matrix(_from_big.(T, G)), false, route)
     end
     sol = solve_program(garbling_model(e′, e); optimizer, rounding_tol)
-    sol.status === :infeasible &&
-        return GarblingResult(false, nothing, sol.exact, sol.route)
+    if sol.status === :infeasible
+        # A "no" from a floating-point optimiser is exact once a separating payoff
+        # table passes the exact check.
+        certified = sol.exact ||
+                    _separating_payoff(e′, e; optimizer, rounding_tol) !== nothing
+        return GarblingResult(false, nothing, certified, sol.route)
+    end
     sol.status === :optimal || throw(LinearProgramError(:garbling, sol.status))
     G = sol.exact ? sol.values.G : _clean_columns(sol.values.G)
     (G !== nothing &&

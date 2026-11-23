@@ -138,8 +138,12 @@ It is nonnegative, equals the smallest [`expected_regret`](@ref), and bounds the
 [`CredalSet`](@ref) use [`robust_evpi`](@ref).
 
 If the payoff table was built from a stochastic simulator with few replicates per
-cell, the maximum over noisy cells biases EVPI upwards; that is a property of the
-table, not corrected here.
+cell, every maximum is taken over noisy cells: the act-now value and the value with
+perfect information are each biased upwards, and the chosen action is on average
+worth less than its reported score. EVPI is the difference of the two, so the sign
+of its bias is not determined in general. With exact payoffs and a sampled belief,
+EVPI is biased downwards. This is a property of the table, not corrected here; see
+[`VOIEstimate`](@ref) for the estimates of both biases.
 
 ```jldoctest
 julia> evpi(DecisionProblem(PayoffTable([0 -100; -30 -30]), [3 // 5, 2 // 5]))

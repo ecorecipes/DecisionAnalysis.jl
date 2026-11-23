@@ -456,8 +456,18 @@ function decide(problem::DecisionProblem, rule::DecisionRule; atol::Real=0,
     actions = feasible_actions(problem)
     details = rule.metric.transform isa IdentityTransform ? (;) :
               (; menu_dependent=true, note=_MENU_NOTE)
+    if problem.belief isa SampleBelief &&
+       rule.metric.summary isa Union{WorstCase,BestCase,Hurwicz}
+        details = merge(details, (; sample_dependent=true, sample_note=_SAMPLE_NOTE))
+    end
     return DecisionResult(rule, actions, scores, actions[idx], sense, details)
 end
+
+# Attached to the result of a state-wise rule applied to a sample.
+const _SAMPLE_NOTE = "The worst and best cases are taken over the draws in the " *
+                     "sample, whatever their weights, so this score depends on which " *
+                     "draws were sampled: a larger sample can only make the worst " *
+                     "case worse and the best case better."
 
 # Attached to the result of every regret-based rule.
 const _MENU_NOTE = "Regret is measured against the best feasible action in each " *
@@ -532,7 +542,12 @@ function _eadmissible_witness(E::AbstractMatrix, a::Int; tol::Real=0, optimizer=
     # only a witness, so clean the weights up and check them exactly.
     w = _clean_weights(λ)
     w !== nothing && _optimal_under(Eb, w, a) && return true, w, true, sol.route
-    slack < -1e-6 * max(1, maximum(abs, Eb)) && return false, nothing, false, sol.route
+    if slack < -1e-6 * max(1, maximum(abs, Eb))
+        # A "no" from a floating-point optimiser is exact once a mixed action that
+        # strictly beats `a` at every generating point passes the exact check.
+        certified = _mixed_dominator(E, a; optimizer, rounding_tol) !== nothing
+        return false, nothing, certified, sol.route
+    end
     throw(ExactVerificationError(:e_admissibility,
                                  "the floating-point optimiser reports action $a " *
                                  "E-admissible to its tolerance, but the rounded " *

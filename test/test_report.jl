@@ -135,4 +135,68 @@
                        sprint(show, decide(flood, Satisfice(0; aggregator=WorstCase()))))
         @test occursin("envelope", sprint(show, report.robust_evpi))
     end
+
+    @testset "sample-based reports show Monte Carlo standard errors" begin
+        rng = Xoshiro(41)
+        n = 400
+        x = randn(rng, n)
+        site = [isodd(i) ? "a" : "b" for i in 1:n]
+        truth = permutedims(hcat(zeros(n), x .+ 0.2, 0.5 .* x .+ 0.1 .* (site .== "a")))
+        se = fill(0.3, 3, n)
+        se[1, :] .= 0
+        Q = truth .+ se .* randn(rng, 3, n)
+        payoff = PayoffTable(Q; actions=[:none, :treat, :fence], standard_errors=se,
+                             replicates=fill(5, 3, n))
+        problem = DecisionProblem(payoff, SampleBelief((; x, site)); baseline=:none)
+        r = DecisionReport(problem; parameters=[:x, :site, (:x, :site)],
+                           regression=SplineRegression(; knots=1))
+        mc = r.monte_carlo
+        @test r.evpi == evpi(problem) == mc.evpi.value
+        @test mc.evpi.standard_error > 0 && mc.evpi.bias.cells > 0
+        @test mc.evpi_regression.method === :SplineRegression
+        @test [q.name for q in mc.evppi] == ["x", "site", "x, site"]
+        @test mc.evppi[1].estimate.value == evppi(problem, :x).value
+        @test mc.evppi[2].estimate.method === :Grouping
+        @test [e.value for e in mc.expected_utility] ≈ aggregate(Expectation(), problem)
+        @test [e.value for e in mc.expected_gain] ≈ r.expected_gain
+        @test length(mc.variance) == 3 && !mc.single_replicate
+        # Laplace is not shown for a sample; the state-wise rules are flagged.
+        names = [DecisionAnalysis._rule_name(res.rule) for res in r.results]
+        @test :Laplace ∉ names && :MaxExpectedUtility in names && :Maximin in names
+        text = sprint(show, MIME"text/plain"(), r)
+        @test occursin("Monte Carlo standard errors", text)
+        @test occursin("never folded", text)
+        @test occursin("EVPI, all-parameter regression", text)
+        @test occursin("EVPPI of site (Grouping)", text)
+        @test occursin("sign of its bias is not determined", join(split(text), " "))
+        @test all(line -> length(line) <= 80, split(text, '\n'))
+        @test occursin("Monte Carlo", sprint(show, MIME"text/markdown"(), r))
+        @test occursin("<table", sprint(show, MIME"text/html"(), r))
+        rows = Tables.rows(r)
+        @test rows[2].expected_utility_standard_error ≈
+              mc.expected_utility[2].standard_error
+        @test rows[2].expected_gain_standard_error ≈ mc.expected_gain[2].standard_error
+        # The standard error is a separate number: the values are those of the plain
+        # functions, unchanged.
+        @test rows[2].MaxExpectedUtility == aggregate(Expectation(), problem)[2]
+
+        # One run per cell: flagged, and no regression without parameters.
+        flagged = DecisionProblem(PayoffTable(Q; replicates=fill(1, 3, n)), SampleBelief(n))
+        rf = DecisionReport(flagged)
+        @test rf.monte_carlo.single_replicate
+        @test rf.monte_carlo.evpi_regression === nothing
+        @test rf.monte_carlo.variance === nothing
+        @test occursin("single simulator run", sprint(show, MIME"text/plain"(), rf))
+        @test any(a -> occursin("carry no parameters", a), rf.assumptions)
+        # Too few draws for the default regression: said, not attempted.
+        few = DecisionProblem(PayoffTable(Q[:, 1:30]; standard_errors=se[:, 1:30]),
+                              SampleBelief((; x=x[1:30])))
+        @test any(a -> occursin("too few draws", a), DecisionReport(few).assumptions)
+        @test DecisionReport(few; regression=nothing).monte_carlo.evpi_regression ===
+              nothing
+        # `parameters` belongs to samples.
+        finite = DecisionProblem(PayoffTable([1 2; 3 0]), [1 // 2, 1 // 2])
+        @test_throws BeliefFormError DecisionReport(finite; parameters=[:x])
+        @test DecisionReport(finite).monte_carlo === nothing
+    end
 end

@@ -30,6 +30,13 @@ function total_variation(p::FiniteBelief, q::FiniteBelief)
     return total_variation(p.probabilities, q.probabilities)
 end
 
+function total_variation(p::SampleBelief, ::SampleBelief)
+    throw(BeliefFormError(:total_variation, :SampleBelief,
+                          "two samples of a continuous distribution share no draw, so " *
+                          "the distance between their empirical distributions says " *
+                          "nothing about the distributions"))
+end
+
 """
     decision_loss_bound(B, ε)
 
@@ -46,6 +53,10 @@ Then for every action `|E_p u(a) − E_q u(a)| ≤ B ε`, and so the action that
 under `q` falls short of the best under `p`, in expectation under `p`, by at most
 `2 B ε`. With `ε` an ℓ¹ distance the bound would read `B ε`; with `B` a bound on
 `|u|` it would read `4 B ε`.
+
+The bound also holds with the sharper constant `B = max_a (max_θ Q[a, θ] − min_θ
+Q[a, θ])`, the largest range of **one action's** payoffs across states, which is
+never more than the range of the table (proved in the Lean development).
 
 ```jldoctest
 julia> decision_loss_bound(150, 1 // 100)
