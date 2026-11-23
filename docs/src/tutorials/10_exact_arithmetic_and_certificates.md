@@ -48,26 +48,28 @@ include(joinpath("..", "_common.jl"))
 
 actions = [:no_intervention, :antifungal_baths, :disinfect_pond]
 states = [:absent, :low_prevalence, :high_prevalence]
-uninfected = [500 300 100; 470 380 250; 350 340 320]
-infected = [0 150 250; 0 60 120; 0 10 20]
+uninfected = PayoffTable(actions, states, [500 300 100; 470 380 250; 350 340 320])
+infected = PayoffTable(actions, states, [0 150 250; 0 60 120; 0 10 20])
 prior = FiniteBelief(states, [1 // 2, 3 // 10, 1 // 5])
 
 function bd_problem(w)
-    return DecisionProblem(PayoffTable(actions, states, uninfected .- w .* infected),
-                           prior; baseline=:no_intervention)
+    return DecisionProblem(infection_payoff(; uninfected, infected, weight=w), prior;
+                           baseline=:no_intervention)
 end
 
 problem = bd_problem(1)
 swab = Experiment([19//20 2//5 1//20; 1//20 3//5 19//20];
                   signals=[:negative, :positive], states=states)
-payoff_markdown(problem.payoff; corner="uninfected − infected")
+problem.payoff
 ```
 
-| uninfected − infected | `absent` | `low_prevalence` | `high_prevalence` |
-|:----------------------|---------:|-----------------:|------------------:|
-| `no_intervention`     |      500 |              150 |              -150 |
-| `antifungal_baths`    |      470 |              320 |               130 |
-| `disinfect_pond`      |      350 |              330 |               300 |
+**PayoffTable{Int64}: 3 actions × 3 states**
+
+| action             | `absent` | `low_prevalence` | `high_prevalence` |
+|:-------------------|---------:|-----------------:|------------------:|
+| `no_intervention`  |      500 |              150 |              -150 |
+| `antifungal_baths` |      470 |              320 |               130 |
+| `disinfect_pond`   |      350 |              330 |               300 |
 
 ## Exact in, exact out
 
@@ -136,7 +138,7 @@ for floating-point problems (`rtol`).
 
 ``` julia
 w = 58 / 35
-float_tie = DecisionProblem(PayoffTable(actions, states, uninfected .- w .* infected),
+float_tie = DecisionProblem(infection_payoff(; uninfected, infected, weight=w),
                             Float64.(probabilities(prior)))
 decide(float_tie, MaxExpectedUtility(); rtol=0).chosen,
 decide(float_tie, MaxExpectedUtility()).chosen
@@ -265,7 +267,7 @@ catch err
 end
 ```
 
-    WitnessError: the first experiment is not a garbling of the second: the deficiency is positive and there is no witness
+    WitnessError: the first experiment is not a garbling of the second: there is no witness
 
 ## An E-admissibility witness
 

@@ -8,6 +8,8 @@ Simon Frost
 - [Rules that return a set](#rules-that-return-a-set)
   - [E-admissibility is not a check of the stated
     priors](#e-admissibility-is-not-a-check-of-the-stated-priors)
+  - [The same question by another
+    solver](#the-same-question-by-another-solver)
   - [The three sets can differ](#the-three-sets-can-differ)
 - [The value of information under a set of
   priors](#the-value-of-information-under-a-set-of-priors)
@@ -55,8 +57,10 @@ actions = [:no_control, :trap_mink, :refuges, :translocate]
 states = [:absent, :transient, :established]
 payoff = PayoffTable(actions, states,
                      [800 400 50; 700 600 300; 760 480 200; 500 450 420])
-payoff_markdown(payoff)
+payoff
 ```
+
+**PayoffTable{Int64}: 4 actions × 3 states**
 
 | action        | `absent` | `transient` | `established` |
 |:--------------|---------:|------------:|--------------:|
@@ -190,15 +194,15 @@ md_table(["α (weight on the lower expectation)", "choice"],
 | 3/4                                 |  `trap_mink` |
 | 1                                   |  `trap_mink` |
 
-The gain over no control has a range too. `gain_over_baseline` needs no
-prior, so the table of gains can be given the same credal set.
+The gain over no control has a range too. Under a credal set
+`expected_gain_over_baseline` returns the lowest and the highest
+expected gain of each action over the set, as a named tuple
+`(lower, upper)`.
 
 ``` julia
-gains = DecisionProblem(gain_over_baseline(problem), credal)
+gain = expected_gain_over_baseline(problem)
 md_table(["action", "lowest expected gain over no control", "highest expected gain"],
-         [[a, l, u]
-          for (a, l, u) in zip(actions, aggregate(LowerExpectation(), gains),
-                               aggregate(UpperExpectation(), gains))])
+         [[a, l, u] for (a, l, u) in zip(actions, gain.lower, gain.upper)])
 ```
 
 | action        | lowest expected gain over no control | highest expected gain |
@@ -274,6 +278,125 @@ aggregate(Expectation(), at_witness), decide(at_witness, MaxExpectedUtility()).c
 
 At that prior refuges tie for the best. Checking only the three stated
 priors would have missed them.
+
+### The same question by another solver
+
+The linear programme behind E-admissibility is an ordinary
+[JuMP](https://jump.dev) model, and the package states it once:
+`eadmissibility_model` returns it, with its variables (the weights `λ`
+on the stated priors and the slack `t`).
+
+``` julia
+program = eadmissibility_model(problem, :refuges)
+print(program.model)
+```
+
+    Max t
+    Subject to
+     λ[1] + λ[2] + λ[3] = 1//1
+     -9//1 λ[1] + 46//1 λ[2] + 96//1 λ[3] - t ≥ 0//1
+     26//1 λ[1] - 44//1 λ[2] - 94//1 λ[3] - t ≥ 0//1
+     -t ≥ 0//1
+     189//1 λ[1] + 72//1 λ[2] - 47//1 λ[3] - t ≥ 0//1
+     λ[1] ≥ 0//1
+     λ[2] ≥ 0//1
+     λ[3] ≥ 0//1
+
+The action is E-admissible exactly when the largest slack is zero. There
+are three ways to solve the model, chosen by the `optimizer` keyword of
+`decide` (and of `solve_program`).
+
+By default nothing needs to be installed: the package reads the matrix
+form of the model and solves it with its own simplex method in exact
+rational arithmetic.
+
+``` julia
+exact_route = decide(problem, EAdmissible())
+exact_route.chosen, exact_route.details.route
+```
+
+    ([:no_control, :trap_mink, :refuges], :internal)
+
+Any floating-point solver can be used instead, here HiGHS. A
+floating-point solution is not an exact answer, so the package does not
+return it as one. It rounds the solution to rationals, tidies the
+weights so that they are nonnegative and sum to one, and then checks
+**in exact arithmetic** that the action really is optimal under the
+prior those weights give. Only a witness that passes is returned.
+
+``` julia
+using HiGHS
+float_route = decide(problem, EAdmissible(); optimizer=HiGHS.Optimizer)
+float_route.chosen, float_route.details.route
+```
+
+    ([:no_control, :trap_mink, :refuges], :float_optimizer)
+
+``` julia
+md_table(["action", "weights, default exact route", "weights, HiGHS then verified",
+          "answer is exact"],
+         [[a, join(exact.(exact_route.details.weights[a]), ", "),
+           join(exact.(float_route.details.weights[a]), ", "),
+           float_route.details.exact[a]] for a in float_route.chosen])
+```
+
+| action | weights, default exact route | weights, HiGHS then verified | answer is exact |
+|:---|---:|---:|---:|
+| `no_control` | 46/55, 9/55, 0 | 46/55, 9/55, 0 | yes |
+| `trap_mink` | 22/35, 13/35, 0 | 22/35, 13/35, 0 | yes |
+| `refuges` | 22/35, 13/35, 0 | 22/35, 13/35, 0 | yes |
+
+The two routes agree on the set. The witnesses need not be the same
+prior, because an action can be optimal under many priors, but each one
+has been verified exactly. The check made on the HiGHS witness for
+refuges, written out:
+
+``` julia
+λ = float_route.details.weights[:refuges]
+mixture = sum(λ[k] .* extreme_points(credal)[k] for k in eachindex(λ))
+eu = payoff.Q * mixture
+all(>=(0), λ), sum(λ) == 1, eu[3] == maximum(eu)
+```
+
+    (true, true, true)
+
+`details.exact` says how far each answer can be relied on. A “yes” from
+the floating-point route is exact, because its witness was verified. A
+“no” is exact when the rounded primal and dual solutions of the
+programme certify its optimum, which is then strictly below zero; that
+is the case for translocation here. A “no” that cannot be certified in
+that way is the solver’s verdict to its tolerance, and is marked as not
+exact.
+
+``` julia
+md_table(["action", "E-admissible", "answer is exact"],
+         [[a, a in float_route.chosen, float_route.details.exact[a]] for a in actions])
+```
+
+| action        | E-admissible | answer is exact |
+|:--------------|-------------:|----------------:|
+| `no_control`  |          yes |             yes |
+| `trap_mink`   |          yes |             yes |
+| `refuges`     |          yes |             yes |
+| `translocate` |           \- |             yes |
+
+If a rounded witness fails the exact check, the package throws
+`ExactVerificationError` and returns nothing unverified. A third route
+is an exact solver such as `CDDLib.Optimizer{Rational{BigInt}}`, which
+solves the rational model itself:
+
+``` julia
+using CDDLib
+decide(problem, EAdmissible(); optimizer=CDDLib.Optimizer{Rational{BigInt}}).chosen
+```
+
+    3-element Vector{Symbol}:
+     :no_control
+     :trap_mink
+     :refuges
+
+The garbling test, deficiency and the EVPI envelope below take the same
+keyword.
 
 ### The three sets can differ
 
@@ -551,6 +674,13 @@ bounds the loss here at `decision_loss_bound(750, 1 // 100)` = 15 voles.
   actions that cannot be ruled out. E-admissibility is decided over the
   whole set of priors, and can admit an action that no stated prior
   chooses.
+- The linear programmes are JuMP models (`eadmissibility_model` and its
+  siblings). The default route solves them exactly with no solver
+  installed; `optimizer=` hands them to any JuMP solver. A
+  floating-point solution is rounded and verified exactly before it is
+  returned, and `details.exact` says which answers are exact.
+- Under a credal set `expected_gain_over_baseline` gives the lowest and
+  highest expected gain of each action.
 - `robust_evpi` and `robust_evsi` keep the rule-specific value apart
   from the range of single-prior values. The rule-specific value of a
   survey can be negative, and is reported as such.

@@ -209,9 +209,10 @@ is a little more likely when foxes are many.</p>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>chicks <span class="op">=</span> [ <span class="fl">60</span>  <span class="fl">20</span> <span class="fl">140</span>  <span class="fl">50</span>     <span class="co"># no management</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>           <span class="fl">50</span>  <span class="fl">55</span> <span class="fl">120</span> <span class="fl">130</span>     <span class="co"># fence: disturbance when building, protection from foxes</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>          <span class="fl">120</span>  <span class="fl">40</span> <span class="fl">110</span>  <span class="fl">40</span>]    <span class="co"># raised water: good in a dry spring, floods nests in a wet one</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, <span class="fu">state_labels</span>(belief), chicks)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">individuals_payoff</span>(<span class="fu">PayoffTable</span>(actions, <span class="fu">state_labels</span>(belief), chicks))</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>problem <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, belief; baseline<span class="op">=:</span>no_management)</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(payoff)</span></code></pre></div>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>payoff</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 3 actions × 4 states</strong></p>
 <table>
 <thead>
 <tr>

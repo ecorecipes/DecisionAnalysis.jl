@@ -1,14 +1,14 @@
-# A small dense two-phase simplex method in exact rational arithmetic, used for
-# E-admissibility, the garbling test, deficiency and the upper EVPI envelope. It is
-# internal: nothing here is exported.
+# A small dense two-phase simplex method in exact rational arithmetic. It is the
+# fallback solver: every linear programme of the package is stated as a JuMP model
+# (`src/programs.jl`), and when no `optimizer` is given `solve_program`
+# (`src/solve.jl`) reads the model's matrix form and solves it here, so the package
+# works with no solver installed. Nothing in this file is exported.
 #
-# Why built in rather than an extension on an external solver: the programmes of this
-# package are tiny (tens of variables), and the answers that depend on them ("is this
-# action E-admissible", "is the deficiency zero") are exact statements that a
-# floating-point solver can only answer up to a tolerance. Every number is converted to
+# It is meant for small problems (tens of variables and constraints): the tableau is
+# dense and every pivot is in `Rational{BigInt}`, so the cost grows quickly with size.
+# For larger problems pass an `optimizer`. Every number is converted to
 # `Rational{BigInt}` (a `Float64` is a dyadic rational, so the conversion is exact) and
-# Bland's rule guarantees termination. The cost is speed on large problems, which
-# version 0.1 does not target.
+# Bland's rule guarantees termination.
 
 const _BigRat = Rational{BigInt}
 

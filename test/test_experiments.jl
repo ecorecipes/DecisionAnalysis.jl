@@ -150,7 +150,8 @@
             @test (back === nothing) == (δ > 0)
             back === nothing || @test back * garbled.likelihood == e.likelihood
             # The programme's own minimiser attains the value it reports.
-            d, M = DecisionAnalysis._deficiency_lp(garbled, e)
+            sol = solve_program(deficiency_model(garbled, e))
+            d, M = sol.objective, sol.values.G
             @test all(>=(0), M) && all(==(1), sum(M; dims=1))
             @test maximum(sum(abs, M * garbled.likelihood .- e.likelihood; dims=1)) == d
             @test δ == d / 2

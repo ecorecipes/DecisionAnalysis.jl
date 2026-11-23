@@ -1,4 +1,6 @@
-# Printing.
+# Printing. Compact one-line forms for every type, and tabular displays (plain text
+# that fits 80 columns, Markdown and HTML) for payoff tables, regret tables, rule
+# results and the decision report.
 
 function Base.show(io::IO, b::FiniteBelief)
     return print(io, "FiniteBelief(",
@@ -43,7 +45,30 @@ function Base.show(io::IO, v::RobustVOI)
     return print(io, ")")
 end
 
-# Numbers in a report: rationals as decimals when short, otherwise as they are.
+function Base.show(io::IO, p::DecisionProgram{T}) where {T}
+    return print(io, "DecisionProgram{", T, "}(", p.name, ": ",
+                 JuMP.num_variables(p.model), " variables, ",
+                 JuMP.num_constraints(p.model; count_variable_in_set_constraints=false),
+                 " constraints)")
+end
+
+function Base.show(io::IO, s::ProgramSolution)
+    print(io, "ProgramSolution(", s.status)
+    s.objective === nothing || print(io, ", objective ", s.objective)
+    return print(io, ", ", s.route, s.exact ? ", exact)" : ", not exact)")
+end
+
+function Base.show(io::IO, r::GarblingResult)
+    return print(io, "GarblingResult(", r.is_garbling ? "a garbling" : "not a garbling",
+                 r.exact ? ", exact" : ", numerical", ", ", r.route, ")")
+end
+
+function Base.show(io::IO, r::DecisionReport)
+    return print(io, "DecisionReport(", length(r.results), " rules, ",
+                 length(feasible_actions(r.problem)), " actions)")
+end
+
+# Numbers in a display: rationals as decimals when short, otherwise as they are.
 _cell(x::Bool) = x ? "yes" : "-"
 _cell(x::AbstractFloat) = string(round(x; sigdigits=6))
 _cell(x::Integer) = string(x)
@@ -51,90 +76,394 @@ function _cell(x::Rational)
     isone(denominator(x)) && return string(numerator(x))
     return string(round(Float64(x); sigdigits=6))
 end
+_cell(x::Symbol) = String(x)
+_cell(::Nothing) = "-"
 _cell(x) = string(x)
 
-function _print_grid(io::IO, header::Vector{String}, rows::Vector{Vector{String}})
-    widths = [maximum(length, vcat(header[j], [r[j] for r in rows]))
-              for j in eachindex(header)]
-    function line(cells)
-        return join((j == 1 ? rpad(c, widths[j]) : lpad(c, widths[j])
-                     for (j, c) in enumerate(cells)), "  ")
-    end
-    println(io, "  ", line(header))
-    println(io, "  ", join(("-"^w for w in widths), "  "))
-    for r in rows
-        println(io, "  ", line(r))
-    end
-    return nothing
+# A display is a list of blocks, rendered as plain text, Markdown or HTML.
+# ------------------------------------------------------------------------
+
+# A table. The first column is left-aligned and the others right-aligned unless
+# `left` marks them; `code` marks the columns whose cells are labels (actions, rules),
+# and `code_header` says that the header cells after the first are labels too.
+struct _Grid
+    header::Vector{String}
+    rows::Vector{Vector{String}}
+    left::Vector{Bool}
+    code::Vector{Bool}
+    code_header::Bool
+end
+function _Grid(header, rows; left=Int[], code=[1], code_header::Bool=false)
+    n = length(header)
+    return _Grid(String.(header), [String.(r) for r in rows],
+                 [j == 1 || j in left for j in 1:n], [j in code for j in 1:n], code_header)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", r::DecisionReport)
-    p = r.problem
-    actions = feasible_actions(p)
-    println(io, "DecisionReport: ", length(actions), " actions × ", size(p.payoff, 2),
-            " states, ", nameof(typeof(p.belief)))
-    println(io, "Baseline (no intervention): ",
-            p.baseline === nothing ? "none set" : String(p.baseline))
-    println(io)
-    println(io, "Scores by rule (* marks the chosen actions)")
-    header = vcat("action", [String(_rule_name(res.rule)) for res in r.results])
-    rows = [vcat(String(a),
-                 [_cell(res.scores[i]) * (a in res.chosen ? " *" : "  ")
-                  for res in r.results]) for (i, a) in enumerate(actions)]
-    _print_grid(io, header, rows)
-    println(io)
-    println(io, "First choice by rule")
-    for res in r.results
-        println(io, "  ", rpad(String(_rule_name(res.rule)), 20), first_choice(res),
-                p.baseline === nothing ? "" :
-                first_choice(res) == p.baseline ? "  [the baseline]" :
-                "  [not the baseline]",
-                length(res.chosen) > 1 ? "  (tied: " * join(res.chosen, ", ") * ")" : "")
-    end
-    if r.expected_gain !== nothing
-        println(io)
-        println(io, "Expected gain over the baseline (", p.baseline, ")")
-        _print_grid(io, ["action", "expected gain"],
-                    [[String(a), _cell(r.expected_gain[i])]
-                     for (i, a) in enumerate(actions)])
-    end
-    println(io)
-    println(io, "Regret profile")
-    header = ["action", "max regret"]
-    r.expected_regret === nothing || push!(header, "expected regret")
-    rows = [vcat(String(a), _cell(r.max_regret[i]),
-                 r.expected_regret === nothing ? String[] :
-                 [_cell(r.expected_regret[i])]) for (i, a) in enumerate(actions)]
-    _print_grid(io, header, rows)
-    if !isempty(r.robust)
-        println(io)
-        println(io, "Robust sets over the credal set")
-        for res in r.robust
-            println(io, "  ", rpad(String(_rule_name(res.rule)), 20),
-                    join(res.chosen, ", "))
+struct _Title
+    text::String
+end
+struct _Para
+    text::String
+end
+struct _Items
+    items::Vector{String}
+end
+
+const _WIDTH = 80
+
+# Break `text` into lines of at most `width` characters at spaces.
+function _wrap(text::AbstractString, width::Int)
+    lines = String[]
+    line = ""
+    for word in split(text)
+        if isempty(line)
+            line = String(word)
+        elseif length(line) + 1 + length(word) <= width
+            line = line * " " * word
+        else
+            push!(lines, line)
+            line = String(word)
         end
     end
-    println(io)
-    println(io, "Value of information")
-    r.evpi === nothing || println(io, "  EVPI                ", _cell(r.evpi))
-    r.evsi === nothing || println(io, "  EVSI                ", _cell(r.evsi))
-    if r.robust_evpi !== nothing
-        v = r.robust_evpi
-        println(io, "  EVPI, Γ-maximin     ", _cell(v.value))
-        println(io, "  EVPI envelope       [", _cell(v.lower), ", ", _cell(v.upper), "]")
+    push!(lines, line)
+    return lines
+end
+
+# Column blocks of a grid that each fit `width`: the first column is repeated in
+# every block.
+function _column_blocks(widths::Vector{Int}, width::Int)
+    blocks = Vector{Int}[]
+    current = Int[]
+    used = 2 + widths[1]
+    for j in 2:length(widths)
+        if !isempty(current) && used + 2 + widths[j] > width
+            push!(blocks, current)
+            current = Int[]
+            used = 2 + widths[1]
+        end
+        push!(current, j)
+        used += 2 + widths[j]
     end
-    r.evpi === nothing && r.robust_evpi === nothing &&
-        println(io, "  not defined without probabilities")
-    println(io)
-    println(io, "Assumptions")
-    for (i, a) in enumerate(r.assumptions)
-        print(io, "  ", i, ". ", a)
-        i == length(r.assumptions) || println(io)
+    (isempty(current) && !isempty(blocks)) || push!(blocks, current)
+    return blocks
+end
+
+function _plain(io::IO, g::_Grid)
+    widths = [maximum(length, vcat(g.header[j], [r[j] for r in g.rows]))
+              for j in eachindex(g.header)]
+    for (k, block) in enumerate(_column_blocks(widths, _WIDTH))
+        k == 1 || println(io)
+        cols = vcat(1, block)
+        function line(cells)
+            return rstrip(join((g.left[j] ? rpad(cells[j], widths[j]) :
+                                lpad(cells[j], widths[j]) for j in cols), "  "))
+        end
+        println(io, "  ", line(g.header))
+        println(io, "  ", join(("-"^widths[j] for j in cols), "  "))
+        for r in g.rows
+            println(io, "  ", line(r))
+        end
+    end
+    return nothing
+end
+function _plain(io::IO, t::_Title)
+    for line in split(t.text, '\n')
+        foreach(l -> println(io, l), _wrap(line, _WIDTH))
+    end
+    return nothing
+end
+function _plain(io::IO, p::_Para)
+    foreach(l -> println(io, "  ", l), _wrap(p.text, _WIDTH - 2))
+    return nothing
+end
+function _plain(io::IO, list::_Items)
+    pad = ndigits(length(list.items)) + 2
+    for (i, item) in enumerate(list.items)
+        lines = _wrap(item, _WIDTH - 2 - pad)
+        println(io, "  ", rpad(string(i, "."), pad), lines[1])
+        foreach(l -> println(io, "  ", " "^pad, l), lines[2:end])
     end
     return nothing
 end
 
-function Base.show(io::IO, r::DecisionReport)
-    return print(io, "DecisionReport(", length(r.results), " rules, ",
-                 length(feasible_actions(r.problem)), " actions)")
+# Plain text: a blank line before every title but the first, no trailing newline.
+function _render_plain(io::IO, blocks)
+    buffer = IOBuffer()
+    for (i, b) in enumerate(blocks)
+        b isa _Title && i > 1 && println(buffer)
+        _plain(buffer, b)
+    end
+    return print(io, rstrip(String(take!(buffer))))
+end
+
+_md_escape(s::AbstractString) = replace(s, "|" => "\\|", "*" => "\\*", "_" => "\\_")
+_md_code(s::AbstractString) = isempty(s) ? "" : "`" * s * "`"
+function _md_cell(g::_Grid, j::Int, s::AbstractString; header::Bool=false)
+    code = header ? (g.code_header && j > 1) : g.code[j]
+    return code ? _md_code(s) : _md_escape(s)
+end
+
+function _markdown(io::IO, g::_Grid)
+    cols = eachindex(g.header)
+    println(io, "| ", join((_md_cell(g, j, g.header[j]; header=true) for j in cols), " | "),
+            " |")
+    println(io, "|", join((g.left[j] ? ":--" : "--:" for j in cols), "|"), "|")
+    for r in g.rows
+        println(io, "| ", join((_md_cell(g, j, r[j]) for j in cols), " | "), " |")
+    end
+    return println(io)
+end
+function _markdown(io::IO, t::_Title)
+    return println(io,
+                   join(("**" * _md_escape(l) * "**" for l in split(t.text, '\n')),
+                        "  \n"), "\n")
+end
+_markdown(io::IO, p::_Para) = println(io, _md_escape(p.text), "\n")
+function _markdown(io::IO, list::_Items)
+    for (i, item) in enumerate(list.items)
+        println(io, i, ". ", _md_escape(item))
+    end
+    return println(io)
+end
+_render_markdown(io::IO, blocks) = foreach(b -> _markdown(io, b), blocks)
+
+_html_escape(s::AbstractString) = replace(s, "&" => "&amp;", "<" => "&lt;", ">" => "&gt;")
+function _html_cell(g::_Grid, j::Int, s::AbstractString; header::Bool=false)
+    code = header ? (g.code_header && j > 1) : g.code[j]
+    text = _html_escape(s)
+    return code && !isempty(s) ? "<code>" * text * "</code>" : text
+end
+
+function _html(io::IO, g::_Grid)
+    cols = eachindex(g.header)
+    align(j) = g.left[j] ? "left" : "right"
+    println(io, "<table>")
+    println(io, "<thead><tr>",
+            join(("<th style=\"text-align: $(align(j));\">" *
+                  _html_cell(g, j, g.header[j]; header=true) * "</th>" for j in cols)),
+            "</tr></thead>")
+    println(io, "<tbody>")
+    for r in g.rows
+        println(io, "<tr>",
+                join(("<td style=\"text-align: $(align(j));\">" * _html_cell(g, j, r[j]) *
+                      "</td>" for j in cols)), "</tr>")
+    end
+    return println(io, "</tbody>\n</table>")
+end
+function _html(io::IO, t::_Title)
+    return println(io, "<p><strong>",
+                   join((_html_escape(l) for l in split(t.text, '\n')), "<br>"),
+                   "</strong></p>")
+end
+_html(io::IO, p::_Para) = println(io, "<p>", _html_escape(p.text), "</p>")
+function _html(io::IO, list::_Items)
+    println(io, "<ol>")
+    foreach(item -> println(io, "<li>", _html_escape(item), "</li>"), list.items)
+    return println(io, "</ol>")
+end
+_render_html(io::IO, blocks) = foreach(b -> _html(io, b), blocks)
+
+# The blocks of each displayed type
+# ---------------------------------
+
+# A labelled matrix: one row per action, one column per state.
+function _matrix_grid(corner::AbstractString, rows, columns, M::AbstractMatrix)
+    return _Grid(vcat(corner, String.(columns)),
+                 [vcat(String(rows[i]), [_cell(M[i, j]) for j in axes(M, 2)])
+                  for i in axes(M, 1)]; code_header=true)
+end
+
+function _blocks(t::PayoffTable)
+    blocks = Any[_Title("PayoffTable{$(eltype(t))}: $(size(t, 1)) actions × " *
+                        "$(size(t, 2)) states"),
+                 _matrix_grid("action", t.actions, t.states, t.Q)]
+    if t.standard_errors !== nothing
+        push!(blocks, _Title("Standard errors"),
+              _matrix_grid("action", t.actions, t.states, t.standard_errors))
+    end
+    return blocks
+end
+
+function _blocks(t::RegretTable)
+    return Any[_Title("RegretTable{$(eltype(t))}: " *
+                      (t.relative ? "relative regret" : "regret") *
+                      ", $(size(t, 1)) actions × $(size(t, 2)) states"),
+               _matrix_grid("action", t.actions, t.states, t.R)]
+end
+
+_sense_words(r::DecisionResult) = r.sense === :max ? "higher is better" : "lower is better"
+
+function _blocks(r::DecisionResult)
+    actions = r.actions
+    chosen = [_cell(a in r.chosen) for a in actions]
+    name = String(_rule_name(r.rule))
+    blocks = Any[]
+    if r.rule isa ParetoFront
+        objectives = String.(r.details.objectives)
+        push!(blocks,
+              _Title("DecisionResult: $name over $(length(objectives)) objectives, " *
+                     "each summarised by $(nameof(typeof(r.rule.aggregator)))"),
+              _Grid(vcat("action", objectives, "on the front"),
+                    [vcat(String(a), [_cell(r.scores[i, j]) for j in axes(r.scores, 2)],
+                          chosen[i]) for (i, a) in enumerate(actions)];
+                    code=[1]))
+    elseif r.scores === nothing
+        header = ["action"]
+        columns = Vector{String}[]
+        if haskey(r.details, :lower)
+            push!(header, "lower expectation", "upper expectation")
+            push!(columns, _cell.(r.details.lower), _cell.(r.details.upper))
+        end
+        push!(header, "kept")
+        push!(columns, chosen)
+        push!(blocks, _Title("DecisionResult: $name (set-valued)"),
+              _Grid(header,
+                    [vcat(String(a), [c[i] for c in columns])
+                     for (i, a) in enumerate(actions)]))
+    else
+        push!(blocks, _Title("DecisionResult: $name ($(_sense_words(r)))"),
+              _Grid(["action", "score", "chosen"],
+                    [[String(a), _cell(r.scores[i]), chosen[i]]
+                     for (i, a) in enumerate(actions)]))
+    end
+    if !(r.rule isa ParetoFront) && !(r.scores === nothing)
+        push!(blocks,
+              _Para("First choice: " *
+                    (isempty(r.chosen) ? "none (no action chosen)" :
+                     String(first_choice(r))) *
+                    (length(r.chosen) > 1 ? " (tied: " * join(r.chosen, ", ") * ")" : "")))
+    end
+    haskey(r.details, :note) && push!(blocks, _Para("Note: " * r.details.note))
+    if haskey(r.details, :exact) && !all(values(r.details.exact))
+        unsure = [a for a in actions if !r.details.exact[a]]
+        push!(blocks,
+              _Para("Numerical, not exact, for: " * join(unsure, ", ") * " (route: " *
+                    String(r.details.route) * ")."))
+    end
+    return blocks
+end
+
+function _baseline_mark(r::DecisionReport, res::DecisionResult)
+    r.problem.baseline === nothing && return ""
+    return first_choice(res) == r.problem.baseline ? "[the baseline]" :
+           "[not the baseline]"
+end
+
+function _blocks(r::DecisionReport)
+    p = r.problem
+    actions = feasible_actions(p)
+    labels = String.(actions)
+    blocks = Any[_Title("DecisionReport: $(length(actions)) actions × " *
+                        "$(size(p.payoff, 2)) states, $(nameof(typeof(p.belief)))\n" *
+                        "Baseline (no intervention): " *
+                        (p.baseline === nothing ? "none set" : String(p.baseline)))]
+
+    push!(blocks, _Title("Scores by rule (* marks the chosen actions)"),
+          _Grid(vcat("action", [String(_rule_name(res.rule)) for res in r.results]),
+                [vcat(labels[i],
+                      [_cell(res.scores[i]) * (a in res.chosen ? " *" : "  ")
+                       for res in r.results]) for (i, a) in enumerate(actions)]))
+
+    header = ["rule", "first choice"]
+    p.baseline === nothing || push!(header, "baseline")
+    any(res -> length(res.chosen) > 1, r.results) && push!(header, "tied")
+    rows = map(r.results) do res
+        row = [String(_rule_name(res.rule)), _cell(first_choice(res))]
+        p.baseline === nothing || push!(row, _baseline_mark(r, res))
+        "tied" in header &&
+            push!(row, length(res.chosen) > 1 ? join(res.chosen, ", ") : "")
+        return row
+    end
+    push!(blocks, _Title("First choice by rule"),
+          _Grid(header, rows; left=collect(2:length(header)), code=[1, 2]),
+          _Para("Minimax regret depends on the menu of actions: adding or removing " *
+                "an action, even one that is never chosen, can change its choice."))
+
+    if r.expected_gain !== nothing
+        push!(blocks, _Title("Expected gain over the baseline ($(p.baseline))"),
+              _Grid(["action", "expected gain"],
+                    [[labels[i], _cell(r.expected_gain[i])] for i in eachindex(actions)]))
+    elseif r.gain_range !== nothing
+        what = p.belief isa CredalSet ?
+               "Range of the expected gain over the baseline " *
+               "($(p.baseline)), over the credal set" :
+               "Range of the gain over the baseline ($(p.baseline)), over the scenarios"
+        push!(blocks, _Title(what),
+              _Grid(["action", "lowest gain", "highest gain"],
+                    [[labels[i], _cell(r.gain_range.lower[i]),
+                      _cell(r.gain_range.upper[i])] for i in eachindex(actions)]))
+    end
+
+    header = ["action", "max regret"]
+    r.expected_regret === nothing || push!(header, "expected regret")
+    push!(blocks, _Title("Regret profile"),
+          _Grid(header,
+                [vcat(labels[i], _cell(r.max_regret[i]),
+                      r.expected_regret === nothing ? String[] :
+                      [_cell(r.expected_regret[i])]) for i in eachindex(actions)]))
+
+    if !isempty(r.robust)
+        push!(blocks, _Title("Robust sets over the credal set"),
+              _Grid(["rule", "actions kept"],
+                    [[String(_rule_name(res.rule)), join(res.chosen, ", ")]
+                     for res in r.robust]; left=[2], code=[1, 2]))
+    end
+
+    push!(blocks, _Title("Value of information"))
+    rows = Vector{String}[]
+    r.evpi === nothing || push!(rows, ["EVPI", _cell(r.evpi), ""])
+    for e in r.experiments
+        push!(rows,
+              ["EVSI of $(e.name)", _cell(e.evsi),
+               e.can_change_decision ? "can change the decision" :
+               "this experiment cannot change the decision"])
+    end
+    for q in r.partitions
+        push!(rows, ["EVPPI of $(q.name)", _cell(q.evppi), ""])
+    end
+    if r.robust_evpi !== nothing
+        v = r.robust_evpi
+        push!(rows, ["EVPI, Γ-maximin", _cell(v.value), ""],
+              ["EVPI envelope", "[" * _cell(v.lower) * ", " * _cell(v.upper) * "]", ""])
+    end
+    if isempty(rows)
+        push!(blocks, _Para("not defined without probabilities"))
+    else
+        noted = any(row -> !isempty(row[3]), rows)
+        push!(blocks,
+              _Grid(noted ? ["quantity", "value", "note"] : ["quantity", "value"],
+                    noted ? rows : [row[1:2] for row in rows]; left=[3], code=Int[]))
+    end
+    if any(e -> !iszero(e.cost), r.experiments)
+        push!(blocks, _Title("Experiments net of their cost"),
+              _Grid(["experiment", "EVSI", "cost", "EVSI − cost"],
+                    [[String(e.name), _cell(e.evsi), _cell(e.cost), _cell(e.net)]
+                     for e in r.experiments]))
+    end
+
+    if r.pareto !== nothing
+        front = r.pareto
+        objectives = String.(front.details.objectives)
+        push!(blocks,
+              _Title("Several objectives: Pareto front, each objective summarised by " *
+                     string(nameof(typeof(front.rule.aggregator)))),
+              _Grid(vcat("action", objectives, "on the front"),
+                    [vcat(labels[i],
+                          [_cell(front.scores[i, j]) for j in axes(front.scores, 2)],
+                          _cell(a in front.chosen)) for (i, a) in enumerate(actions)]),
+              _Para("Not dominated: " * join(front.chosen, ", ") * "."))
+    end
+
+    push!(blocks, _Title("Assumptions"), _Items(r.assumptions))
+    return blocks
+end
+
+# One method per type: a `Union` signature would be ambiguous with Base's text/plain
+# method for arrays, which a `RegretTable` is.
+for T in (:PayoffTable, :RegretTable, :DecisionResult, :DecisionReport)
+    @eval begin
+        Base.show(io::IO, ::MIME"text/plain", x::$T) = _render_plain(io, _blocks(x))
+        Base.show(io::IO, ::MIME"text/markdown", x::$T) = _render_markdown(io, _blocks(x))
+        Base.show(io::IO, ::MIME"text/html", x::$T) = _render_html(io, _blocks(x))
+    end
 end

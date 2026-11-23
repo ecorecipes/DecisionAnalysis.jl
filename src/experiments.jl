@@ -255,52 +255,17 @@ function _check_same_states(e::Experiment, f::Experiment)
     return nothing
 end
 
-# The deficiency programme: over column-stochastic G (rows = signals of `target`,
-# columns = signals of `source`), minimise the largest ℓ¹ distance over states between
-# column θ of G * L_source and column θ of L_target. Returns that minimum and G.
-function _deficiency_lp(source::Experiment, target::Experiment)
-    _check_same_states(source, target)
-    L, Lt = source.likelihood, target.likelihood
-    nz, S = size(L)
-    nt = size(Lt, 1)
-    # Variables: G[z′, z] (column-major), u[z′, θ] (column-major), d.
-    g(zt, z) = (z - 1) * nt + zt
-    u(zt, θ) = nt * nz + (θ - 1) * nt + zt
-    nvar = nt * nz + nt * S + 1
-    Aeq = zeros(_BigRat, nz, nvar)
-    for z in 1:nz, zt in 1:nt
-        Aeq[z, g(zt, z)] = 1
-    end
-    Aub = zeros(_BigRat, 2 * nt * S + S, nvar)
-    bub = zeros(_BigRat, 2 * nt * S + S)
-    row = 0
-    for θ in 1:S, zt in 1:nt
-        # (G L)[z′, θ] − u ≤ Lt[z′, θ]  and  −(G L)[z′, θ] − u ≤ −Lt[z′, θ]
-        for sign in (1, -1)
-            row += 1
-            for z in 1:nz
-                Aub[row, g(zt, z)] = sign * _BigRat(L[z, θ])
-            end
-            Aub[row, u(zt, θ)] = -1
-            bub[row] = sign * _BigRat(Lt[zt, θ])
-        end
-    end
-    for θ in 1:S
-        row += 1
-        for zt in 1:nt
-            Aub[row, u(zt, θ)] = 1
-        end
-        Aub[row, nvar] = -1
-    end
-    c = zeros(_BigRat, nvar)
-    c[nvar] = 1
-    sol = _solve_lp(c, Aeq, ones(_BigRat, nz), Aub, bub)
+# Solve the deficiency programme: returns `d` (twice the deficiency), the minimising
+# garbling matrix and the solution's `exact` flag and route.
+function _deficiency_solution(source::Experiment, target::Experiment; optimizer=nothing,
+                              rounding_tol=_ROUNDING_TOLS)
+    sol = solve_program(deficiency_model(source, target); optimizer, rounding_tol)
     sol.status === :optimal || throw(LinearProgramError(:deficiency, sol.status))
-    return sol.objective, reshape(sol.x[1:(nt * nz)], nt, nz)
+    return sol.objective, sol.values.G, sol.exact, sol.route
 end
 
 """
-    deficiency(e::Experiment, e′::Experiment)
+    deficiency(e::Experiment, e′::Experiment; optimizer=nothing, rounding_tol=(1e-8, 1e-10, 1e-12))
 
 Le Cam's deficiency of `e` with respect to `e′`: how far `e` is from being able to
 simulate `e′`,
@@ -319,8 +284,13 @@ payoff table with range `B` (largest minus smallest payoff), the value of acting
 `e′` exceeds that of acting on `e` by at most `B δ(e, e′)`, for every prior (simulate
 `e′` from `e` through the minimising `G` and act as if the result were `e′`).
 
-Computed by an exact linear programme. The result is a `Rational{BigInt}` for
-rational likelihoods and a float for floating-point ones.
+Computed by the linear programme of [`deficiency_model`](@ref), solved by
+[`solve_program`](@ref) with the keywords `optimizer` and `rounding_tol`: by default
+the built-in exact simplex. The result is a `Rational{BigInt}` for rational
+likelihoods and a float for floating-point ones. With a floating-point optimiser on
+rational likelihoods the rounded solution must be certified optimal exactly, and
+[`ExactVerificationError`](@ref) is thrown when it is not: the value returned for a
+rational pair is always the exact deficiency.
 
 ```jldoctest
 julia> e = Experiment([4//5 1//5; 1//5 4//5]);
@@ -331,27 +301,111 @@ julia> deficiency(e, noisy), deficiency(noisy, e)
 (0//1, 3//20)
 ```
 """
-function deficiency(e::Experiment, e′::Experiment)
-    d, _ = _deficiency_lp(e, e′)
-    return _from_big(promote_type(eltype(e), eltype(e′)), d / 2)
+function deficiency(e::Experiment, e′::Experiment; optimizer=nothing,
+                    rounding_tol=_ROUNDING_TOLS)
+    T = promote_type(eltype(e), eltype(e′))
+    d, _, exact, _ = _deficiency_solution(e, e′; optimizer, rounding_tol)
+    _is_exact(T) && !exact &&
+        throw(ExactVerificationError(:deficiency,
+                                     "the rounded solution of the floating-point " *
+                                     "optimiser is not certified optimal"))
+    return _from_big(T, d / 2)
 end
 
 """
-    is_garbling_of(e′::Experiment, e::Experiment; atol) -> Union{Matrix,Nothing}
+    GarblingResult
+
+What [`garbling_result`](@ref) returns. Fields:
+
+- `is_garbling`: whether the first experiment is a garbling of the second.
+- `witness`: when it is, a column-stochastic matrix `G` with `G[z′, z] = P(z′ | z)`
+  and `G * L_e = L_e′`; otherwise `nothing`.
+- `exact`: whether `is_garbling` is an exact statement. A `true` with `exact` set
+  carries a witness that was checked in exact arithmetic (`G` nonnegative, columns
+  summing to one, `G * L_e == L_e′` entry for entry). A `false` is exact by the
+  default route or with an exact optimiser, and numerical (to the tolerance of the
+  optimiser) with a floating-point optimiser. Every answer for floating-point
+  likelihoods, or with a nonzero `atol`, is numerical.
+- `route`: the route that solved the programme (see [`ProgramSolution`](@ref)).
+"""
+struct GarblingResult{M<:Union{Nothing,Matrix}}
+    is_garbling::Bool
+    witness::M
+    exact::Bool
+    route::Symbol
+end
+
+function _is_garbling_witness(G::AbstractMatrix, L::AbstractMatrix, Lt::AbstractMatrix)
+    return all(>=(0), G) && all(isone, sum(G; dims=1)) && G * L == Lt
+end
+
+"""
+    garbling_result(e′::Experiment, e::Experiment; atol, optimizer=nothing,
+                    rounding_tol=(1e-8, 1e-10, 1e-12)) -> GarblingResult
+
+Decide whether `e′` is a garbling of `e` (whether `e′` is less informative than `e`
+in Blackwell's order) and say how sure the answer is; [`is_garbling_of`](@ref)
+returns only the witness.
+
+For `Rational` or integer likelihoods and `atol = 0` (the default for them) the
+feasibility programme of [`garbling_model`](@ref) is solved. A witness, whatever
+found it, is returned only after it has passed the exact check; with a
+floating-point `optimizer` it is first rounded and cleaned up (negative entries to
+zero, columns renormalised), and [`ExactVerificationError`](@ref) is thrown if the
+optimiser reports a garbling and the cleaned matrix is not exactly one. A "no" from a
+floating-point optimiser is numerical and is marked so.
+
+Otherwise (floating-point likelihoods, or `atol > 0`) the programme of
+[`deficiency_model`](@ref) is solved and the pair counts as a garbling when the
+deficiency is at most `atol` (default `1e-8` in floating point); the answer is
+numerical.
+
+`optimizer` and `rounding_tol` are those of [`solve_program`](@ref).
+"""
+function garbling_result(e′::Experiment, e::Experiment;
+                         atol::Real=_default_atol(promote_type(eltype(e), eltype(e′))),
+                         optimizer=nothing, rounding_tol=_ROUNDING_TOLS)
+    T = promote_type(eltype(e), eltype(e′))
+    if !(_is_exact(T) && iszero(atol))
+        d, G, _, route = _deficiency_solution(e, e′; optimizer, rounding_tol)
+        d / 2 <= atol || return GarblingResult(false, nothing, false, route)
+        return GarblingResult(true, Matrix(_from_big.(T, G)), false, route)
+    end
+    sol = solve_program(garbling_model(e′, e); optimizer, rounding_tol)
+    sol.status === :infeasible &&
+        return GarblingResult(false, nothing, sol.exact, sol.route)
+    sol.status === :optimal || throw(LinearProgramError(:garbling, sol.status))
+    G = sol.exact ? sol.values.G : _clean_columns(sol.values.G)
+    (G !== nothing &&
+     _is_garbling_witness(G, _BigRat.(e.likelihood), _BigRat.(e′.likelihood))) ||
+        throw(ExactVerificationError(:garbling,
+                                     "the optimiser reports a garbling, but the " *
+                                     "matrix found is not exactly one (nonnegative, " *
+                                     "columns summing to one, product equal to the " *
+                                     "garbled likelihood)"))
+    return GarblingResult(true, Matrix(G), true, sol.route)
+end
+
+"""
+    is_garbling_of(e′::Experiment, e::Experiment; atol, optimizer=nothing,
+                   rounding_tol=(1e-8, 1e-10, 1e-12)) -> Union{Matrix,Nothing}
 
 Whether `e′` is a garbling of `e`, that is, whether `e′` is less informative than `e`
 in Blackwell's order. Returns a witness: a column-stochastic matrix `G` with
 `G[z′, z] = P(z′ | z)` and `G * L_e = L_e′`, or `nothing` when there is none.
 
-The test is the linear programme of [`deficiency`](@ref): a witness exists exactly
-when `deficiency(e, e′)` is zero. `atol` is the deficiency below which a
-floating-point pair counts as a garbling (default `1e-8`); for `Rational`
-likelihoods the default is zero and the answer is exact, with a witness whose product
-reproduces `L_e′` entry for entry.
+For `Rational` likelihoods the default `atol` is zero, the test is the feasibility
+programme of [`garbling_model`](@ref), and the answer is exact, with a witness whose
+product reproduces `L_e′` entry for entry. For floating-point likelihoods the test is
+the programme of [`deficiency`](@ref): a witness is returned when
+`deficiency(e, e′)` is at most `atol` (default `1e-8`).
+
+This is `garbling_result(e′, e; ...).witness`. With a floating-point `optimizer` on
+rational likelihoods a matrix that is returned has still been verified exactly, but a
+`nothing` is then numerical; [`garbling_result`](@ref) says which.
 """
 function is_garbling_of(e′::Experiment, e::Experiment;
-                        atol::Real=_default_atol(promote_type(eltype(e), eltype(e′))))
-    d, G = _deficiency_lp(e, e′)
-    d / 2 <= atol || return nothing
-    return _from_big.(promote_type(eltype(e), eltype(e′)), G)
+                        atol::Real=_default_atol(promote_type(eltype(e), eltype(e′))),
+                        optimizer=nothing, rounding_tol=_ROUNDING_TOLS)
+    return garbling_result(e′, e; atol, optimizer, rounding_tol).witness
 end

@@ -49,9 +49,10 @@ voles = [800 400  50     # no control: fine without mink, a collapse with them
          700 600 300     # trapping: disturbance when there are no mink, protection when there are
          760 480 200     # refuges: cheap in disturbance, partial protection
          500 450 420]    # translocation: losses in the move, then little exposure
-payoff = PayoffTable(actions, states, voles)
-payoff_markdown(payoff)
+payoff = individuals_payoff(PayoffTable(actions, states, voles))
 ```
+
+**PayoffTable{Int64}: 4 actions × 3 states**
 
 | action        | `absent` | `transient` | `established` |
 |:--------------|---------:|------------:|--------------:|

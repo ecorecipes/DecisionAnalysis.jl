@@ -14,8 +14,8 @@ Abstract supertype of every exception that DecisionAnalysis defines:
 [`InvalidExperimentError`](@ref), [`LabelMismatchError`](@ref),
 [`BeliefFormError`](@ref), [`NoFeasibleActionError`](@ref),
 [`InvalidBaselineError`](@ref), [`MissingBaselineError`](@ref),
-[`InexactCertificateError`](@ref), [`WitnessError`](@ref) and
-[`LinearProgramError`](@ref). It marks the
+[`InexactCertificateError`](@ref), [`WitnessError`](@ref),
+[`LinearProgramError`](@ref) and [`ExactVerificationError`](@ref). It marks the
 package that introduced an error, not a kind of failure. Invalid arguments and
 keywords raise Base's `ArgumentError` instead, which is outside this root.
 """
@@ -69,8 +69,9 @@ end
     LabelMismatchError(what, expected, got)
 
 Thrown when two objects that must share labels do not: the states of a belief or an
-experiment against the states of a payoff table, or the actions of two problems
-compared by [`ParetoFront`](@ref). `what` names the pairing.
+experiment against the states of a payoff table, the actions of two problems
+compared by [`ParetoFront`](@ref), or the labels of two payoff tables that are added
+or subtracted. `what` names the pairing.
 """
 struct LabelMismatchError <: DecisionAnalysisError
     what::String
@@ -185,9 +186,12 @@ end
     LinearProgramError(problem, status)
 
 Thrown when a linear programme that is feasible and bounded by construction is
-reported otherwise by the built-in solver. `problem` names the programme
-(`:e_admissibility`, `:deficiency`, `:evpi_envelope`) and `status` is `:infeasible`
-or `:unbounded`. Seeing this error means a bug, not bad input.
+reported otherwise by the solver that was used (the built-in simplex or the
+`optimizer` that was passed). `problem` names the programme (`:e_admissibility`,
+`:deficiency`, `:evpi_envelope`) and `status` is `:infeasible`, `:unbounded`, or the
+lower-case name of another termination status of the optimiser (for example
+`:time_limit`). With the built-in solver this error means a bug, not bad input; with
+an external optimiser it may mean that the optimiser failed.
 """
 struct LinearProgramError <: DecisionAnalysisError
     problem::Symbol
@@ -197,4 +201,25 @@ end
 function Base.showerror(io::IO, e::LinearProgramError)
     return print(io, "LinearProgramError: the ", e.problem, " programme was reported ",
                  e.status, ", which its construction rules out")
+end
+
+"""
+    ExactVerificationError(problem, msg)
+
+Thrown when a floating-point `optimizer` was used on an exact (`Rational` or integer)
+problem and its answer, rounded to rationals, did not pass the exact check that every
+answer must pass before it is returned: a witness that is not exactly a witness, or
+an optimal value that the rounded primal and dual solutions do not certify. `problem`
+names the programme (`:e_admissibility`, `:garbling`, `:deficiency`,
+`:evpi_envelope`) and `msg` says which check failed. Nothing unverified is returned in
+its place. The default route (`optimizer = nothing`) and an exact optimiser do not
+round and do not throw this error; a different `rounding_tol` may also help.
+"""
+struct ExactVerificationError <: DecisionAnalysisError
+    problem::Symbol
+    msg::String
+end
+
+function Base.showerror(io::IO, e::ExactVerificationError)
+    return print(io, "ExactVerificationError: the ", e.problem, " programme: ", e.msg)
 end

@@ -8,15 +8,15 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 
 | | Vignette | Covers |
 |---|---|---|
-| 01 | [A first decision table](01_first_decision_table/01_first_decision_table.md) | `PayoffTable`, `FiniteBelief`, `PointBelief`, `DecisionProblem`, feasibility, expected utility, the baseline and gains over it |
+| 01 | [A first decision table](01_first_decision_table/01_first_decision_table.md) | `PayoffTable`, `individuals_payoff`, `FiniteBelief`, `PointBelief`, `DecisionProblem`, feasibility, expected utility, the baseline and gains over it |
 | 02 | [Decision rules side by side](02_decision_rules/02_decision_rules.md) | expected utility, maximin, maximax, Hurwicz, Laplace, minimax regret, satisficing, CVaR and quantile, ties |
 | 03 | [Regret](03_regret/03_regret.md) | regret tables, expected and maximum regret, the identity with EVPI, relative regret, menu-dependence of minimax regret |
-| 04 | [Experiments and the value of sample information](04_experiments_and_evsi/04_experiments_and_evsi.md) | `Experiment`, `bayes_invert`, `evsi`, zero-value information, `enbs` |
+| 04 | [Experiments and the value of sample information](04_experiments_and_evsi/04_experiments_and_evsi.md) | `Experiment`, `infection_payoff`, `bayes_invert`, `evsi`, zero-value information and `information_can_change_decision`, `enbs` |
 | 05 | [Partial information](05_partial_information/05_partial_information.md) | `evppi` over partitions, beliefs from FiniteKernels states, `restrict_scenarios` |
 | 06 | [Comparing experiments](06_comparing_experiments/06_comparing_experiments.md) | `garble`, `is_garbling_of`, `deficiency`, incomparable designs, experiments from kernels |
-| 07 | [Uncertain beliefs](07_uncertain_beliefs/07_uncertain_beliefs.md) | `CredalSet`, `ScenarioSet`, Γ-maximin, α-maxmin, E-admissibility, maximality, interval dominance, robust value of information, robustness metrics, `total_variation`, `decision_loss_bound` |
-| 08 | [Several objectives](08_several_objectives/08_several_objectives.md) | `ParetoFront`, the weight sweep |
-| 09 | [The decision report](09_decision_report/09_decision_report.md) | `DecisionReport`, Tables.jl output |
+| 07 | [Uncertain beliefs](07_uncertain_beliefs/07_uncertain_beliefs.md) | `CredalSet`, `ScenarioSet`, Γ-maximin, α-maxmin, E-admissibility, maximality, interval dominance, the same linear programme by the default exact route, by HiGHS with exact verification and by CDDLib (`eadmissibility_model`, `optimizer=`), robust value of information, robustness metrics, `total_variation`, `decision_loss_bound` |
+| 08 | [Several objectives](08_several_objectives/08_several_objectives.md) | `ParetoFront` over named payoff tables, arithmetic on tables, the weight sweep |
+| 09 | [The decision report](09_decision_report/09_decision_report.md) | `DecisionReport` with named experiments, partitions and objectives, its Markdown and 80-column text forms, Tables.jl output |
 | 10 | [Exact arithmetic and certificates](10_exact_arithmetic_and_certificates/10_exact_arithmetic_and_certificates.md) | rational problems, the three exporters, the Lean checker |
 
 ## Conventions of the examples
@@ -70,8 +70,9 @@ script detects this and renders that vignette once more; later runs execute once
 ## Requirements
 
 - Julia 1.12 or later, and this directory's environment (`Project.toml`: the package
-  and FiniteKernels by path, Plots, Tables). The script instantiates and precompiles
-  it.
+  and FiniteKernels by path, Plots, Tables, and the solvers HiGHS and CDDLib that
+  vignette 07 uses; the package itself depends on no solver). The script instantiates
+  and precompiles it.
 - Quarto 1.9 or later (Julia engine).
 - For the PDF: `lualatex` with `koma-script`, `fvextra`, `float` and `unicode-math`.
   TinyTeX from `quarto install tinytex` is found even when it is not on the `PATH`.
@@ -94,8 +95,9 @@ therefore the LaTeX default. The HTML is marked `en-GB`.
 ## Files
 
 - `_quarto.yml`: the Quarto project (Julia engine, `gfm` only).
-- `_common.jl`: Markdown-table and plotting helpers included by every vignette. It
-  computes no result.
+- `_common.jl`: plotting helpers and a small Markdown table for summaries assembled by
+  hand, included by every vignette. It computes no result. Payoff tables, regret
+  tables, rule results and reports display themselves as tables.
 - `_pandoc/`: the style sheet of the HTML and the LaTeX preamble of the PDF.
 - `Project.toml`, `Manifest.toml`: the environment, as in the sibling packages.
 - `NN_name/_out/`: files a vignette writes while it runs (the certificates of

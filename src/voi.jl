@@ -74,6 +74,59 @@ function evsi(problem::DecisionProblem, experiment::Experiment)
 end
 
 """
+    information_can_change_decision(problem::DecisionProblem, experiment::Experiment;
+                                    atol=0, rtol) -> Bool
+
+Whether observing the signal of `experiment` can change what is done: `true` exactly
+when **no single action is optimal after every signal of positive probability**. When
+it is `false`, one action is best whatever is observed, the experiment cannot change
+the decision, and it is worth nothing.
+
+This is equivalent to a positive value of sample information,
+
+    information_can_change_decision(problem, e)  ⟺  evsi(problem, e) > 0,
+
+for a single prior (theorem `evsi_eq_zero_iff` of the Lean development: EVSI is zero
+exactly when one action maximises `Σ_θ p(θ) L[z, θ] Q[a, θ]` for every signal `z`).
+The check does not compute the EVSI: it intersects, over the signals of positive
+probability, the sets of actions that are optimal after each. Ties count: an action
+that is only tied for best after some signal is still optimal after it.
+
+Optimality after a signal is judged with the tie tolerance of [`decide`](@ref)
+(`max(atol, rtol · max|score|)`; zero by default for exact problems, where the
+equivalence is exact, and `rtol = sqrt(eps)` in floating point, where it holds up to
+that tolerance). Needs a single prior.
+
+```jldoctest
+julia> p = DecisionProblem(PayoffTable([0 -100; -30 -30]), [3 // 5, 2 // 5]);
+
+julia> information_can_change_decision(p, Experiment([4//5 1//5; 1//5 4//5]))
+true
+
+julia> information_can_change_decision(p, Experiment([1//2 1//2; 1//2 1//2]))
+false
+```
+"""
+function information_can_change_decision(problem::DecisionProblem, experiment::Experiment;
+                                         atol::Real=0,
+                                         rtol::Real=_default_rtol(promote_type(eltype(problem.payoff),
+                                                                               eltype(experiment))))
+    _check_states(experiment, problem.payoff.states, "payoff table")
+    p = _prior(problem, :information_can_change_decision)
+    Q = _feasible_Q(problem)
+    L = experiment.likelihood
+    always_best = trues(size(Q, 1))
+    for z in axes(L, 1)
+        joint = p .* view(L, z, :)
+        iszero(sum(joint)) && continue
+        scores = Q * joint
+        best = _select(Optimize(), scores, :max, _tolerance(scores, atol, rtol))
+        always_best .&= [a in best for a in eachindex(scores)]
+    end
+    return !any(always_best)
+end
+
+"""
     evpi(problem::DecisionProblem)
 
 The expected value of perfect information about the state:
@@ -215,21 +268,23 @@ function _credal_view(problem::DecisionProblem, operation::Symbol)
     return v
 end
 
-# Largest single-prior EVPI over the convex hull of the priors. EVPI is concave in
-# the prior (a linear term minus a maximum of linear terms), so this is a linear
-# programme: maximise Σ_k λ_k (p_k · m) − w subject to Σ_k λ_k E[a, k] ≤ w for all a.
-function _evpi_upper(E::AbstractMatrix, perfect::AbstractVector)
-    n, K = size(E)
-    c = vcat(-perfect, 1)
-    Aeq = hcat(ones(Int, 1, K), 0)
-    Aub = hcat(E, -ones(Int, n))
-    sol = _solve_lp(c, Aeq, [1], Aub, zeros(Int, n); free=[K + 1])
+# Largest single-prior EVPI over the convex hull of the priors, by the programme of
+# `evpi_envelope_model`.
+function _evpi_upper(E::AbstractMatrix, perfect::AbstractVector; optimizer=nothing,
+                     rounding_tol=_ROUNDING_TOLS)
+    T = promote_type(eltype(E), eltype(perfect))
+    sol = solve_program(_evpi_envelope_program(E, perfect); optimizer, rounding_tol)
     sol.status === :optimal || throw(LinearProgramError(:evpi_envelope, sol.status))
-    return _from_big(promote_type(eltype(E), eltype(perfect)), -sol.objective)
+    _is_exact(T) && !sol.exact &&
+        throw(ExactVerificationError(:evpi_envelope,
+                                     "the rounded solution of the floating-point " *
+                                     "optimiser is not certified optimal"))
+    return _from_big(T, sol.objective)
 end
 
 """
-    robust_evpi(problem::DecisionProblem; rule=GammaMaximin()) -> RobustVOI
+    robust_evpi(problem::DecisionProblem; rule=GammaMaximin(), optimizer=nothing,
+                rounding_tol=(1e-8, 1e-10, 1e-12)) -> RobustVOI
 
 The value of perfect information when the belief is a [`CredalSet`](@ref). Two
 objects are returned in one [`RobustVOI`](@ref), because a single "robust EVPI"
@@ -245,13 +300,17 @@ is the difference.
 **The envelope.** `lower` and `upper` are the smallest and largest single-prior
 [`evpi`](@ref) over the whole set. EVPI is concave in the prior, so the smallest is
 attained at a generating point (`lower == minimum(members)`), while the largest may
-lie at an interior prior and is found by a linear programme
-(`upper ≥ maximum(members)`).
+lie at an interior prior and is found by the linear programme of
+[`evpi_envelope_model`](@ref) (`upper ≥ maximum(members)`). `optimizer` and
+`rounding_tol` are passed to [`solve_program`](@ref); with a floating-point
+optimiser on an exact problem the optimum must be certified exactly, or
+[`ExactVerificationError`](@ref) is thrown.
 
 A [`FiniteBelief`](@ref) is treated as a one-point credal set; every number then
 equals [`evpi`](@ref).
 """
-function robust_evpi(problem::DecisionProblem; rule::AbstractRule=GammaMaximin())
+function robust_evpi(problem::DecisionProblem; rule::AbstractRule=GammaMaximin(),
+                     optimizer=nothing, rounding_tol=_ROUNDING_TOLS)
     agg = _prior_rule(rule, :robust_evpi)
     v = _credal_view(problem, :robust_evpi)
     Q = v.Q
@@ -262,7 +321,7 @@ function robust_evpi(problem::DecisionProblem; rule::AbstractRule=GammaMaximin()
     perfect = [dot(q, best) for q in v.priors]
     members = [perfect[k] - maximum(view(E, :, k)) for k in eachindex(perfect)]
     act_now, informed, least = promote(act_now, informed, minimum(members))
-    lower, upper = promote(least, _evpi_upper(E, perfect))
+    lower, upper = promote(least, _evpi_upper(E, perfect; optimizer, rounding_tol))
     return RobustVOI(:evpi, rule, act_now, informed, informed - act_now,
                      collect(typeof(least), members), lower, upper)
 end

@@ -136,6 +136,8 @@ action</a></li>
 <ul>
 <li><a href="#e-admissibility-is-not-a-check-of-the-stated-priors" id="toc-e-admissibility-is-not-a-check-of-the-stated-priors">E-admissibility
 is not a check of the stated priors</a></li>
+<li><a href="#the-same-question-by-another-solver" id="toc-the-same-question-by-another-solver">The same question by
+another solver</a></li>
 <li><a href="#the-three-sets-can-differ" id="toc-the-three-sets-can-differ">The three sets can differ</a></li>
 </ul></li>
 <li><a href="#the-value-of-information-under-a-set-of-priors" id="toc-the-value-of-information-under-a-set-of-priors">The value of
@@ -186,7 +188,8 @@ illustrative.</strong></p>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>states <span class="op">=</span> [<span class="op">:</span>absent, <span class="op">:</span>transient, <span class="op">:</span>established]</span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states,</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>                     [<span class="fl">800</span> <span class="fl">400</span> <span class="fl">50</span>; <span class="fl">700</span> <span class="fl">600</span> <span class="fl">300</span>; <span class="fl">760</span> <span class="fl">480</span> <span class="fl">200</span>; <span class="fl">500</span> <span class="fl">450</span> <span class="fl">420</span>])</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(payoff)</span></code></pre></div>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>payoff</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 4 actions × 3 states</strong></p>
 <table>
 <thead>
 <tr>
@@ -405,14 +408,13 @@ puts its weight on the best state.)</p>
 </tr>
 </tbody>
 </table>
-<p>The gain over no control has a range too.
-<code>gain_over_baseline</code> needs no prior, so the table of gains
-can be given the same credal set.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>gains <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">gain_over_baseline</span>(problem), credal)</span>
+<p>The gain over no control has a range too. Under a credal set
+<code>expected_gain_over_baseline</code> returns the lowest and the
+highest expected gain of each action over the set, as a named tuple
+<code>(lower, upper)</code>.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>gain <span class="op">=</span> <span class="fu">expected_gain_over_baseline</span>(problem)</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;lowest expected gain over no control&quot;</span>, <span class="st">&quot;highest expected gain&quot;</span>],</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>         [[a, l, u]</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>          for (a, l, u) <span class="kw">in</span> <span class="fu">zip</span>(actions, <span class="fu">aggregate</span>(<span class="fu">LowerExpectation</span>(), gains),</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>                               <span class="fu">aggregate</span>(<span class="fu">UpperExpectation</span>(), gains))])</span></code></pre></div>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>         [[a, l, u] for (a, l, u) <span class="kw">in</span> <span class="fu">zip</span>(actions, gain.lower, gain.upper)])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -537,17 +539,153 @@ that produce it.</p>
 <pre><code>(Rational{BigInt}[4288//7, 624, 624, 16746//35], [:trap_mink, :refuges])</code></pre>
 <p>At that prior refuges tie for the best. Checking only the three
 stated priors would have missed them.</p>
+<h2 id="the-same-question-by-another-solver">The same question by
+another solver</h2>
+<p>The linear programme behind E-admissibility is an ordinary <a href="https://jump.dev">JuMP</a> model, and the package states it once:
+<code>eadmissibility_model</code> returns it, with its variables (the
+weights <code>λ</code> on the stated priors and the slack
+<code>t</code>).</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>program <span class="op">=</span> <span class="fu">eadmissibility_model</span>(problem, <span class="op">:</span>refuges)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(program.model)</span></code></pre></div>
+<pre><code>Max t
+Subject to
+ λ[1] + λ[2] + λ[3] = 1//1
+ -9//1 λ[1] + 46//1 λ[2] + 96//1 λ[3] - t ≥ 0//1
+ 26//1 λ[1] - 44//1 λ[2] - 94//1 λ[3] - t ≥ 0//1
+ -t ≥ 0//1
+ 189//1 λ[1] + 72//1 λ[2] - 47//1 λ[3] - t ≥ 0//1
+ λ[1] ≥ 0//1
+ λ[2] ≥ 0//1
+ λ[3] ≥ 0//1</code></pre>
+<p>The action is E-admissible exactly when the largest slack is zero.
+There are three ways to solve the model, chosen by the
+<code>optimizer</code> keyword of <code>decide</code> (and of
+<code>solve_program</code>).</p>
+<p>By default nothing needs to be installed: the package reads the
+matrix form of the model and solves it with its own simplex method in
+exact rational arithmetic.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>exact_route <span class="op">=</span> <span class="fu">decide</span>(problem, <span class="fu">EAdmissible</span>())</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>exact_route.chosen, exact_route.details.route</span></code></pre></div>
+<pre><code>([:no_control, :trap_mink, :refuges], :internal)</code></pre>
+<p>Any floating-point solver can be used instead, here HiGHS. A
+floating-point solution is not an exact answer, so the package does not
+return it as one. It rounds the solution to rationals, tidies the
+weights so that they are nonnegative and sum to one, and then checks
+<strong>in exact arithmetic</strong> that the action really is optimal
+under the prior those weights give. Only a witness that passes is
+returned.</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">HiGHS</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>float_route <span class="op">=</span> <span class="fu">decide</span>(problem, <span class="fu">EAdmissible</span>(); optimizer<span class="op">=</span>HiGHS.Optimizer)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>float_route.chosen, float_route.details.route</span></code></pre></div>
+<pre><code>([:no_control, :trap_mink, :refuges], :float_optimizer)</code></pre>
+<div class="sourceCode" id="cb24"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;weights, default exact route&quot;</span>, <span class="st">&quot;weights, HiGHS then verified&quot;</span>,</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;answer is exact&quot;</span>],</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>         [[a, <span class="fu">join</span>(<span class="fu">exact</span>.(exact_route.details.weights[a]), <span class="st">&quot;, &quot;</span>),</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>           <span class="fu">join</span>(<span class="fu">exact</span>.(float_route.details.weights[a]), <span class="st">&quot;, &quot;</span>),</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>           float_route.details.exact[a]] for a <span class="kw">in</span> float_route.chosen])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">weights, default exact route</th>
+<th style="text-align: right;">weights, HiGHS then verified</th>
+<th style="text-align: right;">answer is exact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_control</code></td>
+<td style="text-align: right;">46/55, 9/55, 0</td>
+<td style="text-align: right;">46/55, 9/55, 0</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>trap_mink</code></td>
+<td style="text-align: right;">22/35, 13/35, 0</td>
+<td style="text-align: right;">22/35, 13/35, 0</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>refuges</code></td>
+<td style="text-align: right;">22/35, 13/35, 0</td>
+<td style="text-align: right;">22/35, 13/35, 0</td>
+<td style="text-align: right;">yes</td>
+</tr>
+</tbody>
+</table>
+<p>The two routes agree on the set. The witnesses need not be the same
+prior, because an action can be optimal under many priors, but each one
+has been verified exactly. The check made on the HiGHS witness for
+refuges, written out:</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>λ <span class="op">=</span> float_route.details.weights[<span class="op">:</span>refuges]</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>mixture <span class="op">=</span> <span class="fu">sum</span>(λ[k] <span class="op">.*</span> <span class="fu">extreme_points</span>(credal)[k] <span class="cf">for</span> k <span class="kw">in</span> <span class="fu">eachindex</span>(λ))</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>eu <span class="op">=</span> payoff.Q <span class="op">*</span> mixture</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="fu">all</span>(<span class="op">&gt;=</span>(<span class="fl">0</span>), λ), <span class="fu">sum</span>(λ) <span class="op">==</span> <span class="fl">1</span>, eu[<span class="fl">3</span>] <span class="op">==</span> <span class="fu">maximum</span>(eu)</span></code></pre></div>
+<pre><code>(true, true, true)</code></pre>
+<p><code>details.exact</code> says how far each answer can be relied on.
+A “yes” from the floating-point route is exact, because its witness was
+verified. A “no” is exact when the rounded primal and dual solutions of
+the programme certify its optimum, which is then strictly below zero;
+that is the case for translocation here. A “no” that cannot be certified
+in that way is the solver’s verdict to its tolerance, and is marked as
+not exact.</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;E-admissible&quot;</span>, <span class="st">&quot;answer is exact&quot;</span>],</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>         [[a, a <span class="kw">in</span> float_route.chosen, float_route.details.exact[a]] for a <span class="kw">in</span> actions])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">E-admissible</th>
+<th style="text-align: right;">answer is exact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_control</code></td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>trap_mink</code></td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>refuges</code></td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>translocate</code></td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">yes</td>
+</tr>
+</tbody>
+</table>
+<p>If a rounded witness fails the exact check, the package throws
+<code>ExactVerificationError</code> and returns nothing unverified. A
+third route is an exact solver such as
+<code>CDDLib.Optimizer{Rational{BigInt}}</code>, which solves the
+rational model itself:</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">CDDLib</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(problem, <span class="fu">EAdmissible</span>(); optimizer<span class="op">=</span>CDDLib.Optimizer{<span class="dt">Rational</span>{<span class="dt">BigInt</span>}}).chosen</span></code></pre></div>
+<pre><code>3-element Vector{Symbol}:
+ :no_control
+ :trap_mink
+ :refuges</code></pre>
+<p>The garbling test, deficiency and the EVPI envelope below take the
+same keyword.</p>
 <h2 id="the-three-sets-can-differ">The three sets can differ</h2>
 <p>Add a fifth action: half the traps and half the refuges, which does
 slightly worse in every state than the average of the two full
 measures.</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>payoff5 <span class="op">=</span> <span class="fu">PayoffTable</span>(<span class="fu">vcat</span>(actions, <span class="op">:</span>half_measures), states,</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>                      <span class="fu">vcat</span>(payoff.Q, [<span class="fl">725</span> <span class="fl">535</span> <span class="fl">245</span>]))</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>problem5 <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff5, credal; baseline<span class="op">=:</span>no_control)</span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;actions kept&quot;</span>],</span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;E-admissible&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">EAdmissible</span>()).chosen],</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;maximal&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">Maximal</span>()).chosen],</span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;interval dominance&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">IntervalDominance</span>()).chosen]])</span></code></pre></div>
+<div class="sourceCode" id="cb30"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>payoff5 <span class="op">=</span> <span class="fu">PayoffTable</span>(<span class="fu">vcat</span>(actions, <span class="op">:</span>half_measures), states,</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>                      <span class="fu">vcat</span>(payoff.Q, [<span class="fl">725</span> <span class="fl">535</span> <span class="fl">245</span>]))</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>problem5 <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff5, credal; baseline<span class="op">=:</span>no_control)</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;actions kept&quot;</span>],</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;E-admissible&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">EAdmissible</span>()).chosen],</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;maximal&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">Maximal</span>()).chosen],</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;interval dominance&quot;</span>, <span class="fu">decide</span>(problem5, <span class="fu">IntervalDominance</span>()).chosen]])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -586,14 +724,14 @@ information under a set of priors</h1>
 <p>With several priors there are two different things that “the value of
 perfect information” can mean, and <code>robust_evpi</code> returns
 both.</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>v <span class="op">=</span> <span class="fu">robust_evpi</span>(problem)</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, v.act_now],</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value with perfect information&quot;</span>, v.informed],</span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVPI (the difference)&quot;</span>, v.value],</span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVPI under each expert&#39;s prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(v.members), <span class="st">&quot;, &quot;</span>)],</span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;smallest EVPI over the credal set&quot;</span>, v.lower],</span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;largest EVPI over the credal set&quot;</span>, v.upper]])</span></code></pre></div>
+<div class="sourceCode" id="cb31"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>v <span class="op">=</span> <span class="fu">robust_evpi</span>(problem)</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, v.act_now],</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value with perfect information&quot;</span>, v.informed],</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVPI (the difference)&quot;</span>, v.value],</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVPI under each expert&#39;s prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(v.members), <span class="st">&quot;, &quot;</span>)],</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;smallest EVPI over the credal set&quot;</span>, v.lower],</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;largest EVPI over the credal set&quot;</span>, v.upper]])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -637,14 +775,14 @@ and is found by linear programme.</p>
 <p>For a survey, <code>robust_evsi</code> gives the rule-specific value
 and the single-prior EVSI of each stated prior. Take a search for field
 signs of mink, which a Γ-maximin manager values at 3.7 voles:</p>
-<div class="sourceCode" id="cb20"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>signs <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">9</span><span class="op">//</span><span class="fl">10</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">1</span><span class="op">//</span><span class="fl">10</span>; <span class="fl">1</span><span class="op">//</span><span class="fl">10</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">9</span><span class="op">//</span><span class="fl">10</span>];</span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>                   signals<span class="op">=</span>[<span class="op">:</span>no_sign, <span class="op">:</span>sign], states<span class="op">=</span>states)</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> <span class="fu">robust_evsi</span>(problem, signs)</span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, s.act_now],</span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of surveying first&quot;</span>, s.informed],</span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVSI&quot;</span>, s.value],</span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVSI under each expert&#39;s prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(s.members), <span class="st">&quot;, &quot;</span>)]])</span></code></pre></div>
+<div class="sourceCode" id="cb32"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>signs <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">9</span><span class="op">//</span><span class="fl">10</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">1</span><span class="op">//</span><span class="fl">10</span>; <span class="fl">1</span><span class="op">//</span><span class="fl">10</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">9</span><span class="op">//</span><span class="fl">10</span>];</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>                   signals<span class="op">=</span>[<span class="op">:</span>no_sign, <span class="op">:</span>sign], states<span class="op">=</span>states)</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> <span class="fu">robust_evsi</span>(problem, signs)</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, s.act_now],</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of surveying first&quot;</span>, s.informed],</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVSI&quot;</span>, s.value],</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVSI under each expert&#39;s prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(s.members), <span class="st">&quot;, &quot;</span>)]])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -683,24 +821,24 @@ set has two extreme priors, one in which the neighbouring catchment
 certainly has no mink and one in which it certainly has. A ranger’s note
 arrives that says only whether the two catchments have the <em>same</em>
 status or a <em>different</em> one.</p>
-<div class="sourceCode" id="cb21"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>states2 <span class="op">=</span> [<span class="op">:</span>neither, <span class="op">:</span>here_only, <span class="op">:</span>there_only, <span class="op">:</span>both]</span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>payoff2 <span class="op">=</span> <span class="fu">PayoffTable</span>([<span class="op">:</span>no_control, <span class="op">:</span>trap_mink, <span class="op">:</span>translocate], states2,</span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>                      [<span class="fl">800</span>  <span class="fl">50</span> <span class="fl">800</span>  <span class="fl">50</span>      <span class="co"># the outcome depends only on mink here</span></span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>                       <span class="fl">700</span> <span class="fl">300</span> <span class="fl">700</span> <span class="fl">300</span></span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>                       <span class="fl">450</span> <span class="fl">420</span> <span class="fl">450</span> <span class="fl">420</span>])</span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>credal2 <span class="op">=</span> <span class="fu">CredalSet</span>(states2, [[<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">0</span>, <span class="fl">0</span>],      <span class="co"># no mink in the other catchment</span></span>
-<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>                              [<span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>]])     <span class="co"># mink in the other catchment</span></span>
-<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>note <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">1</span> <span class="fl">0</span> <span class="fl">0</span> <span class="fl">1</span>      <span class="co"># &quot;same&quot;:      neither, or both</span></span>
-<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>                   <span class="fl">0</span> <span class="fl">1</span> <span class="fl">1</span> <span class="fl">0</span>];    <span class="co"># &quot;different&quot;: here only, or there only</span></span>
-<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>                  signals<span class="op">=</span>[<span class="op">:</span>same, <span class="op">:</span>different], states<span class="op">=</span>states2)</span>
-<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>problem2 <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff2, credal2; baseline<span class="op">=:</span>no_control)</span>
-<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> <span class="fu">robust_evsi</span>(problem2, note)</span>
-<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
-<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin choice now&quot;</span>, <span class="fu">first_choice</span>(<span class="fu">decide</span>(problem2, <span class="fu">GammaMaximin</span>()))],</span>
-<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, n.act_now],</span>
-<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of reading the note first&quot;</span>, n.informed],</span>
-<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVSI&quot;</span>, n.value],</span>
-<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVSI under each extreme prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(n.members), <span class="st">&quot;, &quot;</span>)]])</span></code></pre></div>
+<div class="sourceCode" id="cb33"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>states2 <span class="op">=</span> [<span class="op">:</span>neither, <span class="op">:</span>here_only, <span class="op">:</span>there_only, <span class="op">:</span>both]</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>payoff2 <span class="op">=</span> <span class="fu">PayoffTable</span>([<span class="op">:</span>no_control, <span class="op">:</span>trap_mink, <span class="op">:</span>translocate], states2,</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>                      [<span class="fl">800</span>  <span class="fl">50</span> <span class="fl">800</span>  <span class="fl">50</span>      <span class="co"># the outcome depends only on mink here</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>                       <span class="fl">700</span> <span class="fl">300</span> <span class="fl">700</span> <span class="fl">300</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>                       <span class="fl">450</span> <span class="fl">420</span> <span class="fl">450</span> <span class="fl">420</span>])</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>credal2 <span class="op">=</span> <span class="fu">CredalSet</span>(states2, [[<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">0</span>, <span class="fl">0</span>],      <span class="co"># no mink in the other catchment</span></span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>                              [<span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>]])     <span class="co"># mink in the other catchment</span></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>note <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">1</span> <span class="fl">0</span> <span class="fl">0</span> <span class="fl">1</span>      <span class="co"># &quot;same&quot;:      neither, or both</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>                   <span class="fl">0</span> <span class="fl">1</span> <span class="fl">1</span> <span class="fl">0</span>];    <span class="co"># &quot;different&quot;: here only, or there only</span></span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>                  signals<span class="op">=</span>[<span class="op">:</span>same, <span class="op">:</span>different], states<span class="op">=</span>states2)</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>problem2 <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff2, credal2; baseline<span class="op">=:</span>no_control)</span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> <span class="fu">robust_evsi</span>(problem2, note)</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;voles&quot;</span>],</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;Γ-maximin choice now&quot;</span>, <span class="fu">first_choice</span>(<span class="fu">decide</span>(problem2, <span class="fu">GammaMaximin</span>()))],</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of acting now&quot;</span>, n.act_now],</span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;Γ-maximin value of reading the note first&quot;</span>, n.informed],</span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;rule-specific EVSI&quot;</span>, n.value],</span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;EVSI under each extreme prior&quot;</span>, <span class="fu">join</span>(<span class="fu">fmt</span>.(n.members), <span class="st">&quot;, &quot;</span>)]])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -752,14 +890,14 @@ probabilities</h1>
 state-wise rules then range over those states only, and regret is
 measured within them. Suppose mink have been seen upstream, so “absent”
 is no longer a scenario.</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>all_states <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, <span class="fu">ScenarioSet</span>(states); baseline<span class="op">=:</span>no_control)</span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>seen <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, <span class="fu">ScenarioSet</span>([<span class="op">:</span>transient, <span class="op">:</span>established]);</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>                       baseline<span class="op">=:</span>no_control)</span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>statewise <span class="op">=</span> [<span class="st">&quot;maximin&quot;</span> <span class="op">=&gt;</span> <span class="fu">Maximin</span>(), <span class="st">&quot;maximax&quot;</span> <span class="op">=&gt;</span> <span class="fu">Maximax</span>(),</span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>             <span class="st">&quot;Laplace&quot;</span> <span class="op">=&gt;</span> <span class="fu">DecisionRule</span>(<span class="fu">Laplace</span>()), <span class="st">&quot;minimax regret&quot;</span> <span class="op">=&gt;</span> <span class="fu">MinimaxRegret</span>()]</span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;all three states&quot;</span>, <span class="st">&quot;mink seen upstream&quot;</span>],</span>
-<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>         [[n, <span class="fu">first_choice</span>(<span class="fu">decide</span>(all_states, r)), <span class="fu">first_choice</span>(<span class="fu">decide</span>(seen, r))]</span>
-<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>          for (n, r) <span class="kw">in</span> statewise])</span></code></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>all_states <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, <span class="fu">ScenarioSet</span>(states); baseline<span class="op">=:</span>no_control)</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>seen <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, <span class="fu">ScenarioSet</span>([<span class="op">:</span>transient, <span class="op">:</span>established]);</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>                       baseline<span class="op">=:</span>no_control)</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>statewise <span class="op">=</span> [<span class="st">&quot;maximin&quot;</span> <span class="op">=&gt;</span> <span class="fu">Maximin</span>(), <span class="st">&quot;maximax&quot;</span> <span class="op">=&gt;</span> <span class="fu">Maximax</span>(),</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>             <span class="st">&quot;Laplace&quot;</span> <span class="op">=&gt;</span> <span class="fu">DecisionRule</span>(<span class="fu">Laplace</span>()), <span class="st">&quot;minimax regret&quot;</span> <span class="op">=&gt;</span> <span class="fu">MinimaxRegret</span>()]</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;all three states&quot;</span>, <span class="st">&quot;mink seen upstream&quot;</span>],</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>         [[n, <span class="fu">first_choice</span>(<span class="fu">decide</span>(all_states, r)), <span class="fu">first_choice</span>(<span class="fu">decide</span>(seen, r))]</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>          for (n, r) <span class="kw">in</span> statewise])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -793,11 +931,11 @@ is no longer a scenario.</p>
 </table>
 <p>Rules that need probabilities are not defined for a scenario set, and
 the value of information is not defined either.</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">evpi</span>(seen)</span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">evpi</span>(seen)</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
 <pre><code>BeliefFormError: evpi is not defined for a ScenarioSet: a scenario set carries no probabilities; supply a FiniteBelief</code></pre>
 <h1 id="robustness-metrics-from-the-same-pieces">Robustness metrics from
 the same pieces</h1>
@@ -806,19 +944,19 @@ a subset of scenarios, an aggregator and a selector. The first three
 without the selector are a <code>RobustnessMetric</code>: a score per
 action that can be tabulated without choosing. Named metrics exist for
 the common cases and any combination can be written down.</p>
-<div class="sourceCode" id="cb25"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>metrics <span class="op">=</span> [<span class="st">&quot;worst case, `maximin_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">maximin_metric</span>(),</span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;best case, `maximax_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">maximax_metric</span>(),</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;Hurwicz at 1/2, `hurwicz_metric(1 // 2)`&quot;</span> <span class="op">=&gt;</span> <span class="fu">hurwicz_metric</span>(<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>),</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;mean over states, `laplace_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">laplace_metric</span>(),</span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest regret, `minimax_regret_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">minimax_regret_metric</span>(),</span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest regret, mink seen upstream&quot;</span> <span class="op">=&gt;</span></span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>               <span class="fu">minimax_regret_metric</span>(; scenarios<span class="op">=</span>[<span class="op">:</span>transient, <span class="op">:</span>established]),</span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest expected regret over the priors&quot;</span> <span class="op">=&gt;</span></span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>               <span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>(); transform<span class="op">=</span><span class="fu">RegretTransform</span>()),</span>
-<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;lowest expected voles over the priors&quot;</span> <span class="op">=&gt;</span></span>
-<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>               <span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>())]</span>
-<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>(<span class="fu">vcat</span>(<span class="st">&quot;metric&quot;</span>, actions),</span>
-<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>         [<span class="fu">vcat</span>(n, <span class="fu">robustness</span>(problem, m)) for (n, m) <span class="kw">in</span> metrics])</span></code></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>metrics <span class="op">=</span> [<span class="st">&quot;worst case, `maximin_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">maximin_metric</span>(),</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;best case, `maximax_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">maximax_metric</span>(),</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;Hurwicz at 1/2, `hurwicz_metric(1 // 2)`&quot;</span> <span class="op">=&gt;</span> <span class="fu">hurwicz_metric</span>(<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>),</span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;mean over states, `laplace_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">laplace_metric</span>(),</span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest regret, `minimax_regret_metric()`&quot;</span> <span class="op">=&gt;</span> <span class="fu">minimax_regret_metric</span>(),</span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest regret, mink seen upstream&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>               <span class="fu">minimax_regret_metric</span>(; scenarios<span class="op">=</span>[<span class="op">:</span>transient, <span class="op">:</span>established]),</span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;largest expected regret over the priors&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>               <span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>(); transform<span class="op">=</span><span class="fu">RegretTransform</span>()),</span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;lowest expected voles over the priors&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a>               <span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>())]</span>
+<span id="cb37-12"><a href="#cb37-12" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>(<span class="fu">vcat</span>(<span class="st">&quot;metric&quot;</span>, actions),</span>
+<span id="cb37-13"><a href="#cb37-13" aria-hidden="true" tabindex="-1"></a>         [<span class="fu">vcat</span>(n, <span class="fu">robustness</span>(problem, m)) for (n, m) <span class="kw">in</span> metrics])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -898,9 +1036,9 @@ priors</td>
 expectation” of a loss is its worst case over the priors, the largest
 expected regret. Putting a selector on a metric makes it a rule
 again:</p>
-<div class="sourceCode" id="cb26"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>rule <span class="op">=</span> <span class="fu">DecisionRule</span>(<span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>(); transform<span class="op">=</span><span class="fu">RegretTransform</span>());</span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>                    name<span class="op">=:</span>MinimaxExpectedRegret)</span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="fu">first_choice</span>(<span class="fu">decide</span>(problem, rule))</span></code></pre></div>
+<div class="sourceCode" id="cb38"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>rule <span class="op">=</span> <span class="fu">DecisionRule</span>(<span class="fu">RobustnessMetric</span>(<span class="fu">LowerExpectation</span>(); transform<span class="op">=</span><span class="fu">RegretTransform</span>());</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>                    name<span class="op">=:</span>MinimaxExpectedRegret)</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a><span class="fu">first_choice</span>(<span class="fu">decide</span>(problem, rule))</span></code></pre></div>
 <pre><code>:trap_mink</code></pre>
 <h1 id="how-far-apart-are-the-experts">How far apart are the
 experts?</h1>
@@ -910,21 +1048,21 @@ half the sum of the absolute differences.
 deciding under a belief that is within total-variation distance
 <code>ε</code> of the right one, when the payoffs span a range
 <code>B</code>: at most <code>2 B ε</code>.</p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>B <span class="op">=</span> <span class="fu">maximum</span>(payoff.Q) <span class="op">-</span> <span class="fu">minimum</span>(payoff.Q)</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>optimist, moderate <span class="op">=</span> <span class="fu">last</span>(experts[<span class="fl">1</span>]), <span class="fu">last</span>(experts[<span class="fl">2</span>])</span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>ε <span class="op">=</span> <span class="fu">total_variation</span>(optimist, moderate)</span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>choice <span class="op">=</span> <span class="fu">first_choice</span>(<span class="fu">decide</span>(<span class="fu">DecisionProblem</span>(payoff, optimist), <span class="fu">MaxExpectedUtility</span>()))</span>
-<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>truth <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, moderate)</span>
-<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>actual <span class="op">=</span> <span class="fu">act_now_value</span>(truth) <span class="op">-</span></span>
-<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>         <span class="fu">aggregate</span>(<span class="fu">Expectation</span>(), truth)[<span class="fu">findfirst</span>(<span class="op">==</span>(choice), actions)]</span>
-<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;value&quot;</span>],</span>
-<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;range of the payoffs, B&quot;</span>, B],</span>
-<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;distance between optimist and moderate, ε&quot;</span>, <span class="fu">exact</span>(ε)],</span>
-<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;bound on the loss, 2 B ε&quot;</span>, <span class="fu">decision_loss_bound</span>(B, ε)],</span>
-<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;actual loss from acting on the optimist&#39;s prior when the moderate is right&quot;</span>,</span>
-<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>           actual]])</span></code></pre></div>
+<div class="sourceCode" id="cb40"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>B <span class="op">=</span> <span class="fu">maximum</span>(payoff.Q) <span class="op">-</span> <span class="fu">minimum</span>(payoff.Q)</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>optimist, moderate <span class="op">=</span> <span class="fu">last</span>(experts[<span class="fl">1</span>]), <span class="fu">last</span>(experts[<span class="fl">2</span>])</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>ε <span class="op">=</span> <span class="fu">total_variation</span>(optimist, moderate)</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>choice <span class="op">=</span> <span class="fu">first_choice</span>(<span class="fu">decide</span>(<span class="fu">DecisionProblem</span>(payoff, optimist), <span class="fu">MaxExpectedUtility</span>()))</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>truth <span class="op">=</span> <span class="fu">DecisionProblem</span>(payoff, moderate)</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>actual <span class="op">=</span> <span class="fu">act_now_value</span>(truth) <span class="op">-</span></span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>         <span class="fu">aggregate</span>(<span class="fu">Expectation</span>(), truth)[<span class="fu">findfirst</span>(<span class="op">==</span>(choice), actions)]</span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;value&quot;</span>],</span>
+<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;range of the payoffs, B&quot;</span>, B],</span>
+<span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;distance between optimist and moderate, ε&quot;</span>, <span class="fu">exact</span>(ε)],</span>
+<span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;bound on the loss, 2 B ε&quot;</span>, <span class="fu">decision_loss_bound</span>(B, ε)],</span>
+<span id="cb40-14"><a href="#cb40-14" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;actual loss from acting on the optimist&#39;s prior when the moderate is right&quot;</span>,</span>
+<span id="cb40-15"><a href="#cb40-15" aria-hidden="true" tabindex="-1"></a>           actual]])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -972,6 +1110,14 @@ never picks a prior for you.</li>
 <code>IntervalDominance</code> return nested sets of actions that cannot
 be ruled out. E-admissibility is decided over the whole set of priors,
 and can admit an action that no stated prior chooses.</li>
+<li>The linear programmes are JuMP models
+(<code>eadmissibility_model</code> and its siblings). The default route
+solves them exactly with no solver installed; <code>optimizer=</code>
+hands them to any JuMP solver. A floating-point solution is rounded and
+verified exactly before it is returned, and <code>details.exact</code>
+says which answers are exact.</li>
+<li>Under a credal set <code>expected_gain_over_baseline</code> gives
+the lowest and highest expected gain of each action.</li>
 <li><code>robust_evpi</code> and <code>robust_evsi</code> keep the
 rule-specific value apart from the range of single-prior values. The
 rule-specific value of a survey can be negative, and is reported as

@@ -134,6 +134,8 @@ img { background: #fff; }
 as data</a></li>
 <li><a href="#a-tablesjl-table" id="toc-a-tablesjl-table">A Tables.jl
 table</a></li>
+<li><a href="#the-report-as-text" id="toc-the-report-as-text">The report
+as text</a></li>
 <li><a href="#what-the-report-leaves-out-when-it-cannot-be-computed" id="toc-what-the-report-leaves-out-when-it-cannot-be-computed">What the
 report leaves out when it cannot be computed</a></li>
 <li><a href="#the-weight-on-infected-frogs" id="toc-the-weight-on-infected-frogs">The weight on infected
@@ -169,21 +171,22 @@ The report is built at <code>w = 1</code> and compared with
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>actions <span class="op">=</span> [<span class="op">:</span>no_intervention, <span class="op">:</span>antifungal_baths, <span class="op">:</span>disinfect_pond]</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>states <span class="op">=</span> [<span class="op">:</span>absent, <span class="op">:</span>low_prevalence, <span class="op">:</span>high_prevalence]</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>uninfected <span class="op">=</span> [<span class="fl">500</span> <span class="fl">300</span> <span class="fl">100</span>; <span class="fl">470</span> <span class="fl">380</span> <span class="fl">250</span>; <span class="fl">350</span> <span class="fl">340</span> <span class="fl">320</span>]</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>infected <span class="op">=</span> [<span class="fl">0</span> <span class="fl">150</span> <span class="fl">250</span>; <span class="fl">0</span> <span class="fl">60</span> <span class="fl">120</span>; <span class="fl">0</span> <span class="fl">10</span> <span class="fl">20</span>]</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>uninfected <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states, [<span class="fl">500</span> <span class="fl">300</span> <span class="fl">100</span>; <span class="fl">470</span> <span class="fl">380</span> <span class="fl">250</span>; <span class="fl">350</span> <span class="fl">340</span> <span class="fl">320</span>])</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>infected <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states, [<span class="fl">0</span> <span class="fl">150</span> <span class="fl">250</span>; <span class="fl">0</span> <span class="fl">60</span> <span class="fl">120</span>; <span class="fl">0</span> <span class="fl">10</span> <span class="fl">20</span>])</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>prior <span class="op">=</span> <span class="fu">FiniteBelief</span>(states, [<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>])</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">bd_problem</span>(w)</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>(actions, states, uninfected <span class="op">.-</span> w <span class="op">.*</span> infected),</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>                           prior; baseline<span class="op">=:</span>no_intervention)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">DecisionProblem</span>(<span class="fu">infection_payoff</span>(; uninfected, infected, weight<span class="op">=</span>w), prior;</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>                           baseline<span class="op">=:</span>no_intervention)</span>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>problem <span class="op">=</span> <span class="fu">bd_problem</span>(<span class="fl">1</span>)</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(problem.payoff; corner<span class="op">=</span><span class="st">&quot;uninfected − infected&quot;</span>)</span></code></pre></div>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>problem.payoff</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 3 actions × 3 states</strong></p>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">uninfected − infected</th>
+<th style="text-align: left;">action</th>
 <th style="text-align: right;"><code>absent</code></th>
 <th style="text-align: right;"><code>low_prevalence</code></th>
 <th style="text-align: right;"><code>high_prevalence</code></th>
@@ -210,78 +213,316 @@ The report is built at <code>w = 1</code> and compared with
 </tr>
 </tbody>
 </table>
-<p>Three further ingredients are optional. A credal set says how far the
-prior might be wrong: here the stated prior and two alternatives, one
-more hopeful and one less. An experiment is the swab test. The Hurwicz
+<p>The further ingredients are all optional. A credal set says how far
+the prior might be wrong: here the stated prior and two alternatives,
+one more hopeful and one less. The experiments are the swab test and a
+visual check for sick frogs, which barely separates the states, given by
+name. A partition of the states names something that could be learned
+exactly: here, whether Bd is present at all. The objectives are the two
+counts kept apart, as in the vignette on several objectives. The Hurwicz
 index is fixed at 1/2.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>credal <span class="op">=</span> <span class="fu">CredalSet</span>(states, [[<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>],</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">7</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">10</span>],</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">2</span> <span class="op">//</span> <span class="fl">5</span>]])</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>swab <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">19</span><span class="op">//</span><span class="fl">20</span> <span class="fl">2</span><span class="op">//</span><span class="fl">5</span> <span class="fl">1</span><span class="op">//</span><span class="fl">20</span>; <span class="fl">1</span><span class="op">//</span><span class="fl">20</span> <span class="fl">3</span><span class="op">//</span><span class="fl">5</span> <span class="fl">19</span><span class="op">//</span><span class="fl">20</span>];</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>                  signals<span class="op">=</span>[<span class="op">:</span>negative, <span class="op">:</span>positive], states<span class="op">=</span>states)</span></code></pre></div>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>                  signals<span class="op">=</span>[<span class="op">:</span>negative, <span class="op">:</span>positive], states<span class="op">=</span>states)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>visual_check <span class="op">=</span> <span class="fu">Experiment</span>([<span class="fl">11</span><span class="op">//</span><span class="fl">20</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">9</span><span class="op">//</span><span class="fl">20</span>; <span class="fl">9</span><span class="op">//</span><span class="fl">20</span> <span class="fl">1</span><span class="op">//</span><span class="fl">2</span> <span class="fl">11</span><span class="op">//</span><span class="fl">20</span>];</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>                          signals<span class="op">=</span>[<span class="op">:</span>no_signs, <span class="op">:</span>signs], states<span class="op">=</span>states)</span></code></pre></div>
 <pre><code>Experiment{Rational{Int64}}(2 signals × 3 states, cost 0)</code></pre>
 <h1 id="the-report">The report</h1>
-<div class="sourceCode" id="cb4"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>report <span class="op">=</span> <span class="fu">DecisionReport</span>(problem; credal<span class="op">=</span>credal, experiment<span class="op">=</span>swab, hurwicz<span class="op">=</span><span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>,</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                        assumptions<span class="op">=</span>[<span class="st">&quot;All payoffs are illustrative.&quot;</span>,</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                                     <span class="st">&quot;Utility is uninfected minus infected frogs &quot;</span> <span class="op">*</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                                     <span class="st">&quot;(w = 1); infected but living frogs are not &quot;</span> <span class="op">*</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>                                     <span class="st">&quot;counted as population.&quot;</span>])</span></code></pre></div>
-<pre><code>DecisionReport: 3 actions × 3 states, FiniteBelief
-Baseline (no intervention): no_intervention
-
-Scores by rule (* marks the chosen actions)
-  action            MaxExpectedUtility  Maximin  Maximax    Laplace  Hurwicz  MinimaxRegret  GammaMaximin
-  ----------------  ------------------  -------  -------  ---------  -------  -------------  ------------
-  no_intervention                265     -150      500 *  166.667      175            450           135  
-  antifungal_baths               357 *    130      470    306.667      300            170           289  
-  disinfect_pond                 334      300 *    350    326.667 *    325 *          150 *         324 *
-
-First choice by rule
-  MaxExpectedUtility  antifungal_baths  [not the baseline]
-  Maximin             disinfect_pond  [not the baseline]
-  Maximax             no_intervention  [the baseline]
-  Laplace             disinfect_pond  [not the baseline]
-  Hurwicz             disinfect_pond  [not the baseline]
-  MinimaxRegret       disinfect_pond  [not the baseline]
-  GammaMaximin        disinfect_pond  [not the baseline]
-
-Expected gain over the baseline (no_intervention)
-  action            expected gain
-  ----------------  -------------
-  no_intervention               0
-  antifungal_baths             92
-  disinfect_pond               69
-
-Regret profile
-  action            max regret  expected regret
-  ----------------  ----------  ---------------
-  no_intervention          450              144
-  antifungal_baths         170               52
-  disinfect_pond           150               75
-
-Robust sets over the credal set
-  EAdmissible         antifungal_baths, disinfect_pond
-  Maximal             antifungal_baths, disinfect_pond
-  IntervalDominance   no_intervention, antifungal_baths, disinfect_pond
-
-Value of information
-  EVPI                52
-  EVSI                31.1
-  EVPI, Γ-maximin     45
-  EVPI envelope       [40, 66]
-
-Assumptions
-  1. Payoffs are conditional expected utilities of each action in each state; higher is better.
-  2. State-wise rules (maximin, maximax, Laplace, Hurwicz, minimax regret) ignore probabilities and range over every state of the table, including any of probability zero.
-  3. Regret is measured against the best feasible action in each state, so it changes when the set of actions changes.
-  4. Tied actions are all reported; the first choice is the tied action that comes first in the payoff table.
-  5. Expected utility, expected regret and EVPI are under the single stated prior; EVPI is the value of learning the state exactly and at no cost.
-  6. EVSI is gross of the cost of the experiment and assumes the stated likelihood.
-  7. The credal set is the convex hull of 3 stated priors; E-admissibility is decided over the whole hull.
-  8. The rule-specific robust EVPI is under Γ-maximin; the envelope is the range of the single-prior EVPI over the credal set.
-  9. The baseline (no intervention) is no_intervention; gains are payoffs minus the payoff of the baseline in the same state.
-  10. All payoffs are illustrative.
-  11. Utility is uninfected minus infected frogs (w = 1); infected but living frogs are not counted as population.</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>report <span class="op">=</span> <span class="fu">DecisionReport</span>(problem; credal<span class="op">=</span>credal, experiments<span class="op">=</span>(; swab, visual_check),</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                        partitions<span class="op">=</span>(; presence<span class="op">=</span>[<span class="op">:</span>absent, <span class="op">:</span>present, <span class="op">:</span>present]),</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                        objectives<span class="op">=</span>(; uninfected, fewer_infected<span class="op">=-</span>infected),</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                        hurwicz<span class="op">=</span><span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>                        assumptions<span class="op">=</span>[<span class="st">&quot;All payoffs are illustrative.&quot;</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>                                     <span class="st">&quot;Utility is uninfected minus infected frogs &quot;</span> <span class="op">*</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>                                     <span class="st">&quot;(w = 1); infected but living frogs are not &quot;</span> <span class="op">*</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>                                     <span class="st">&quot;counted as population.&quot;</span>])</span></code></pre></div>
+<p><strong>DecisionReport: 3 actions × 3 states,
+FiniteBelief</strong><br />
+<strong>Baseline (no intervention): no_intervention</strong></p>
+<p><strong>Scores by rule (* marks the chosen actions)</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">MaxExpectedUtility</th>
+<th style="text-align: right;">Maximin</th>
+<th style="text-align: right;">Maximax</th>
+<th style="text-align: right;">Laplace</th>
+<th style="text-align: right;">Hurwicz</th>
+<th style="text-align: right;">MinimaxRegret</th>
+<th style="text-align: right;">GammaMaximin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">265</td>
+<td style="text-align: right;">-150</td>
+<td style="text-align: right;">500 *</td>
+<td style="text-align: right;">166.667</td>
+<td style="text-align: right;">175</td>
+<td style="text-align: right;">450</td>
+<td style="text-align: right;">135</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">357 *</td>
+<td style="text-align: right;">130</td>
+<td style="text-align: right;">470</td>
+<td style="text-align: right;">306.667</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">170</td>
+<td style="text-align: right;">289</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">334</td>
+<td style="text-align: right;">300 *</td>
+<td style="text-align: right;">350</td>
+<td style="text-align: right;">326.667 *</td>
+<td style="text-align: right;">325 *</td>
+<td style="text-align: right;">150 *</td>
+<td style="text-align: right;">324 *</td>
+</tr>
+</tbody>
+</table>
+<p><strong>First choice by rule</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">rule</th>
+<th style="text-align: left;">first choice</th>
+<th style="text-align: left;">baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>MaxExpectedUtility</code></td>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Maximin</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Maximax</code></td>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: left;">[the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Laplace</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Hurwicz</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>MinimaxRegret</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>GammaMaximin</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+</tbody>
+</table>
+<p>Minimax regret depends on the menu of actions: adding or removing an
+action, even one that is never chosen, can change its choice.</p>
+<p><strong>Expected gain over the baseline
+(no_intervention)</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">expected gain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">92</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">69</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Regret profile</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">max regret</th>
+<th style="text-align: right;">expected regret</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">450</td>
+<td style="text-align: right;">144</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">170</td>
+<td style="text-align: right;">52</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">150</td>
+<td style="text-align: right;">75</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Robust sets over the credal set</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">rule</th>
+<th style="text-align: left;">actions kept</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>EAdmissible</code></td>
+<td style="text-align: left;"><code>antifungal_baths, disinfect_pond</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Maximal</code></td>
+<td style="text-align: left;"><code>antifungal_baths, disinfect_pond</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>IntervalDominance</code></td>
+<td style="text-align: left;"><code>no_intervention, antifungal_baths, disinfect_pond</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value of information</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">quantity</th>
+<th style="text-align: right;">value</th>
+<th style="text-align: left;">note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">EVPI</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EVSI of swab</td>
+<td style="text-align: right;">31.1</td>
+<td style="text-align: left;">can change the decision</td>
+</tr>
+<tr>
+<td style="text-align: left;">EVSI of visual_check</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">this experiment cannot change the
+decision</td>
+</tr>
+<tr>
+<td style="text-align: left;">EVPPI of presence</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EVPI, Γ-maximin</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EVPI envelope</td>
+<td style="text-align: right;">[40, 66]</td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Several objectives: Pareto front, each objective summarised
+by Expectation</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">uninfected</th>
+<th style="text-align: right;">fewer_infected</th>
+<th style="text-align: right;">on the front</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">360</td>
+<td style="text-align: right;">-95</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">399</td>
+<td style="text-align: right;">-42</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">341</td>
+<td style="text-align: right;">-7</td>
+<td style="text-align: right;">yes</td>
+</tr>
+</tbody>
+</table>
+<p>Not dominated: antifungal_baths, disinfect_pond.</p>
+<p><strong>Assumptions</strong></p>
+<ol type="1">
+<li>Payoffs are conditional expected utilities of each action in each
+state; higher is better.</li>
+<li>State-wise rules (maximin, maximax, Laplace, Hurwicz, minimax
+regret) ignore probabilities and range over every state of the table,
+including any of probability zero.</li>
+<li>Regret is measured against the best feasible action in each state,
+so it changes when the set of actions changes. Minimax regret therefore
+depends on the menu of actions: adding or removing an action, even one
+that is never chosen, can change its choice.</li>
+<li>Tied actions are all reported; the first choice is the tied action
+that comes first in the payoff table.</li>
+<li>Expected utility, expected regret and EVPI are under the single
+stated prior; EVPI is the value of learning the state exactly and at no
+cost.</li>
+<li>EVSI is gross of the cost of the experiment and assumes the stated
+likelihood. The net value is EVSI minus the cost, which is meaningful
+only when payoffs and costs are in the same additive units. An
+experiment can change the decision exactly when its EVSI is
+positive.</li>
+<li>EVPPI is the value of learning which cell of a partition of the
+states holds, and nothing more, at no cost.</li>
+<li>The credal set is the convex hull of 3 stated priors;
+E-admissibility is decided over the whole hull.</li>
+<li>The rule-specific robust EVPI is under Γ-maximin; the envelope is
+the range of the single-prior EVPI over the credal set.</li>
+<li>The Pareto front keeps the actions that no other action matches on
+every objective and beats on one; each objective is summarised over the
+states by Expectation.</li>
+<li>The baseline (no intervention) is no_intervention; gains are payoffs
+minus the payoff of the baseline in the same state.</li>
+<li>All payoffs are illustrative.</li>
+<li>Utility is uninfected minus infected frogs (w = 1); infected but
+living frogs are not counted as population.</li>
+</ol>
 <p>Reading it from the top:</p>
 <ul>
 <li><strong>Scores by rule.</strong> One column per rule, with a star on
@@ -290,16 +531,23 @@ on the smallest number.</li>
 <li><strong>First choice by rule.</strong> The single choice of each
 rule, and whether it is the baseline. Here maximax, which looks only at
 the best cell of each row, recommends doing nothing, and no other rule
-does.</li>
+does. The line below the table is a standing warning: the minimax-regret
+choice depends on which actions are on the menu.</li>
 <li><strong>Expected gain over the baseline.</strong> What each action
 adds to no intervention, in expectation under the stated prior.</li>
 <li><strong>Regret profile.</strong> Maximum and expected regret by
 action.</li>
 <li><strong>Robust sets.</strong> The actions that the credal set cannot
 rule out.</li>
-<li><strong>Value of information.</strong> EVPI and the EVSI of the swab
-under the stated prior, the EVPI of a Γ-maximin decision-maker, and the
-range of EVPI over the credal set.</li>
+<li><strong>Value of information.</strong> EVPI under the stated prior;
+the EVSI of each named experiment, with a note saying whether it can
+change the decision; the EVPPI of each named partition; the EVPI of a
+Γ-maximin decision-maker, and the range of EVPI over the credal set. The
+visual check is informative, yet the same action is best after either of
+its results, so the report says that this experiment cannot change the
+decision: its EVSI is zero.</li>
+<li><strong>Several objectives.</strong> The expected score of each
+action on each objective, and the actions on the Pareto front.</li>
 <li><strong>Assumptions.</strong> The conditions under which the numbers
 hold, including the two supplied above.</li>
 </ul>
@@ -313,9 +561,9 @@ the bad states get, and that information is worth having: EVPI is about
 a seventh of the expected utility of acting now.</p>
 <h1 id="the-report-as-data">The report as data</h1>
 <p>The fields hold the same content as objects.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;first choice&quot;</span>, <span class="st">&quot;is the baseline&quot;</span>],</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>         [[<span class="fu">string</span>(r.rule), <span class="fu">first_choice</span>(r), <span class="fu">first_choice</span>(r) <span class="op">==</span> problem.baseline]</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>          for r <span class="kw">in</span> report.results])</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;first choice&quot;</span>, <span class="st">&quot;is the baseline&quot;</span>],</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>         [[<span class="fu">string</span>(r.rule), <span class="fu">first_choice</span>(r), <span class="fu">first_choice</span>(r) <span class="op">==</span> problem.baseline]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>          for r <span class="kw">in</span> report.results])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -362,8 +610,8 @@ a seventh of the expected utility of acting now.</p>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb7"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;robust rule&quot;</span>, <span class="st">&quot;actions kept&quot;</span>],</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>         [[<span class="fu">string</span>(<span class="fu">nameof</span>(<span class="fu">typeof</span>(r.rule))), r.chosen] for r <span class="kw">in</span> report.robust])</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;robust rule&quot;</span>, <span class="st">&quot;actions kept&quot;</span>],</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>         [[<span class="fu">string</span>(<span class="fu">nameof</span>(<span class="fu">typeof</span>(r.rule))), r.chosen] for r <span class="kw">in</span> report.robust])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -389,9 +637,11 @@ a seventh of the expected utility of acting now.</p>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb8"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>report.evpi, report.evsi, report.robust_evpi</span></code></pre></div>
-<pre><code>(52//1, 311//10, RobustVOI(evpi under GammaMaximin: 45//1; envelope [40//1, 66//1]))</code></pre>
-<div class="sourceCode" id="cb10"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bullet</span>(report.assumptions)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>report.evpi, report.experiments, report.partitions</span></code></pre></div>
+<pre><code>(52//1, NamedTuple[(name = :swab, evsi = 311//10, cost = 0, net = 311//10, can_change_decision = true), (name = :visual_check, evsi = 0//1, cost = 0, net = 0//1, can_change_decision = false)], NamedTuple[(name = :presence, evppi = 52//1)])</code></pre>
+<div class="sourceCode" id="cb9"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>report.robust_evpi, report.pareto.chosen</span></code></pre></div>
+<pre><code>(RobustVOI(evpi under GammaMaximin: 45//1; envelope [40//1, 66//1]), [:antifungal_baths, :disinfect_pond])</code></pre>
+<div class="sourceCode" id="cb11"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bullet</span>(report.assumptions)</span></code></pre></div>
 <ul>
 <li>Payoffs are conditional expected utilities of each action in each
 state; higher is better.</li>
@@ -399,18 +649,28 @@ state; higher is better.</li>
 regret) ignore probabilities and range over every state of the table,
 including any of probability zero.</li>
 <li>Regret is measured against the best feasible action in each state,
-so it changes when the set of actions changes.</li>
+so it changes when the set of actions changes. Minimax regret therefore
+depends on the menu of actions: adding or removing an action, even one
+that is never chosen, can change its choice.</li>
 <li>Tied actions are all reported; the first choice is the tied action
 that comes first in the payoff table.</li>
 <li>Expected utility, expected regret and EVPI are under the single
 stated prior; EVPI is the value of learning the state exactly and at no
 cost.</li>
 <li>EVSI is gross of the cost of the experiment and assumes the stated
-likelihood.</li>
+likelihood. The net value is EVSI minus the cost, which is meaningful
+only when payoffs and costs are in the same additive units. An
+experiment can change the decision exactly when its EVSI is
+positive.</li>
+<li>EVPPI is the value of learning which cell of a partition of the
+states holds, and nothing more, at no cost.</li>
 <li>The credal set is the convex hull of 3 stated priors;
 E-admissibility is decided over the whole hull.</li>
 <li>The rule-specific robust EVPI is under Γ-maximin; the envelope is
 the range of the single-prior EVPI over the credal set.</li>
+<li>The Pareto front keeps the actions that no other action matches on
+every objective and beats on one; each objective is summarised over the
+states by Expectation.</li>
 <li>The baseline (no intervention) is no_intervention; gains are payoffs
 minus the payoff of the baseline in the same state.</li>
 <li>All payoffs are illustrative.</li>
@@ -421,13 +681,13 @@ living frogs are not counted as population.</li>
 <p>A report is a Tables.jl row table with one row per feasible action,
 so it can be passed to anything that accepts a table: a
 <code>DataFrame</code>, a CSV writer, a plotting package.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> Tables.<span class="fu">rows</span>(report)</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>Tables.<span class="fu">istable</span>(report), <span class="fu">length</span>(rows), <span class="fu">propertynames</span>(<span class="fu">first</span>(rows))</span></code></pre></div>
-<pre><code>(true, 3, (:action, :MaxExpectedUtility, :MaxExpectedUtility_chosen, :Maximin, :Maximin_chosen, :Maximax, :Maximax_chosen, :Laplace, :Laplace_chosen, :Hurwicz, :Hurwicz_chosen, :MinimaxRegret, :MinimaxRegret_chosen, :GammaMaximin, :GammaMaximin_chosen, :max_regret, :expected_regret, :expected_gain_over_baseline, :EAdmissible, :Maximal, :IntervalDominance))</code></pre>
-<div class="sourceCode" id="cb13"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>columns <span class="op">=</span> Tables.<span class="fu">columntable</span>(report)</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;column&quot;</span>, columns.action<span class="op">...</span>],</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>         [<span class="fu">vcat</span>(<span class="st">&quot;`</span><span class="sc">$</span>name<span class="st">`&quot;</span>, <span class="fu">collect</span>(<span class="fu">getproperty</span>(columns, name)))</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>          for name <span class="kw">in</span> <span class="fu">keys</span>(columns) if name <span class="op">!=</span> <span class="op">:</span>action])</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> Tables.<span class="fu">rows</span>(report)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>Tables.<span class="fu">istable</span>(report), <span class="fu">length</span>(rows), <span class="fu">propertynames</span>(<span class="fu">first</span>(rows))</span></code></pre></div>
+<pre><code>(true, 3, (:action, :MaxExpectedUtility, :MaxExpectedUtility_chosen, :Maximin, :Maximin_chosen, :Maximax, :Maximax_chosen, :Laplace, :Laplace_chosen, :Hurwicz, :Hurwicz_chosen, :MinimaxRegret, :MinimaxRegret_chosen, :GammaMaximin, :GammaMaximin_chosen, :max_regret, :expected_regret, :expected_gain_over_baseline, :EAdmissible, :Maximal, :IntervalDominance, :ParetoFront))</code></pre>
+<div class="sourceCode" id="cb14"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>columns <span class="op">=</span> Tables.<span class="fu">columntable</span>(report)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;column&quot;</span>, columns.action<span class="op">...</span>],</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>         [<span class="fu">vcat</span>(<span class="st">&quot;`</span><span class="sc">$</span>name<span class="st">`&quot;</span>, <span class="fu">collect</span>(<span class="fu">getproperty</span>(columns, name)))</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>          for name <span class="kw">in</span> <span class="fu">keys</span>(columns) if name <span class="op">!=</span> <span class="op">:</span>action])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -558,66 +818,289 @@ so it can be passed to anything that accepts a table: a
 <td style="text-align: right;">yes</td>
 <td style="text-align: right;">yes</td>
 </tr>
+<tr>
+<td style="text-align: left;"><code>ParetoFront</code></td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">yes</td>
+</tr>
 </tbody>
 </table>
 <p>The table is shown here with one line per column because it is wide.
 Each scalar rule contributes its score and a <code>_chosen</code> flag,
-followed by the regret profile, the expected gain over the baseline and
-membership of each robust set.</p>
+followed by the regret profile, the expected gain over the baseline,
+membership of each robust set and of the Pareto front.</p>
+<h1 id="the-report-as-text">The report as text</h1>
+<p>In a notebook or a Quarto document a report renders as the tables
+above. At the REPL, or printed, it is plain text that fits 80 columns,
+with the rules wrapped into blocks of a few columns. This is the text
+form of a smaller report.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">show</span>(<span class="cn">stdout</span>, MIME<span class="st">&quot;text/plain&quot;</span>(), <span class="fu">DecisionReport</span>(problem; experiments<span class="op">=</span>(; swab)))</span></code></pre></div>
+<pre><code>DecisionReport: 3 actions × 3 states, FiniteBelief
+Baseline (no intervention): no_intervention
+
+Scores by rule (* marks the chosen actions)
+  action            MaxExpectedUtility  Maximin  Maximax    Laplace
+  ----------------  ------------------  -------  -------  ---------
+  no_intervention                265     -150      500 *  166.667
+  antifungal_baths               357 *    130      470    306.667
+  disinfect_pond                 334      300 *    350    326.667 *
+
+  action            MinimaxRegret
+  ----------------  -------------
+  no_intervention           450
+  antifungal_baths          170
+  disinfect_pond            150 *
+
+First choice by rule
+  rule                first choice      baseline
+  ------------------  ----------------  ------------------
+  MaxExpectedUtility  antifungal_baths  [not the baseline]
+  Maximin             disinfect_pond    [not the baseline]
+  Maximax             no_intervention   [the baseline]
+  Laplace             disinfect_pond    [not the baseline]
+  MinimaxRegret       disinfect_pond    [not the baseline]
+  Minimax regret depends on the menu of actions: adding or removing an action,
+  even one that is never chosen, can change its choice.
+
+Expected gain over the baseline (no_intervention)
+  action            expected gain
+  ----------------  -------------
+  no_intervention               0
+  antifungal_baths             92
+  disinfect_pond               69
+
+Regret profile
+  action            max regret  expected regret
+  ----------------  ----------  ---------------
+  no_intervention          450              144
+  antifungal_baths         170               52
+  disinfect_pond           150               75
+
+Value of information
+  quantity      value  note
+  ------------  -----  -----------------------
+  EVPI             52
+  EVSI of swab   31.1  can change the decision
+
+Assumptions
+  1. Payoffs are conditional expected utilities of each action in each state;
+     higher is better.
+  2. State-wise rules (maximin, maximax, Laplace, Hurwicz, minimax regret)
+     ignore probabilities and range over every state of the table, including any
+     of probability zero.
+  3. Regret is measured against the best feasible action in each state, so it
+     changes when the set of actions changes. Minimax regret therefore depends
+     on the menu of actions: adding or removing an action, even one that is
+     never chosen, can change its choice.
+  4. Tied actions are all reported; the first choice is the tied action that
+     comes first in the payoff table.
+  5. Expected utility, expected regret and EVPI are under the single stated
+     prior; EVPI is the value of learning the state exactly and at no cost.
+  6. EVSI is gross of the cost of the experiment and assumes the stated
+     likelihood. The net value is EVSI minus the cost, which is meaningful only
+     when payoffs and costs are in the same additive units. An experiment can
+     change the decision exactly when its EVSI is positive.
+  7. The baseline (no intervention) is no_intervention; gains are payoffs minus
+     the payoff of the baseline in the same state.</code></pre>
 <h1 id="what-the-report-leaves-out-when-it-cannot-be-computed">What the
 report leaves out when it cannot be computed</h1>
 <p>The content depends on the belief. With a scenario set there are no
 probabilities, so the report has the state-wise rules and the maximum
-regret, and no expected utility, no expected gain and no value of
-information.</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>scenario_report <span class="op">=</span> <span class="fu">DecisionReport</span>(<span class="fu">DecisionProblem</span>(problem.payoff, <span class="fu">ScenarioSet</span>(states);</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>                                                 baseline<span class="op">=:</span>no_intervention))</span></code></pre></div>
-<pre><code>DecisionReport: 3 actions × 3 states, ScenarioSet
-Baseline (no intervention): no_intervention
-
-Scores by rule (* marks the chosen actions)
-  action            Maximin  Maximax    Laplace  MinimaxRegret
-  ----------------  -------  -------  ---------  -------------
-  no_intervention    -150      500 *  166.667            450  
-  antifungal_baths    130      470    306.667            170  
-  disinfect_pond      300 *    350    326.667 *          150 *
-
-First choice by rule
-  Maximin             disinfect_pond  [not the baseline]
-  Maximax             no_intervention  [the baseline]
-  Laplace             disinfect_pond  [not the baseline]
-  MinimaxRegret       disinfect_pond  [not the baseline]
-
-Regret profile
-  action            max regret
-  ----------------  ----------
-  no_intervention          450
-  antifungal_baths         170
-  disinfect_pond           150
-
-Value of information
-  not defined without probabilities
-
-Assumptions
-  1. Payoffs are conditional expected utilities of each action in each state; higher is better.
-  2. State-wise rules (maximin, maximax, Laplace, Hurwicz, minimax regret) ignore probabilities and range over the states of the scenario set.
-  3. Regret is measured against the best feasible action in each state, so it changes when the set of actions changes.
-  4. Tied actions are all reported; the first choice is the tied action that comes first in the payoff table.
-  5. The baseline (no intervention) is no_intervention; gains are payoffs minus the payoff of the baseline in the same state, and no expected gain is shown because the belief has no single prior.</code></pre>
+regret, and no expected utility and no value of information. The gain
+over the baseline is shown as a range: the smallest and the largest gain
+of each action over the scenarios.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>scenario_report <span class="op">=</span> <span class="fu">DecisionReport</span>(<span class="fu">DecisionProblem</span>(problem.payoff, <span class="fu">ScenarioSet</span>(states);</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>                                                 baseline<span class="op">=:</span>no_intervention))</span></code></pre></div>
+<p><strong>DecisionReport: 3 actions × 3 states,
+ScenarioSet</strong><br />
+<strong>Baseline (no intervention): no_intervention</strong></p>
+<p><strong>Scores by rule (* marks the chosen actions)</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">Maximin</th>
+<th style="text-align: right;">Maximax</th>
+<th style="text-align: right;">Laplace</th>
+<th style="text-align: right;">MinimaxRegret</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">-150</td>
+<td style="text-align: right;">500 *</td>
+<td style="text-align: right;">166.667</td>
+<td style="text-align: right;">450</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">130</td>
+<td style="text-align: right;">470</td>
+<td style="text-align: right;">306.667</td>
+<td style="text-align: right;">170</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">300 *</td>
+<td style="text-align: right;">350</td>
+<td style="text-align: right;">326.667 *</td>
+<td style="text-align: right;">150 *</td>
+</tr>
+</tbody>
+</table>
+<p><strong>First choice by rule</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">rule</th>
+<th style="text-align: left;">first choice</th>
+<th style="text-align: left;">baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Maximin</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Maximax</code></td>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: left;">[the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Laplace</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>MinimaxRegret</code></td>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: left;">[not the baseline]</td>
+</tr>
+</tbody>
+</table>
+<p>Minimax regret depends on the menu of actions: adding or removing an
+action, even one that is never chosen, can change its choice.</p>
+<p><strong>Range of the gain over the baseline (no_intervention), over
+the scenarios</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">lowest gain</th>
+<th style="text-align: right;">highest gain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">-30</td>
+<td style="text-align: right;">280</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">-150</td>
+<td style="text-align: right;">450</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Regret profile</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">max regret</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">450</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">170</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">150</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value of information</strong></p>
+<p>not defined without probabilities</p>
+<p><strong>Assumptions</strong></p>
+<ol type="1">
+<li>Payoffs are conditional expected utilities of each action in each
+state; higher is better.</li>
+<li>State-wise rules (maximin, maximax, Laplace, Hurwicz, minimax
+regret) ignore probabilities and range over the states of the scenario
+set.</li>
+<li>Regret is measured against the best feasible action in each state,
+so it changes when the set of actions changes. Minimax regret therefore
+depends on the menu of actions: adding or removing an action, even one
+that is never chosen, can change its choice.</li>
+<li>Tied actions are all reported; the first choice is the tied action
+that comes first in the payoff table.</li>
+<li>The baseline (no intervention) is no_intervention; gains are payoffs
+minus the payoff of the baseline in the same state, and no expected gain
+is shown because the belief has no single prior: the range of the gain
+over the scenarios is shown in its place.</li>
+</ol>
 <p>With a credal set as the belief of the problem itself, the rules that
-need one prior are left out and the robust rules are kept.</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>credal_report <span class="op">=</span> <span class="fu">DecisionReport</span>(<span class="fu">DecisionProblem</span>(problem.payoff, credal;</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>                                               baseline<span class="op">=:</span>no_intervention))</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>[<span class="fu">string</span>(r.rule) for r <span class="kw">in</span> credal_report.results],</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>credal_report.evpi <span class="op">===</span> <span class="cn">nothing</span>, credal_report.expected_gain <span class="op">===</span> <span class="cn">nothing</span></span></code></pre></div>
+need one prior are left out and the robust rules are kept. The expected
+gain over the baseline is again a range, this time of the expected gain
+over the priors in the set.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>credal_report <span class="op">=</span> <span class="fu">DecisionReport</span>(<span class="fu">DecisionProblem</span>(problem.payoff, credal;</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>                                               baseline<span class="op">=:</span>no_intervention))</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>[<span class="fu">string</span>(r.rule) for r <span class="kw">in</span> credal_report.results],</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>credal_report.evpi <span class="op">===</span> <span class="cn">nothing</span>, credal_report.expected_gain <span class="op">===</span> <span class="cn">nothing</span></span></code></pre></div>
 <pre><code>([&quot;Maximin&quot;, &quot;Maximax&quot;, &quot;Laplace&quot;, &quot;MinimaxRegret&quot;, &quot;GammaMaximin&quot;], true, true)</code></pre>
+<div class="sourceCode" id="cb20"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;lowest expected gain&quot;</span>, <span class="st">&quot;highest expected gain&quot;</span>],</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>         [[a, l, u] for (a, l, u) <span class="kw">in</span> <span class="fu">zip</span>(actions, credal_report.gain_range.lower,</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>                                         credal_report.gain_range.upper)])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">lowest expected gain</th>
+<th style="text-align: right;">highest expected gain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>no_intervention</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>antifungal_baths</code></td>
+<td style="text-align: right;">41</td>
+<td style="text-align: right;">154</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>disinfect_pond</code></td>
+<td style="text-align: right;">-24</td>
+<td style="text-align: right;">189</td>
+</tr>
+</tbody>
+</table>
 <h1 id="the-weight-on-infected-frogs">The weight on infected frogs</h1>
 <p>The same report at <code>w = 0</code>, where only uninfected frogs
 count.</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>report0 <span class="op">=</span> <span class="fu">DecisionReport</span>(<span class="fu">bd_problem</span>(<span class="fl">0</span>); credal<span class="op">=</span>credal, experiment<span class="op">=</span>swab, hurwicz<span class="op">=</span><span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>)</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;first choice, w = 0&quot;</span>, <span class="st">&quot;first choice, w = 1&quot;</span>],</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>         [[<span class="fu">string</span>(r0.rule), <span class="fu">first_choice</span>(r0), <span class="fu">first_choice</span>(r1)]</span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>          for (r0, r1) <span class="kw">in</span> <span class="fu">zip</span>(report0.results, report.results)])</span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>report0 <span class="op">=</span> <span class="fu">DecisionReport</span>(<span class="fu">bd_problem</span>(<span class="fl">0</span>); credal<span class="op">=</span>credal, experiments<span class="op">=</span>(; swab, visual_check),</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>                         hurwicz<span class="op">=</span><span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>)</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule&quot;</span>, <span class="st">&quot;first choice, w = 0&quot;</span>, <span class="st">&quot;first choice, w = 1&quot;</span>],</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>         [[<span class="fu">string</span>(r0.rule), <span class="fu">first_choice</span>(r0), <span class="fu">first_choice</span>(r1)]</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>          for (r0, r1) <span class="kw">in</span> <span class="fu">zip</span>(report0.results, report.results)])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -664,13 +1147,13 @@ count.</p>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb19"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;w = 0&quot;</span>, <span class="st">&quot;w = 1&quot;</span>],</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>         <span class="fu">vcat</span>([[<span class="st">&quot;expected gain over no intervention: `</span><span class="sc">$</span>a<span class="st">`&quot;</span>, report0.expected_gain[i],</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>                report.expected_gain[i]] for (i, a) <span class="kw">in</span> <span class="fu">enumerate</span>(actions)],</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>              [[<span class="st">&quot;EVPI&quot;</span>, report0.evpi, report.evpi],</span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>               [<span class="st">&quot;EVSI of the swab&quot;</span>, report0.evsi, report.evsi],</span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>               [<span class="st">&quot;E-admissible actions&quot;</span>, report0.robust[<span class="fl">1</span>].chosen,</span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>                report.robust[<span class="fl">1</span>].chosen]]))</span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;w = 0&quot;</span>, <span class="st">&quot;w = 1&quot;</span>],</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>         <span class="fu">vcat</span>([[<span class="st">&quot;expected gain over no intervention: `</span><span class="sc">$</span>a<span class="st">`&quot;</span>, report0.expected_gain[i],</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>                report.expected_gain[i]] for (i, a) <span class="kw">in</span> <span class="fu">enumerate</span>(actions)],</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>              [[<span class="st">&quot;EVPI&quot;</span>, report0.evpi, report.evpi],</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>               [<span class="st">&quot;EVSI of the swab&quot;</span>, report0.evsi, report.evsi],</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>               [<span class="st">&quot;E-admissible actions&quot;</span>, report0.robust[<span class="fl">1</span>].chosen,</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>                report.robust[<span class="fl">1</span>].chosen]]))</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -724,19 +1207,25 @@ about one utility, and the weight belongs among its assumptions.</p>
 report</h1>
 <p>Infeasible actions are left out of every part of a report, and the
 assumptions say so. If the pond cannot be drained this year:</p>
-<div class="sourceCode" id="cb20"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>restricted <span class="op">=</span> <span class="fu">DecisionProblem</span>(problem.payoff, prior; baseline<span class="op">=:</span>no_intervention,</span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>                             feasible<span class="op">=</span>[<span class="op">:</span>no_intervention, <span class="op">:</span>antifungal_baths])</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> <span class="fu">DecisionReport</span>(restricted)</span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>r.evpi, <span class="fu">last</span>(r.assumptions, <span class="fl">3</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>restricted <span class="op">=</span> <span class="fu">DecisionProblem</span>(problem.payoff, prior; baseline<span class="op">=:</span>no_intervention,</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>                             feasible<span class="op">=</span>[<span class="op">:</span>no_intervention, <span class="op">:</span>antifungal_baths])</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> <span class="fu">DecisionReport</span>(restricted)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>r.evpi, <span class="fu">last</span>(r.assumptions, <span class="fl">3</span>)</span></code></pre></div>
 <pre><code>(15//1, [&quot;Infeasible actions are excluded throughout: disinfect_pond.&quot;, &quot;Expected utility, expected regret and EVPI are under the single stated prior; EVPI is the value of learning the state exactly and at no cost.&quot;, &quot;The baseline (no intervention) is no_intervention; gains are payoffs minus the payoff of the baseline in the same state.&quot;])</code></pre>
 <p>Removing an action lowers EVPI here, because there is less to choose
 between once the state is known.</p>
 <h1 id="what-to-take-away">What to take away</h1>
 <ul>
-<li><code>DecisionReport(problem; credal, experiment, hurwicz, assumptions)</code>
+<li><code>DecisionReport(problem; credal, experiments, partitions, objectives, hurwicz, assumptions)</code>
 puts every applicable rule side by side with the regret profile, the
-gain of each action over the baseline, the robust sets and the value of
-information.</li>
+gain of each action over the baseline, the robust sets, the value of
+each named experiment and partition, and the Pareto front of the named
+objectives.</li>
+<li>It says of each experiment whether it can change the decision, and
+warns that the minimax-regret choice depends on the menu of
+actions.</li>
+<li>It renders as tables in a document and prints as aligned text within
+80 columns.</li>
 <li>It states its assumptions, and takes more through the
 <code>assumptions</code> keyword. Put the utility there, including the
 weight on infected animals and the fact that the numbers are

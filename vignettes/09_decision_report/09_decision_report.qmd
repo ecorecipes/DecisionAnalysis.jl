@@ -31,22 +31,25 @@ include(joinpath("..", "_common.jl"))
 
 actions = [:no_intervention, :antifungal_baths, :disinfect_pond]
 states = [:absent, :low_prevalence, :high_prevalence]
-uninfected = [500 300 100; 470 380 250; 350 340 320]
-infected = [0 150 250; 0 60 120; 0 10 20]
+uninfected = PayoffTable(actions, states, [500 300 100; 470 380 250; 350 340 320])
+infected = PayoffTable(actions, states, [0 150 250; 0 60 120; 0 10 20])
 prior = FiniteBelief(states, [1 // 2, 3 // 10, 1 // 5])
 
 function bd_problem(w)
-    return DecisionProblem(PayoffTable(actions, states, uninfected .- w .* infected),
-                           prior; baseline=:no_intervention)
+    return DecisionProblem(infection_payoff(; uninfected, infected, weight=w), prior;
+                           baseline=:no_intervention)
 end
 
 problem = bd_problem(1)
-payoff_markdown(problem.payoff; corner="uninfected − infected")
+problem.payoff
 ```
 
-Three further ingredients are optional. A credal set says how far the prior might be
-wrong: here the stated prior and two alternatives, one more hopeful and one less. An
-experiment is the swab test. The Hurwicz index is fixed at 1/2.
+The further ingredients are all optional. A credal set says how far the prior might be
+wrong: here the stated prior and two alternatives, one more hopeful and one less. The
+experiments are the swab test and a visual check for sick frogs, which barely
+separates the states, given by name. A partition of the states names something that could be learned
+exactly: here, whether Bd is present at all. The objectives are the two counts kept
+apart, as in the vignette on several objectives. The Hurwicz index is fixed at 1/2.
 
 ```{julia}
 credal = CredalSet(states, [[1 // 2, 3 // 10, 1 // 5],
@@ -54,12 +57,17 @@ credal = CredalSet(states, [[1 // 2, 3 // 10, 1 // 5],
                             [3 // 10, 3 // 10, 2 // 5]])
 swab = Experiment([19//20 2//5 1//20; 1//20 3//5 19//20];
                   signals=[:negative, :positive], states=states)
+visual_check = Experiment([11//20 1//2 9//20; 9//20 1//2 11//20];
+                          signals=[:no_signs, :signs], states=states)
 ```
 
 ## The report
 
 ```{julia}
-report = DecisionReport(problem; credal=credal, experiment=swab, hurwicz=1 // 2,
+report = DecisionReport(problem; credal=credal, experiments=(; swab, visual_check),
+                        partitions=(; presence=[:absent, :present, :present]),
+                        objectives=(; uninfected, fewer_infected=-infected),
+                        hurwicz=1 // 2,
                         assumptions=["All payoffs are illustrative.",
                                      "Utility is uninfected minus infected frogs " *
                                      "(w = 1); infected but living frogs are not " *
@@ -72,13 +80,20 @@ Reading it from the top:
   minimax-regret column is a loss, so its star is on the smallest number.
 - **First choice by rule.** The single choice of each rule, and whether it is the
   baseline. Here maximax, which looks only at the best cell of each row, recommends
-  doing nothing, and no other rule does.
+  doing nothing, and no other rule does. The line below the table is a standing
+  warning: the minimax-regret choice depends on which actions are on the menu.
 - **Expected gain over the baseline.** What each action adds to no intervention, in
   expectation under the stated prior.
 - **Regret profile.** Maximum and expected regret by action.
 - **Robust sets.** The actions that the credal set cannot rule out.
-- **Value of information.** EVPI and the EVSI of the swab under the stated prior, the
-  EVPI of a Γ-maximin decision-maker, and the range of EVPI over the credal set.
+- **Value of information.** EVPI under the stated prior; the EVSI of each named
+  experiment, with a note saying whether it can change the decision; the EVPPI of each
+  named partition; the EVPI of a Γ-maximin decision-maker, and the range of EVPI over
+  the credal set. The visual check is informative, yet the same action is best after
+  either of its results, so the report says that this experiment cannot change the
+  decision: its EVSI is zero.
+- **Several objectives.** The expected score of each action on each objective, and the
+  actions on the Pareto front.
 - **Assumptions.** The conditions under which the numbers hold, including the two
   supplied above.
 
@@ -106,7 +121,11 @@ md_table(["robust rule", "actions kept"],
 ```
 
 ```{julia}
-report.evpi, report.evsi, report.robust_evpi
+report.evpi, report.experiments, report.partitions
+```
+
+```{julia}
+report.robust_evpi, report.pareto.chosen
 ```
 
 ```{julia}
@@ -132,13 +151,24 @@ md_table(["column", columns.action...],
 
 The table is shown here with one line per column because it is wide. Each scalar rule
 contributes its score and a `_chosen` flag, followed by the regret profile, the
-expected gain over the baseline and membership of each robust set.
+expected gain over the baseline, membership of each robust set and of the Pareto front.
+
+## The report as text
+
+In a notebook or a Quarto document a report renders as the tables above. At the REPL,
+or printed, it is plain text that fits 80 columns, with the rules wrapped into blocks
+of a few columns. This is the text form of a smaller report.
+
+```{julia}
+show(stdout, MIME"text/plain"(), DecisionReport(problem; experiments=(; swab)))
+```
 
 ## What the report leaves out when it cannot be computed
 
 The content depends on the belief. With a scenario set there are no probabilities, so
-the report has the state-wise rules and the maximum regret, and no expected utility,
-no expected gain and no value of information.
+the report has the state-wise rules and the maximum regret, and no expected utility
+and no value of information. The gain over the baseline is shown as a range: the
+smallest and the largest gain of each action over the scenarios.
 
 ```{julia}
 scenario_report = DecisionReport(DecisionProblem(problem.payoff, ScenarioSet(states);
@@ -146,7 +176,8 @@ scenario_report = DecisionReport(DecisionProblem(problem.payoff, ScenarioSet(sta
 ```
 
 With a credal set as the belief of the problem itself, the rules that need one prior
-are left out and the robust rules are kept.
+are left out and the robust rules are kept. The expected gain over the baseline is
+again a range, this time of the expected gain over the priors in the set.
 
 ```{julia}
 credal_report = DecisionReport(DecisionProblem(problem.payoff, credal;
@@ -155,12 +186,19 @@ credal_report = DecisionReport(DecisionProblem(problem.payoff, credal;
 credal_report.evpi === nothing, credal_report.expected_gain === nothing
 ```
 
+```{julia}
+md_table(["action", "lowest expected gain", "highest expected gain"],
+         [[a, l, u] for (a, l, u) in zip(actions, credal_report.gain_range.lower,
+                                         credal_report.gain_range.upper)])
+```
+
 ## The weight on infected frogs
 
 The same report at `w = 0`, where only uninfected frogs count.
 
 ```{julia}
-report0 = DecisionReport(bd_problem(0); credal=credal, experiment=swab, hurwicz=1 // 2)
+report0 = DecisionReport(bd_problem(0); credal=credal, experiments=(; swab, visual_check),
+                         hurwicz=1 // 2)
 md_table(["rule", "first choice, w = 0", "first choice, w = 1"],
          [[string(r0.rule), first_choice(r0), first_choice(r1)]
           for (r0, r1) in zip(report0.results, report.results)])
@@ -197,9 +235,13 @@ state is known.
 
 ## What to take away
 
-- `DecisionReport(problem; credal, experiment, hurwicz, assumptions)` puts every
-  applicable rule side by side with the regret profile, the gain of each action over
-  the baseline, the robust sets and the value of information.
+- `DecisionReport(problem; credal, experiments, partitions, objectives, hurwicz,
+  assumptions)` puts every applicable rule side by side with the regret profile, the
+  gain of each action over the baseline, the robust sets, the value of each named
+  experiment and partition, and the Pareto front of the named objectives.
+- It says of each experiment whether it can change the decision, and warns that the
+  minimax-regret choice depends on the menu of actions.
+- It renders as tables in a document and prints as aligned text within 80 columns.
 - It states its assumptions, and takes more through the `assumptions` keyword. Put the
   utility there, including the weight on infected animals and the fact that the numbers
   are illustrative.

@@ -173,9 +173,13 @@
         # The table of gains needs no probabilities; the expected gain does.
         scen = DecisionProblem(t, ScenarioSet(t.states); baseline=:nothing)
         @test gain_over_baseline(scen).Q == t.Q .- t.Q[1:1, :]
-        @test_throws BeliefFormError expected_gain_over_baseline(scen)
+        # Without a single prior the gain is a range (lower, upper), not an error:
+        # over the scenarios for a scenario set, over the priors for a credal set.
+        @test expected_gain_over_baseline(scen) ==
+              (lower=[0, -20, -48], upper=[0, 60, 102])
         credal = DecisionProblem(t, CredalSet(t.states, [p]); baseline=:nothing)
-        @test_throws BeliefFormError expected_gain_over_baseline(credal)
+        one = expected_gain_over_baseline(DecisionProblem(t, p; baseline=:nothing))
+        @test expected_gain_over_baseline(credal) == (lower=one, upper=one)
         # The baseline survives a scenario restriction and need not be feasible.
         @test restrict_scenarios(problem, [:low, :high]).baseline == :levee
         barred = DecisionProblem(t, p; baseline=:nothing, feasible=[:levee, :relocate])

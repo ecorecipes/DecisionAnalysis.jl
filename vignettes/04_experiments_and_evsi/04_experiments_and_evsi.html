@@ -195,17 +195,20 @@ estimates for any real pond or test.</p>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>actions <span class="op">=</span> [<span class="op">:</span>no_intervention, <span class="op">:</span>antifungal_baths, <span class="op">:</span>disinfect_pond]</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>states <span class="op">=</span> [<span class="op">:</span>absent, <span class="op">:</span>low_prevalence, <span class="op">:</span>high_prevalence]</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>uninfected <span class="op">=</span> [<span class="fl">500</span> <span class="fl">300</span> <span class="fl">100</span>     <span class="co"># no intervention</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>              <span class="fl">470</span> <span class="fl">380</span> <span class="fl">250</span>     <span class="co"># baths: some handling losses, fewer infections</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>              <span class="fl">350</span> <span class="fl">340</span> <span class="fl">320</span>]    <span class="co"># disinfection: heavy handling losses, Bd nearly removed</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>infected <span class="op">=</span> [<span class="fl">0</span> <span class="fl">150</span> <span class="fl">250</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>            <span class="fl">0</span>  <span class="fl">60</span> <span class="fl">120</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>            <span class="fl">0</span>  <span class="fl">10</span>  <span class="fl">20</span>]</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="fu">labelled_table</span>(<span class="st">&quot;uninfected frogs&quot;</span>, actions, states, uninfected)</span></code></pre></div>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>uninfected <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>                         [<span class="fl">500</span> <span class="fl">300</span> <span class="fl">100</span>     <span class="co"># no intervention</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>                          <span class="fl">470</span> <span class="fl">380</span> <span class="fl">250</span>     <span class="co"># baths: some handling losses, fewer infections</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>                          <span class="fl">350</span> <span class="fl">340</span> <span class="fl">320</span>])   <span class="co"># disinfection: heavy losses, Bd nearly removed</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>infected <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>                       [<span class="fl">0</span> <span class="fl">150</span> <span class="fl">250</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>                        <span class="fl">0</span>  <span class="fl">60</span> <span class="fl">120</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>                        <span class="fl">0</span>  <span class="fl">10</span>  <span class="fl">20</span>])</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>uninfected</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 3 actions × 3 states</strong></p>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">uninfected frogs</th>
+<th style="text-align: left;">action</th>
 <th style="text-align: right;"><code>absent</code></th>
 <th style="text-align: right;"><code>low_prevalence</code></th>
 <th style="text-align: right;"><code>high_prevalence</code></th>
@@ -232,11 +235,12 @@ estimates for any real pond or test.</p>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb2"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">labelled_table</span>(<span class="st">&quot;infected frogs&quot;</span>, actions, states, infected)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>infected</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 3 actions × 3 states</strong></p>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">infected frogs</th>
+<th style="text-align: left;">action</th>
 <th style="text-align: right;"><code>absent</code></th>
 <th style="text-align: right;"><code>low_prevalence</code></th>
 <th style="text-align: right;"><code>high_prevalence</code></th>
@@ -270,8 +274,8 @@ intervention as the baseline.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>prior <span class="op">=</span> <span class="fu">FiniteBelief</span>(states, [<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>])</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">bd_problem</span>(w)</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>(actions, states, uninfected <span class="op">.-</span> w <span class="op">.*</span> infected),</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>                           prior; baseline<span class="op">=:</span>no_intervention)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">DecisionProblem</span>(<span class="fu">infection_payoff</span>(; uninfected, infected, weight<span class="op">=</span>w), prior;</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>                           baseline<span class="op">=:</span>no_intervention)</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;expected utility, w = 0&quot;</span>, <span class="st">&quot;gain over no intervention, w = 0&quot;</span>,</span>
@@ -557,6 +561,41 @@ lead to the baths, which is what the manager would do anyway, so the kit
 is worth nothing. At <code>w = 1</code> a positive result leads to
 disinfection and the same kit has a positive value. Whether information
 is worth collecting depends on the decision it serves.</p>
+<p><code>information_can_change_decision</code> asks that question
+directly. It is true exactly when no single action is best after every
+result that can occur, and that is exactly when the EVSI is positive. It
+does not compute the EVSI.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;test&quot;</span>, <span class="st">&quot;can change the decision, w = 0&quot;</span>, <span class="st">&quot;can change the decision, w = 1&quot;</span>],</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>         [[name, <span class="fu">information_can_change_decision</span>(<span class="fu">bd_problem</span>(<span class="fl">0</span>), <span class="cn">e</span>),</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>           <span class="fu">information_can_change_decision</span>(<span class="fu">bd_problem</span>(<span class="fl">1</span>), <span class="cn">e</span>)]</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>          for (name, <span class="cn">e</span>) <span class="kw">in</span> [<span class="st">&quot;swab&quot;</span> <span class="op">=&gt;</span> swab, <span class="st">&quot;field kit&quot;</span> <span class="op">=&gt;</span> field_kit,</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;uninformative&quot;</span> <span class="op">=&gt;</span> uninformative]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">test</th>
+<th style="text-align: right;">can change the decision, w = 0</th>
+<th style="text-align: right;">can change the decision, w = 1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">swab</td>
+<td style="text-align: right;">yes</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">field kit</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">uninformative</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">-</td>
+</tr>
+</tbody>
+</table>
 <h1 id="net-benefit-only-where-the-cost-is-additive">Net benefit, only
 where the cost is additive</h1>
 <p><code>enbs</code> subtracts the cost of an experiment from its EVSI.
@@ -570,11 +609,11 @@ as the swab and needs 12 frogs, and suppose each of those frogs would
 otherwise have been counted as one uninfected frog at the end, under
 every action and in every state. Under that assumption, which is a
 simplification, the cost is additive.</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>histology <span class="op">=</span> <span class="fu">Experiment</span>(swab.likelihood; signals<span class="op">=</span><span class="fu">signal_labels</span>(swab), states<span class="op">=</span>states,</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>                       cost<span class="op">=</span><span class="fl">12</span>)</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;w&quot;</span>, <span class="st">&quot;EVSI&quot;</span>, <span class="st">&quot;cost in frogs&quot;</span>, <span class="st">&quot;expected net benefit&quot;</span>],</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>         [[w, <span class="fu">evsi</span>(<span class="fu">bd_problem</span>(w), histology), histology.cost,</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>           <span class="fu">enbs</span>(<span class="fu">bd_problem</span>(w), histology)] for w <span class="kw">in</span> (<span class="fl">0</span>, <span class="fl">1</span>)])</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>histology <span class="op">=</span> <span class="fu">Experiment</span>(swab.likelihood; signals<span class="op">=</span><span class="fu">signal_labels</span>(swab), states<span class="op">=</span>states,</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>                       cost<span class="op">=</span><span class="fl">12</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;w&quot;</span>, <span class="st">&quot;EVSI&quot;</span>, <span class="st">&quot;cost in frogs&quot;</span>, <span class="st">&quot;expected net benefit&quot;</span>],</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>         [[w, <span class="fu">evsi</span>(<span class="fu">bd_problem</span>(w), histology), histology.cost,</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>           <span class="fu">enbs</span>(<span class="fu">bd_problem</span>(w), histology)] for w <span class="kw">in</span> (<span class="fl">0</span>, <span class="fl">1</span>)])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -617,7 +656,12 @@ the posterior belief after it.</li>
 seeing the signal before choosing, in the unit of the payoff. It lies
 between zero and <code>evpi(problem)</code>.</li>
 <li>Information is worth nothing when no result would change the action,
-however much it changes the belief.</li>
+however much it changes the belief.
+<code>information_can_change_decision</code> checks this, and is
+equivalent to a positive EVSI.</li>
+<li><code>infection_payoff(; uninfected, infected, weight)</code> builds
+the utility uninfected − weight × infected from the two tables of
+counts.</li>
 <li>For a disease, the value of a test depends on the weight
 <code>w</code> given to infected animals. Report it at
 <code>w = 0</code> and <code>w = 1</code> at least.</li>

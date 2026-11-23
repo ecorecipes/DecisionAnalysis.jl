@@ -25,6 +25,9 @@ random_credal_set
 PayoffTable
 action_labels
 random_payoff_table
+combine_payoffs
+individuals_payoff
+infection_payoff
 DecisionProblem
 feasible_actions
 feasible_payoff
@@ -54,6 +57,7 @@ aggregate
 
 ```@docs
 regret_table
+RegretTable
 relative_regret_table
 expected_regret
 max_regret
@@ -108,6 +112,8 @@ bayes_invert
 BayesianInversion
 garble
 is_garbling_of
+garbling_result
+GarblingResult
 deficiency
 ```
 
@@ -120,9 +126,28 @@ evpi
 evppi
 evsi
 enbs
+information_can_change_decision
 robust_evpi
 robust_evsi
 RobustVOI
+```
+
+## Linear programmes
+
+Every linear programme of the package is stated once, as a JuMP model, by an
+exported builder. [`solve_program`](@ref) solves one by the built-in exact simplex
+or by any JuMP optimiser; the functions above ([`decide`](@ref) with
+[`EAdmissible`](@ref), [`is_garbling_of`](@ref), [`deficiency`](@ref),
+[`robust_evpi`](@ref)) build, solve and verify.
+
+```@docs
+eadmissibility_model
+garbling_model
+deficiency_model
+evpi_envelope_model
+DecisionProgram
+solve_program
+ProgramSolution
 ```
 
 ## Fidelity
@@ -159,4 +184,5 @@ MissingBaselineError
 InexactCertificateError
 WitnessError
 LinearProgramError
+ExactVerificationError
 ```

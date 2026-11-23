@@ -7,7 +7,8 @@ and the exact value of information. The Catlab-free core of the decision layer o
 
 Model packages produce outcomes; this package analyses the payoff table they give. It depends on
 FiniteKernels (finite spaces, kernels and states) through a `[sources]` path to the sibling directory
-`../FiniteKernels.jl`, and on `LinearAlgebra`, `Random`, `Statistics` and `Tables`. FiniteKernels brings
+`../FiniteKernels.jl`, on `JuMP` (to state linear programmes; never on a solver), and on `LinearAlgebra`,
+`Random`, `Statistics` and `Tables`. FiniteKernels brings
 ResilienceCore and StructuredPopulationCore by URL; Pkg follows the sources of a path dependency, so they
 are not listed here. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
 generics, forwards to this package and re-exports its names (ADR 0009). No model package depends on this
@@ -31,9 +32,23 @@ one; adapters will be weak-dependency extensions on this side.
   file `test/fixtures/worked_examples.json` are the same kind of contract.** The schemas are written down in
   `docs/src/certificates.md` and checked by `proofs/` (`lake exe check_certificate`). A witness is verified
   in exact arithmetic before it is written. A change of meaning needs a new schema string.
-- Exact in, exact out. No function converts a `Rational` problem to floating point; tolerances default to
-  zero for exact element types. The built-in linear-programme solver works in `Rational{BigInt}` for every
-  input.
+- Exact in, exact out. No function returns a floating-point answer for a `Rational` problem; tolerances
+  default to zero for exact element types. The built-in linear-programme solver works in `Rational{BigInt}`
+  for every input.
+- **Optimisation goes through JuMP, and no solver is a hard dependency.** Every linear programme is written
+  once, in `src/programs.jl`, as an exported builder that returns a `DecisionProgram` (a
+  `JuMP.GenericModel{T}`, `T = Rational{BigInt}` for exact problems, with its variable and constraint
+  references), with the programme in mathematical notation and its variable and constraint counts in the
+  docstring. Never assemble a programme by hand elsewhere. `solve_program` has three routes:
+  `optimizer = nothing` (default) feeds `JuMP.lp_matrix_data` to the internal simplex of `src/lp.jl`, which
+  is the fallback for small problems; an exact optimiser (e.g. `CDDLib.Optimizer{Rational{BigInt}}`) solves
+  the rational model; a floating-point optimiser (e.g. `HiGHS.Optimizer`) solves a `Float64` copy, and the
+  primal and dual solutions are rounded and checked exactly. Solvers (CDDLib, HiGHS) appear only in the
+  test extras and the vignette environment.
+- **The solver is never trusted.** Whatever route produced it, a witness is verified in exact arithmetic
+  before it is returned or exported, and an optimum found in floating point for an exact problem is returned
+  only when certified exactly; otherwise `ExactVerificationError` is thrown. Yes/no answers say whether they
+  are exact (`details.exact` of an `EAdmissible` result, `GarblingResult.exact`).
 - Robust value of information is returned as computed, never clamped at zero. The rule-specific value and
   the EVPI envelope are separate fields of `RobustVOI`.
 - E-admissibility is decided by linear programme over the credal set. Enumerating extreme points is wrong
@@ -42,34 +57,51 @@ one; adapters will be weak-dependency extensions on this side.
   `Hurwicz` is over states and `AlphaMaxmin` over priors, with opposite conventions for `α`, both
   documented.
 - Ties: every tied action is returned, in table order, and `first_choice` is the first. Nothing is random.
-- A baseline changes no score, choice or value; it only adds the comparison with no intervention.
+- A baseline changes no score, choice or value; it only adds the comparison with no intervention. Under a
+  `CredalSet` or a `ScenarioSet`, `expected_gain_over_baseline` returns the named tuple `(lower, upper)`.
+- `information_can_change_decision(problem, e)` is equivalent to `evsi(problem, e) > 0` (Lean theorem
+  `evsi_eq_zero_iff`); a property test holds the two together. Minimax regret depends on the menu of
+  actions (`minimaxRegret_violates_iia`); the rule's result (`details.note`) and the report say so.
 - Types are immutable. Constructors copy their arrays and check them.
 
 ## Layout
 
 - `src/errors.jl`: the root `DecisionAnalysisError` and every exception under it, with `showerror`.
-- `src/lp.jl`: internal dense two-phase simplex in exact rational arithmetic (Bland's rule).
+- `src/lp.jl`: internal dense two-phase simplex in exact rational arithmetic (Bland's rule); the fallback
+  solver, for small problems.
+- `src/programs.jl`: `DecisionProgram` and the builders `eadmissibility_model`, `garbling_model`,
+  `deficiency_model`, `evpi_envelope_model` (JuMP models).
+- `src/solve.jl`: `solve_program` and `ProgramSolution`: the three routes, rounding, and the exact
+  primal-dual check.
 - `src/beliefs.jl`: `PointBelief`, `FiniteBelief`, `CredalSet`, `ScenarioSet`; label and tolerance helpers.
-- `src/payoff.jl`: `PayoffTable`.
+- `src/payoff.jl`: `PayoffTable`, arithmetic on tables with matching labels, `combine_payoffs`,
+  `individuals_payoff`, `infection_payoff`.
 - `src/problem.jl`: `DecisionProblem`, feasibility filter, baseline and gains over it,
   `restrict_scenarios`, and the internal `_View` that aggregators act on.
 - `src/aggregators.jl`: the ten aggregators and `aggregate`.
-- `src/regret.jl`: regret tables and profiles.
+- `src/regret.jl`: regret tables (`RegretTable`, a labelled matrix) and profiles.
 - `src/rules.jl`: transforms, `RobustnessMetric`, selectors, `DecisionRule`, the named rules, the
   set-valued rules, `DecisionResult`, `decide`.
-- `src/experiments.jl`: `Experiment`, `bayes_invert`, `garble`, `is_garbling_of`, `deficiency`.
-- `src/voi.jl`: `evpi`, `evppi`, `evsi`, `enbs`, `value_with_information`, `robust_evpi`, `robust_evsi`.
+- `src/experiments.jl`: `Experiment`, `bayes_invert`, `garble`, `is_garbling_of`, `garbling_result`,
+  `deficiency`.
+- `src/voi.jl`: `evpi`, `evppi`, `evsi`, `enbs`, `value_with_information`,
+  `information_can_change_decision`, `robust_evpi`, `robust_evsi`.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`.
-- `src/report.jl`, `src/show.jl`: `DecisionReport`, its Tables.jl rows, and printing.
+- `src/report.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives), its
+  Tables.jl rows, and printing. A display is a list of blocks (titles, grids, paragraphs, lists) rendered as
+  plain text within 80 columns, Markdown or HTML, for `PayoffTable`, `RegretTable`, `DecisionResult` and
+  `DecisionReport`.
 - `src/certificates.jl`: `export_decision_certificate`, `export_garbling_witness`,
   `export_eadmissible_witness` and their hand-written JSON encoder.
 - `proofs/`: the Lean 4 / Mathlib project `DecisionAnalysisProofs` and its `check_certificate` executable;
   see `proofs/README.md`.
 - `test/helpers.jl`: the fixture reader and the slow oracles; `test/test_*.jl`: the suite, seeded
-  `Random.Xoshiro` only; `test/fixtures/worked_examples.json`: the three worked examples.
+  `Random.Xoshiro` only; `test/test_programs.jl`: model shapes and the three routes agreeing (CDDLib and
+  HiGHS are test dependencies); `test/test_lean_mirror.jl`: Julia mirrors of Lean lemmas; `test/fixtures/worked_examples.json`: the three worked examples.
 - `docs/`: Documenter manual (`index.md`, `api.md`, `certificates.md`, and `tutorials/`, the synced vignettes).
 - `vignettes/NN_name/NN_name.qmd`: ten Quarto vignettes (Julia engine), basic to advanced, each rendered to
-  `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (table and plot helpers), `vignettes/_pandoc/`
+  `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for
+  ad hoc summaries; package objects display themselves), `vignettes/_pandoc/`
   (HTML style, LaTeX preamble). Vignette rules: utility is counted in individuals, never money (for a disease,
   uninfected − w × infected, shown at w = 0 and 1); every vignette has a no-intervention action as the
   `baseline` and reports gains over it; examples are ecological and every number is labelled illustrative.

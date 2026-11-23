@@ -211,19 +211,53 @@ function gain_over_baseline(p::DecisionProblem)
 end
 
 """
-    expected_gain_over_baseline(p::DecisionProblem) -> Vector
+    expected_gain_over_baseline(p::DecisionProblem)
 
-The expected gain of every feasible action over the baseline action under the single
-prior of the problem, `Σ_θ p(θ) (Q[a, θ] − Q[baseline, θ])`, in
-[`feasible_actions`](@ref) order: the expected utility of the action minus that of no
-intervention. Needs a [`FiniteBelief`](@ref) or a [`PointBelief`](@ref)
-([`BeliefFormError`](@ref) otherwise) and a baseline
-([`MissingBaselineError`](@ref) otherwise).
+The gain of every feasible action over the baseline action (no intervention), in
+[`feasible_actions`](@ref) order. What is returned depends on the belief.
+
+- **A single prior** ([`FiniteBelief`](@ref) or [`PointBelief`](@ref)): a vector, the
+  expected gain `Σ_θ p(θ) (Q[a, θ] − Q[baseline, θ])` of each action, which is its
+  expected utility minus that of no intervention.
+- **A [`CredalSet`](@ref)**: a named tuple `(lower = ..., upper = ...)` of two
+  vectors, the smallest and the largest expected gain of each action over the set.
+  The expected gain is linear in the prior, so both are attained at generating
+  points. The two ends are in general attained at different priors for different
+  actions; `lower[a] > 0` says that `a` beats the baseline under every prior in the
+  set.
+- **A [`ScenarioSet`](@ref)**: a named tuple `(lower = ..., upper = ...)` of the
+  minimum and the maximum of the gain `Q[a, θ] − Q[baseline, θ]` over the states of
+  the set. No probabilities are involved, so these are gains, not expected gains.
+
+The row of the baseline, when it is feasible, is zero in every case. Throws
+[`MissingBaselineError`](@ref) when the problem has no baseline.
+
+```jldoctest
+julia> t = PayoffTable([:wait, :act], [:low, :high], [0 -100; -30 -30]);
+
+julia> credal = CredalSet([:low, :high], [[3 // 5, 2 // 5], [9 // 10, 1 // 10]]);
+
+julia> expected_gain_over_baseline(DecisionProblem(t, credal; baseline=:wait))
+(lower = Rational{Int64}[0, -20], upper = Rational{Int64}[0, 10])
+```
 """
 function expected_gain_over_baseline(p::DecisionProblem)
     row = _baseline_row(p, :expected_gain_over_baseline)
-    prior = _prior(p, :expected_gain_over_baseline)
-    return (p.payoff.Q[p.feasible, :] .- p.payoff.Q[row:row, :]) * prior
+    G = p.payoff.Q[p.feasible, :] .- p.payoff.Q[row:row, :]
+    return _expected_gain(p.belief, p, G)
+end
+
+function _expected_gain(::Union{FiniteBelief,PointBelief}, p::DecisionProblem, G)
+    return G * _prior(p, :expected_gain_over_baseline)
+end
+function _expected_gain(b::CredalSet, ::DecisionProblem, G)
+    E = reduce(hcat, [G * q for q in b.points])
+    return (lower=vec(minimum(E; dims=2)), upper=vec(maximum(E; dims=2)))
+end
+function _expected_gain(b::ScenarioSet, p::DecisionProblem, G)
+    cols = findall(in(b.states), p.payoff.states)
+    return (lower=vec(minimum(view(G, :, cols); dims=2)),
+            upper=vec(maximum(view(G, :, cols); dims=2)))
 end
 
 # Internal view of a problem: the payoff matrix of the feasible actions over the

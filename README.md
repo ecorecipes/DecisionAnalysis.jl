@@ -7,7 +7,8 @@ Standard decision analysis on the output of any model, with no category theory r
 a belief about its states, rules for choosing, Savage regret, and the value of information. Version 0.1 is
 the finite core, and it is exact: give it `Rational` inputs and every number it returns is a rational.
 
-The package depends on [FiniteKernels.jl](https://github.com/ecorecipes/FiniteKernels.jl), `LinearAlgebra`,
+The package depends on [FiniteKernels.jl](https://github.com/ecorecipes/FiniteKernels.jl),
+[JuMP](https://jump.dev) (to state its linear programmes; no solver is a dependency), `LinearAlgebra`,
 `Random`, `Statistics` and `Tables`, and on no Catlab, GATlab or ACSets.
 
 ## Features
@@ -17,27 +18,49 @@ The package depends on [FiniteKernels.jl](https://github.com/ecorecipes/FiniteKe
   probability vector, also built from a FiniteKernels state), a `CredalSet` (the convex hull of a list of
   priors) or a `ScenarioSet` (possible states, no probabilities). `DecisionProblem(payoff, belief)` pairs
   them, with an optional feasibility filter on the actions and an optional `baseline` action.
+- **Utilities counted in individuals.** Tables with the same labels add, subtract and scale (`+`, `-`,
+  scalar `*`), and `combine_payoffs(t1 => w1, t2 => w2, ...)` is their weighted sum, so a payoff table is
+  built from tables of outcome counts without assembling a matrix by hand. `individuals_payoff(counts)` is
+  the utility that counts individuals; `infection_payoff(; uninfected, infected, weight = 1)` is
+  uninfected − weight × infected.
 - **Comparison with no intervention.** Name the business-as-usual action as the `baseline` of a problem;
   `gain_over_baseline` gives the table of differences from it and `expected_gain_over_baseline` each
-  action's expected gain, and a report says for every rule whether it recommends the baseline.
+  action's expected gain (under a credal set, its lower and upper expected gain; under a scenario set, its
+  minimum and maximum gain), and a report says for every rule whether it recommends the baseline.
 - **Aggregators.** `Expectation`, `WorstCase`, `BestCase`, `Hurwicz(α)` (over states), `Laplace`,
   `LowerExpectation`, `UpperExpectation`, `AlphaMaxmin(α)` (over priors), `CVaR(α)`, `Quantile(α)`.
-- **Regret.** `regret_table`, `relative_regret_table`, `expected_regret`, `max_regret`.
+- **Regret.** `regret_table`, `relative_regret_table` (matrices that carry their labels, `RegretTable`),
+  `expected_regret`, `max_regret`.
 - **Rules.** `decide(problem, rule)` with `MaxExpectedUtility`, `Maximin`, `Maximax`, `MinimaxRegret`,
   `GammaMaximin`, `Satisfice(threshold)`, and the set-valued `EAdmissible` (a linear programme over the
-  credal set, not an enumeration of its extreme points), `Maximal`, `IntervalDominance` and `ParetoFront`.
+  credal set, not an enumeration of its extreme points), `Maximal`, `IntervalDominance` and `ParetoFront`
+  (over a vector of problems, or a named collection of payoff tables sharing one belief).
   A scalar rule is an aggregator, an optional transform and a selector (`DecisionRule`); the same pieces
   without the selector are a `RobustnessMetric`. Ties are all returned, and the first choice is the tied
-  action that comes first in the table.
+  action that comes first in the table. Minimax regret depends on the menu of actions, and its result
+  says so.
 - **Experiments.** `Experiment(L)` with `L[z, θ] = P(z | θ)` (rows = signals, columns = states), also built
-  from a `FiniteKernel`; `bayes_invert`, `garble`, `is_garbling_of` (returns a witness matrix) and
-  `deficiency`, the last two by exact linear programme.
+  from a `FiniteKernel`; `bayes_invert`, `garble`, `is_garbling_of` (returns a witness matrix),
+  `garbling_result` (the same with a statement of whether the answer is exact) and `deficiency`, the last
+  three by linear programme.
 - **Value of information.** `evpi`, `evppi` (over a partition of the states), `evsi`, `enbs`,
-  `value_with_information`; under a credal set `robust_evpi` and `robust_evsi`, which keep the
+  `value_with_information`, and `information_can_change_decision` (true exactly when EVSI is positive: no
+  single action is optimal after every signal); under a credal set `robust_evpi` and `robust_evsi`, which keep the
   rule-specific value and the EVPI envelope apart and never clamp a negative value.
+- **Linear programmes through JuMP.** Each programme is written once as a `JuMP.GenericModel` by an
+  exported builder (`eadmissibility_model`, `garbling_model`, `deficiency_model`, `evpi_envelope_model`),
+  and the functions that use them take an `optimizer` keyword. Three routes solve the same model: the
+  built-in exact simplex (the default, no solver needed, for small problems), an exact optimiser such as
+  `CDDLib.Optimizer{Rational{BigInt}}`, or a floating-point optimiser such as `HiGHS.Optimizer`, whose
+  solution is rounded to rationals and verified exactly (`ExactVerificationError` if it does not verify).
+  The solver is never trusted: every witness is re-checked in exact arithmetic before it is returned.
 - **Fidelity.** `total_variation` and `decision_loss_bound(B, ε) = 2Bε`.
 - **Reports and certificates.** `DecisionReport` puts every applicable rule side by side with the regret
-  profile, EVPI, the robust sets and the assumptions, prints as a table and is a Tables.jl table.
+  profile, EVPI, the EVSI of several named experiments (and whether each can change the decision), the
+  EVPPI of named partitions, the robust sets, an optional Pareto section over several objectives, the gain
+  over the baseline (a range under an imprecise belief) and the assumptions. It prints as aligned tables
+  that fit 80 columns and is a Tables.jl table. Payoff tables, regret tables, rule results and reports
+  also render as Markdown and HTML tables, so they display as tables in Quarto and notebooks.
   `export_decision_certificate` writes a rational problem and its claimed numbers as JSON for the Lean
   checker in `proofs/`; `export_garbling_witness` and `export_eadmissible_witness` write the witnesses that
   the linear programmes find, checked exactly before they are written.
@@ -84,7 +107,14 @@ robust = DecisionProblem(payoff, ensemble)
 decide(robust, GammaMaximin()).chosen          # [:raise_levee]
 decide(robust, EAdmissible()).chosen           # [:do_nothing, :raise_levee]
 
-DecisionReport(problem; credal=ensemble, experiment=gauge)
+DecisionReport(problem; credal=ensemble, experiments=(; gauge, noisy))
+
+# The same question by another route: any JuMP optimiser, exact or floating point.
+# using CDDLib, HiGHS
+# decide(robust, EAdmissible(); optimizer=CDDLib.Optimizer{Rational{BigInt}})
+# decide(robust, EAdmissible(); optimizer=HiGHS.Optimizer)   # rounded, then verified exactly
+solve_program(eadmissibility_model(robust, :raise_levee)).objective   # 0//1: E-admissible
+information_can_change_decision(problem, gauge)                       # true: EVSI > 0
 ```
 
 ## Vignettes

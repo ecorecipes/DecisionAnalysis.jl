@@ -3,7 +3,7 @@ Simon Frost
 
 - [Motivation](#motivation)
 - [The problem](#the-problem)
-- [One problem per objective](#one-problem-per-objective)
+- [One table per objective](#one-table-per-objective)
 - [The Pareto front](#the-pareto-front)
 - [The weighted sum and the front](#the-weighted-sum-and-the-front)
 - [What the weighted sum cannot
@@ -49,21 +49,25 @@ using Plots
 
 actions = [:no_intervention, :salt, :antifungal_baths, :remove_infected, :disinfect_pond]
 states = [:absent, :low_prevalence, :high_prevalence]
-uninfected = [500 300 100
-              490 320 160
-              470 380 250
-              480 330 200
-              350 340 320]
-infected = [0 150 250
-            0 120 200
-            0  60 120
-            0  50 100
-            0  10  20]
+uninfected = PayoffTable(actions, states,
+                         [500 300 100
+                          490 320 160
+                          470 380 250
+                          480 330 200
+                          350 340 320])
+infected = PayoffTable(actions, states,
+                       [0 150 250
+                        0 120 200
+                        0  60 120
+                        0  50 100
+                        0  10  20])
 prior = FiniteBelief(states, [1 // 2, 3 // 10, 1 // 5])
-labelled_table("uninfected frogs", actions, states, uninfected)
+uninfected
 ```
 
-| uninfected frogs   | `absent` | `low_prevalence` | `high_prevalence` |
+**PayoffTable{Int64}: 5 actions × 3 states**
+
+| action             | `absent` | `low_prevalence` | `high_prevalence` |
 |:-------------------|---------:|-----------------:|------------------:|
 | `no_intervention`  |      500 |              300 |               100 |
 | `salt`             |      490 |              320 |               160 |
@@ -72,10 +76,12 @@ labelled_table("uninfected frogs", actions, states, uninfected)
 | `disinfect_pond`   |      350 |              340 |               320 |
 
 ``` julia
-labelled_table("infected frogs", actions, states, infected)
+infected
 ```
 
-| infected frogs     | `absent` | `low_prevalence` | `high_prevalence` |
+**PayoffTable{Int64}: 5 actions × 3 states**
+
+| action             | `absent` | `low_prevalence` | `high_prevalence` |
 |:-------------------|---------:|-----------------:|------------------:|
 | `no_intervention`  |        0 |              150 |               250 |
 | `salt`             |        0 |              120 |               200 |
@@ -83,19 +89,28 @@ labelled_table("infected frogs", actions, states, infected)
 | `remove_infected`  |        0 |               50 |               100 |
 | `disinfect_pond`   |        0 |               10 |                20 |
 
-## One problem per objective
+## One table per objective
 
-Every objective is a `DecisionProblem` on the same actions, written so
-that higher is better. The infected count is to be kept low, so its
-payoff is the count with a minus sign. No intervention is the baseline
-of both.
+Every objective is a payoff table on the same actions and states,
+written so that higher is better. The infected count is to be kept low,
+so its table is the count with a minus sign: tables with the same labels
+can be negated, added, subtracted and scaled. The objectives are a named
+collection of tables, and they share one belief.
 
 ``` julia
-more_uninfected = DecisionProblem(PayoffTable(actions, states, uninfected), prior;
+objectives = (; more_uninfected=uninfected, fewer_infected=-infected)
+```
+
+    (more_uninfected = PayoffTable{Int64}(5 actions × 3 states), fewer_infected = PayoffTable{Int64}(5 actions × 3 states))
+
+Taken one at a time, each is an ordinary decision problem. No
+intervention is the baseline of both.
+
+``` julia
+more_uninfected = DecisionProblem(objectives.more_uninfected, prior;
                                   baseline=:no_intervention)
-fewer_infected = DecisionProblem(PayoffTable(actions, states, -infected), prior;
+fewer_infected = DecisionProblem(objectives.fewer_infected, prior;
                                  baseline=:no_intervention)
-objectives = [more_uninfected, fewer_infected]
 
 md_table(["action", "expected uninfected", "gain over no intervention",
           "expected infected", "change from no intervention"],
@@ -127,13 +142,30 @@ first_choice(decide(fewer_infected, MaxExpectedUtility()))
 
 ## The Pareto front
 
-`decide(objectives, ParetoFront())` scores every action on every
+`decide(objectives, prior, ParetoFront())` scores every action on every
 objective (by expectation unless another aggregator is given) and keeps
 the actions that are not dominated. An action is dominated when another
-is at least as good on every objective and strictly better on one.
+is at least as good on every objective and strictly better on one. The
+result displays the scores, one column per objective, and marks the
+front. The second column is minus the expected number infected, so that
+higher is better in both.
 
 ``` julia
-front = decide(objectives, ParetoFront())
+front = decide(objectives, prior, ParetoFront(); baseline=:no_intervention)
+```
+
+**DecisionResult: ParetoFront over 2 objectives, each summarised by
+Expectation**
+
+| action             | more_uninfected | fewer_infected | on the front |
+|:-------------------|----------------:|---------------:|-------------:|
+| `no_intervention`  |             360 |            -95 |           \- |
+| `salt`             |             373 |            -76 |           \- |
+| `antifungal_baths` |             399 |            -42 |          yes |
+| `remove_infected`  |             379 |            -35 |          yes |
+| `disinfect_pond`   |             341 |             -7 |          yes |
+
+``` julia
 front.chosen
 ```
 
@@ -141,20 +173,6 @@ front.chosen
      :antifungal_baths
      :remove_infected
      :disinfect_pond
-
-``` julia
-md_table(["action", "expected uninfected", "expected infected", "on the front"],
-         [[a, front.scores[i, 1], -front.scores[i, 2], a in front.chosen]
-          for (i, a) in enumerate(front.actions)])
-```
-
-| action             | expected uninfected | expected infected | on the front |
-|:-------------------|--------------------:|------------------:|-------------:|
-| `no_intervention`  |                 360 |                95 |           \- |
-| `salt`             |                 373 |                76 |           \- |
-| `antifungal_baths` |                 399 |                42 |          yes |
-| `remove_infected`  |                 379 |                35 |          yes |
-| `disinfect_pond`   |                 341 |                 7 |          yes |
 
 No intervention and salt are off the front. The baths give more
 uninfected frogs *and* fewer infected frogs than either, so no weight on
@@ -178,7 +196,7 @@ annotate!(plt, [(x[i] , y[i] + 6, text(String(a), 8)) for (i, a) in enumerate(ac
 png_figure(plt)
 ```
 
-![](08_several_objectives_files/figure-commonmark/cell-8-output-1.png)
+![](08_several_objectives_files/figure-commonmark/cell-9-output-1.png)
 
 The best corner of this figure is the bottom right: many uninfected, few
 infected. The dashed line joins the two actions that a weighted sum can
@@ -192,8 +210,8 @@ sweep shows which.
 
 ``` julia
 function weighted(w)
-    return DecisionProblem(PayoffTable(actions, states, uninfected .- w .* infected),
-                           prior; baseline=:no_intervention)
+    return DecisionProblem(infection_payoff(; uninfected, infected, weight=w), prior;
+                           baseline=:no_intervention)
 end
 
 md_table(["w", "best action", "expected utility", "gain over no intervention"],
@@ -225,7 +243,7 @@ plt = plot(Float64.(ws), lines; label=permutedims(String.(actions)),
 png_figure(plt)
 ```
 
-![](08_several_objectives_files/figure-commonmark/cell-10-output-1.png)
+![](08_several_objectives_files/figure-commonmark/cell-11-output-1.png)
 
 At `w = 0` and `w = 1` the baths are best. Disinfection takes over once
 an infected frog counts for more than about 1.66 uninfected ones:
@@ -277,34 +295,40 @@ than the expectation. With `WorstCase()` an action is judged on its
 worst state for each objective, with no probabilities.
 
 ``` julia
-worst = decide(objectives, ParetoFront(WorstCase()))
-md_table(["action", "fewest uninfected in any state", "most infected in any state",
-          "on the worst-case front"],
-         [[a, worst.scores[i, 1], -worst.scores[i, 2], a in worst.chosen]
-          for (i, a) in enumerate(worst.actions)])
+worst = decide(objectives, prior, ParetoFront(WorstCase()))
 ```
 
-| action | fewest uninfected in any state | most infected in any state | on the worst-case front |
-|:---|---:|---:|---:|
-| `no_intervention` | 100 | 250 | \- |
-| `salt` | 160 | 200 | \- |
-| `antifungal_baths` | 250 | 120 | \- |
-| `remove_infected` | 200 | 100 | \- |
-| `disinfect_pond` | 320 | 20 | yes |
+**DecisionResult: ParetoFront over 2 objectives, each summarised by
+WorstCase**
+
+| action             | more_uninfected | fewer_infected | on the front |
+|:-------------------|----------------:|---------------:|-------------:|
+| `no_intervention`  |             100 |           -250 |           \- |
+| `salt`             |             160 |           -200 |           \- |
+| `antifungal_baths` |             250 |           -120 |           \- |
+| `remove_infected`  |             200 |           -100 |           \- |
+| `disinfect_pond`   |             320 |            -20 |          yes |
 
 Judged on worst cases, disinfection is best on both objectives at once
 and the front is a single action. The front depends on how each
 objective is summarised over the states, and that choice should be
 stated with it.
 
-The same call takes any number of objectives, for example one problem
-per species when a management action helps one species and harms
-another. The objectives must share their feasible actions.
+The same call takes any number of objectives, for example one table per
+species when a management action helps one species and harms another.
+The tables must share their actions and states. Objectives that do not
+share a belief can still be compared: pass a vector of
+`DecisionProblem`s, one per objective, to
+`decide(problems, ParetoFront())`.
 
 ## What to take away
 
-- Write each objective as its own `DecisionProblem`, with higher better,
-  and pass the vector to `decide(objectives, ParetoFront())`.
+- Write each objective as its own payoff table, with higher better, and
+  pass the named collection and the belief to
+  `decide(objectives, belief, ParetoFront())`.
+- `infection_payoff(; uninfected, infected, weight)` is the weighted sum
+  of the two counts, and tables with the same labels add, subtract and
+  scale.
 - Dominated actions can be dropped without choosing a weight. Here no
   intervention and salt are dominated by the baths.
 - The best action of uninfected − `w` × infected is on the front for

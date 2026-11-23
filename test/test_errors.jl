@@ -16,7 +16,7 @@ end
     concrete = [InvalidBeliefError, InvalidPayoffError, InvalidExperimentError,
                 LabelMismatchError, BeliefFormError, NoFeasibleActionError,
                 InvalidBaselineError, MissingBaselineError, InexactCertificateError,
-                WitnessError, LinearProgramError]
+                WitnessError, LinearProgramError, ExactVerificationError]
 
     @testset "hierarchy" begin
         @test isabstracttype(DecisionAnalysisError)
@@ -70,7 +70,13 @@ end
                                                                                                        1]),
                                                                                       :a2),
                                      LinearProgramError => () -> throw(LinearProgramError(:deficiency,
-                                                                                          :unbounded)))
+                                                                                          :unbounded)),
+                                     ExactVerificationError => () -> deficiency(Experiment([4//5 1//5;
+                                                                                            1//5 4//5]),
+                                                                                Experiment([2//3 1//7;
+                                                                                            1//3 6//7]);
+                                                                                optimizer=HiGHS.Optimizer,
+                                                                                rounding_tol=0.2))
         @test Set(keys(raised)) == Set(concrete)
         for (T, f) in raised
             @test_throws T f()

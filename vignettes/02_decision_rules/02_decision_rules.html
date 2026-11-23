@@ -171,8 +171,8 @@ estimates for any real river.</p>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>         <span class="fl">700</span> <span class="fl">600</span> <span class="fl">300</span>     <span class="co"># trapping: disturbance when there are no mink, protection when there are</span></span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>         <span class="fl">760</span> <span class="fl">480</span> <span class="fl">200</span>     <span class="co"># refuges: cheap in disturbance, partial protection</span></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>         <span class="fl">500</span> <span class="fl">450</span> <span class="fl">420</span>]    <span class="co"># translocation: losses in the move, then little exposure</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states, voles)</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(payoff)</span></code></pre></div>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">individuals_payoff</span>(<span class="fu">PayoffTable</span>(actions, states, voles))</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 4 actions × 3 states</strong></p>
 <table>
 <thead>
 <tr>

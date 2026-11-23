@@ -30,7 +30,7 @@ states = [:absent, :transient, :established]
 payoff = PayoffTable(actions, states,
                      [800 400 50; 700 600 300; 760 480 200; 500 450 420])
 problem = DecisionProblem(payoff, [7 // 10, 1 // 5, 1 // 10]; baseline=:no_control)
-payoff_markdown(payoff)
+payoff
 ```
 
 ## The regret table
@@ -41,7 +41,6 @@ and every column has a zero, at the action that is best for that state.
 
 ```{julia}
 R = regret_table(problem)
-labelled_table("regret in voles", feasible_actions(problem), states, R)
 ```
 
 Reading the first row: with no mink, no control is the best action and has no regret.
@@ -119,8 +118,7 @@ share of what was achievable. Unlike regret it changes if a constant is added to
 payoffs.
 
 ```{julia}
-labelled_table("relative regret", feasible_actions(problem), states,
-               relative_regret_table(problem); digits=3)
+relative_regret_table(problem)
 ```
 
 ```{julia}
@@ -138,7 +136,7 @@ otherwise, because it cuts the colony off from the rest of the river.
 ```{julia}
 bigger = PayoffTable(vcat(actions, :fence), states, vcat(payoff.Q, [300 300 700]))
 problem5 = DecisionProblem(bigger, problem.belief; baseline=:no_control)
-payoff_markdown(bigger)
+bigger
 ```
 
 ```{julia}
@@ -159,6 +157,13 @@ action in that state, and the recommendation moves from trapping to translocatio
 Choosing between trapping and translocation has come to depend on an option that
 neither rule recommends. This is a failure of the independence of irrelevant
 alternatives, and it is a property of the rule, not of this table.
+
+The result of a regret-based rule carries this warning with it, and displays it under
+its scores:
+
+```{julia}
+after
+```
 
 Expected utility does not behave like this. An action's expected payoff does not depend
 on the other rows, so adding the fence leaves the choice where it was.

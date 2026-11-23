@@ -74,6 +74,15 @@ jobs:
                 exit(1)
             end
             println("all files formatted")'
+  vignette-sync:
+    name: Vignette sync check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - run: julia scripts/sync_vignettes.jl --check
   docs:
     name: Documentation
     runs-on: ubuntu-latest

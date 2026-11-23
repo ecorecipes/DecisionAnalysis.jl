@@ -168,7 +168,7 @@ wet.</p>
 were chosen to make the arithmetic easy to follow. They are not data and
 they are not estimates for any real site.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">DecisionAnalysis</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">include</span>(<span class="fu">joinpath</span>(<span class="st">&quot;..&quot;</span>, <span class="st">&quot;_common.jl&quot;</span>))   <span class="co"># Markdown tables and plot defaults, no analysis</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">include</span>(<span class="fu">joinpath</span>(<span class="st">&quot;..&quot;</span>, <span class="st">&quot;_common.jl&quot;</span>))   <span class="co"># plot defaults and small tables, no analysis</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>actions <span class="op">=</span> [<span class="op">:</span>no_intervention, <span class="op">:</span>deepen_ponds, <span class="op">:</span>dig_scrapes, <span class="op">:</span>deepen_and_dig]</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>states <span class="op">=</span> [<span class="op">:</span>dry, <span class="op">:</span>average, <span class="op">:</span>wet]</span>
@@ -176,8 +176,8 @@ they are not estimates for any real site.</p>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>             <span class="fl">900</span> <span class="fl">1400</span> <span class="fl">1500</span>     <span class="co"># deeper ponds hold water, and in a wet spring hold predators</span></span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>             <span class="fl">300</span> <span class="fl">1700</span> <span class="fl">2400</span>     <span class="co"># more shallow ponds: more habitat, the same drying risk</span></span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>            <span class="fl">1000</span> <span class="fl">1800</span> <span class="fl">2000</span>]    <span class="co"># both at once</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">PayoffTable</span>(actions, states, toadlets)</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(payoff)</span></code></pre></div>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>payoff <span class="op">=</span> <span class="fu">individuals_payoff</span>(<span class="fu">PayoffTable</span>(actions, states, toadlets))</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 4 actions × 3 states</strong></p>
 <table>
 <thead>
 <tr>
@@ -216,9 +216,12 @@ they are not estimates for any real site.</p>
 </table>
 <p><code>PayoffTable(actions, states, Q)</code> stores
 <code>Q[a, θ]</code>, with rows for actions and columns for states.
-Higher is better. The helper <code>payoff_markdown</code> comes from
-<code>vignettes/_common.jl</code> and only formats the table for
-display.</p>
+Higher is better. <code>individuals_payoff</code> says what the utility
+is: the payoff of an action in a state <em>is</em> the count of
+individuals, so the table of counts is the payoff table (the function
+checks that no count is negative and returns it). A
+<code>PayoffTable</code> displays itself as a table; nothing else is
+needed to print it.</p>
 <p>The fourth action is the best or equal best in two of the three
 springs, but the site has machinery for one kind of work this season, so
 it cannot be carried out. It stays in the table and is excluded by a
@@ -279,16 +282,14 @@ times outcome. <code>aggregate</code> with the <code>Expectation</code>
 aggregator computes it for every feasible action, and
 <code>decide</code> with <code>MaxExpectedUtility</code> picks the
 largest.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>expected <span class="op">=</span> <span class="fu">aggregate</span>(<span class="fu">Expectation</span>(), problem)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> <span class="fu">decide</span>(problem, <span class="fu">MaxExpectedUtility</span>())</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;expected toadlets&quot;</span>, <span class="st">&quot;chosen&quot;</span>],</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>         [[a, <span class="cn">e</span>, a <span class="kw">in</span> result.chosen]</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>          for (a, <span class="cn">e</span>) <span class="kw">in</span> <span class="fu">zip</span>(<span class="fu">feasible_actions</span>(problem), expected)])</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> <span class="fu">decide</span>(problem, <span class="fu">MaxExpectedUtility</span>())</span></code></pre></div>
+<p><strong>DecisionResult: MaxExpectedUtility (higher is
+better)</strong></p>
 <table>
 <thead>
 <tr>
 <th style="text-align: left;">action</th>
-<th style="text-align: right;">expected toadlets</th>
+<th style="text-align: right;">score</th>
 <th style="text-align: right;">chosen</th>
 </tr>
 </thead>
@@ -310,12 +311,14 @@ largest.</p>
 </tr>
 </tbody>
 </table>
+<p>First choice: dig_scrapes</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">first_choice</span>(result), <span class="fu">act_now_value</span>(problem)</span></code></pre></div>
 <pre><code>(:dig_scrapes, 1420//1)</code></pre>
 <p><code>decide</code> returns a <code>DecisionResult</code> with the
-scores, every chosen action (ties are all listed) and the rule.
-<code>first_choice</code> gives the single deterministic choice, and
-<code>act_now_value</code> the expected number of toadlets under it.</p>
+scores, every chosen action (ties are all listed) and the rule, and it
+displays as the table above. <code>first_choice</code> gives the single
+deterministic choice, and <code>act_now_value</code> the expected number
+of toadlets under it.</p>
 <p>As a check by hand, for digging scrapes: 3/10 × 300 + 1/2 × 1700 +
 1/5 × 2400 = 90 + 850 + 480 = 1420.</p>
 <h1 id="gain-over-no-intervention">Gain over no intervention</h1>
@@ -323,11 +326,12 @@ scores, every chosen action (ties are all listed) and the rule.
 action yields than doing nothing. <code>gain_over_baseline</code> gives
 that difference in every state, and
 <code>expected_gain_over_baseline</code> its expectation.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">payoff_markdown</span>(<span class="fu">gain_over_baseline</span>(problem); corner<span class="op">=</span><span class="st">&quot;gain in toadlets&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">gain_over_baseline</span>(problem)</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 3 actions × 3 states</strong></p>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">gain in toadlets</th>
+<th style="text-align: left;">action</th>
 <th style="text-align: right;"><code>dry</code></th>
 <th style="text-align: right;"><code>average</code></th>
 <th style="text-align: right;"><code>wet</code></th>

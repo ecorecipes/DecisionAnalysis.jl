@@ -72,10 +72,12 @@ actions = [:no_management, :predator_fence, :raise_water]
 chicks = [ 60  20 140  50     # no management
            50  55 120 130     # fence: disturbance when building, protection from foxes
           120  40 110  40]    # raised water: good in a dry spring, floods nests in a wet one
-payoff = PayoffTable(actions, state_labels(belief), chicks)
+payoff = individuals_payoff(PayoffTable(actions, state_labels(belief), chicks))
 problem = DecisionProblem(payoff, belief; baseline=:no_management)
-payoff_markdown(payoff)
+payoff
 ```
+
+**PayoffTable{Int64}: 3 actions × 4 states**
 
 | action | `few_foxes_dry` | `many_foxes_dry` | `few_foxes_wet` | `many_foxes_wet` |
 |:---|---:|---:|---:|---:|

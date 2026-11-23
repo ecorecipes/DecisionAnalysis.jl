@@ -43,12 +43,14 @@ has no declarations and no `sorry`; it is not part of the default target.
 Each line names a proved result and the Julia function or check it motivates.
 
 * `minimaxRegret_violates_iia` (T8): the minimax-regret choice depends on the menu of
-  actions, including actions that are never chosen. `DecisionReport` should say so whenever
-  it lists a minimax-regret choice, and `feasible_actions` filters change that choice.
+  actions, including actions that are never chosen. Done in Julia: the rule's result carries
+  the note (`details.note`) and `DecisionReport` says so; `feasible_actions` filters change
+  that choice.
 * `evsi_eq_zero_iff` and `evsi_eq_zero_iff_of_pos` (T14): an experiment has zero EVSI exactly
   when one action is optimal after every signal of positive probability. This is a cheap test
   ("this information cannot change the decision") that needs one `argmax` per signal and no
-  subtraction; a function such as `can_change_decision(problem, experiment)` would expose it.
+  subtraction. Done in Julia: `information_can_change_decision(problem, experiment)`, held to
+  `evsi > 0` by a property test.
 * `signalValue_eq_zero` and `valueWithInformation_eq_posterior_form`: the joint form used by
   `value_with_information` needs no guard for signals of probability zero, and agrees with
   the posterior form; `bayes_invert` is right to return `nothing` for such signals, and no
@@ -58,11 +60,11 @@ Each line names a proved result and the Julia function or check it motivates.
   `Experiment` and `_check_states` are therefore load-bearing, not cosmetic.
 * `IsEAdmissible` quantifies over the convex hull, and `Examples.flood_isEAdmissible` rejects
   "relocate" through `IsEAdmissible.isMaximal`. The witness checker needs the hull **weights**
-  as well as the witness prior; `decide(problem, EAdmissible()).details.witnesses` currently
-  holds only the prior, so the weights should be exported too.
+  as well as the witness prior. Done in Julia: `details.weights` carries them and
+  `export_eadmissible_witness` writes them.
 * `IsGarblingOf.trans` and `Certificate.RawGarbling.accepts_sound`: the matrix returned by
-  `is_garbling_of` is a complete, independently checkable certificate; an
-  `export_garbling_witness` writing schema `"garbling-witness/1"` would make it one.
+  `is_garbling_of` is a complete, independently checkable certificate. Done in Julia:
+  `export_garbling_witness` writes schema `"garbling-witness/1"`.
 * `valueWithInformation_garble_le` (T6) holds for a single prior only. `robust_evsi` must
   not assume it, and its documentation should keep saying so.
 * `bayesAction_rescale` and `isMinimaxRegret_rescale`: `first_choice` is invariant under a

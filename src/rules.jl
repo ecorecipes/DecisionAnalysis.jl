@@ -243,9 +243,13 @@ Minimise the largest regret over states (Savage):
 `DecisionRule(WorstCase(); transform=RegretTransform())`. The scores are the
 [`max_regret`](@ref) values, and lower is better.
 
-Minimax regret violates independence of irrelevant alternatives: adding an action
-that is never chosen can change which of the others is chosen, because it changes
-the regret table.
+**Minimax regret depends on the menu of actions.** It violates independence of
+irrelevant alternatives: adding or removing an action, even one that is never
+chosen, can change which of the others is chosen, because it changes the regret
+table (proved as `minimaxRegret_violates_iia` in the Lean development). A
+feasibility filter changes the menu in the same way. The result of
+[`decide`](@ref) carries this warning as `details.note`, with
+`details.menu_dependent == true`, and a [`DecisionReport`](@ref) repeats it.
 """
 function MinimaxRegret()
     return DecisionRule(WorstCase(); transform=RegretTransform(), name=:MinimaxRegret)
@@ -296,6 +300,20 @@ is optimal, and `details.weights` the convex weights on the generating points th
 give that prior (`witness = Σ_k weights[k] · point_k`). For a `Rational` problem both
 are exact, and [`export_eadmissible_witness`](@ref) writes them for an independent
 checker.
+
+The programme is [`eadmissibility_model`](@ref), and `decide` takes the keywords
+`optimizer` and `rounding_tol` of [`solve_program`](@ref): by default the built-in
+exact simplex, otherwise any JuMP optimiser. Whatever solved it, on an exact problem
+with zero tolerances an action is reported E-admissible only with weights that have
+been checked exactly (nonnegative, summing to one, the action optimal under their
+mixture). `details.exact` maps every feasible action to whether its yes or no is an
+exact statement: always `true` by the default route and with an exact optimiser on
+an exact problem; with a floating-point optimiser a yes is exact (its witness was
+rounded and verified) and a no is numerical, to the tolerance of the optimiser,
+unless its optimum was certified by duality; on a floating-point problem every answer
+is numerical. `details.route` names the route (see [`ProgramSolution`](@ref)). If a
+floating-point optimiser reports an action E-admissible and the rounded witness fails
+the exact check, [`ExactVerificationError`](@ref) is thrown.
 """
 struct EAdmissible <: AbstractRule end
 
@@ -351,7 +369,11 @@ What [`decide`](@ref) returns. Fields:
   rules over a credal set; the action-by-objective matrix for [`ParetoFront`](@ref).
 - `chosen`: the labels of all chosen actions, in table order. Ties are all listed.
 - `sense`: `:max` when a higher score is better, `:min` when a lower one is.
-- `details`: a named tuple of rule-specific extras (see each set-valued rule).
+- `details`: a named tuple of rule-specific extras (see each set-valued rule, and
+  [`MinimaxRegret`](@ref) for the note every regret-based rule attaches).
+
+A result prints as a table of the actions with their scores and whether each was
+chosen, and renders as a Markdown or HTML table in a notebook or a Quarto document.
 
 [`first_choice`](@ref) gives the deterministic single choice.
 """
@@ -391,6 +413,7 @@ end
 """
     decide(problem::DecisionProblem, rule; atol=0, rtol) -> DecisionResult
     decide(problems::AbstractVector{<:DecisionProblem}, rule::ParetoFront; atol=0, rtol)
+    decide(tables, belief, rule::ParetoFront; feasible=nothing, baseline=nothing, atol=0, rtol)
 
 Apply `rule` to `problem` and return a [`DecisionResult`](@ref) holding the score of
 every feasible action, the chosen actions and the rule.
@@ -431,8 +454,16 @@ function decide(problem::DecisionProblem, rule::DecisionRule; atol::Real=0,
     sense = _sense(rule.metric)
     idx = _select(rule.selector, scores, sense, _tolerance(scores, atol, rtol))
     actions = feasible_actions(problem)
-    return DecisionResult(rule, actions, scores, actions[idx], sense, (;))
+    details = rule.metric.transform isa IdentityTransform ? (;) :
+              (; menu_dependent=true, note=_MENU_NOTE)
+    return DecisionResult(rule, actions, scores, actions[idx], sense, details)
 end
+
+# Attached to the result of every regret-based rule.
+const _MENU_NOTE = "Regret is measured against the best feasible action in each " *
+                   "state, so this rule depends on the menu of actions: adding or " *
+                   "removing an action, even one that is never chosen, can change " *
+                   "the choice (independence of irrelevant alternatives fails)."
 
 # Expected utility of each feasible action at each generating point of the belief.
 function _expectation_matrix(problem::DecisionProblem, rule::AbstractRule)
@@ -466,21 +497,51 @@ function decide(problem::DecisionProblem, rule::Maximal; atol::Real=0,
     return DecisionResult(rule, actions, nothing, actions[idx], :max, (;))
 end
 
-# The E-admissibility programme for action `a`: returns the optimal slack (at most
-# zero) and the weights on the generating points that attain it.
-function _e_admissibility_lp(E::AbstractMatrix, a::Int)
-    n, K = size(E)
-    # Variables: λ_1..λ_K >= 0 and t free. Minimise −t.
-    c = vcat(zeros(Int, K), -1)
-    Aeq = hcat(ones(Int, 1, K), 0)
-    Aub = hcat(-(E[a:a, :] .- E), ones(Int, n))
-    sol = _solve_lp(c, Aeq, [1], Aub, zeros(Int, n); free=[K + 1])
+# Whether action `a` maximises expected utility under the mixture of the generating
+# points with weights `w`, exactly. `E[b, k]` is the expected utility of `b` at point k.
+function _optimal_under(E::AbstractMatrix, w::AbstractVector, a::Int)
+    eu = E * w
+    return all(>=(0), w) && isone(sum(w)) && eu[a] == maximum(eu)
+end
+
+# Decide E-admissibility of action `a` by the programme of `eadmissibility_model`.
+# Returns `(admitted, weights, exact, route)`: `weights` are the convex weights on the
+# generating points (`nothing` when not admitted) and `exact` says whether the yes or no
+# is an exact statement. For an exact problem and a zero tolerance, a yes is returned
+# only with weights that pass `_optimal_under`, whatever solved the programme.
+function _eadmissible_witness(E::AbstractMatrix, a::Int; tol::Real=0, optimizer=nothing,
+                              rounding_tol=_ROUNDING_TOLS)
+    sol = solve_program(_eadmissibility_program(E, a); optimizer, rounding_tol)
     sol.status === :optimal || throw(LinearProgramError(:e_admissibility, sol.status))
-    return -sol.objective, sol.x[1:K]
+    slack, λ = sol.objective, sol.values.λ
+    strict = _is_exact(eltype(E)) && iszero(tol)
+    if !strict
+        # Floating point, or an exact problem with a tolerance: admitted to tolerance.
+        return slack >= -tol, slack >= -tol ? λ : nothing, false, sol.route
+    end
+    Eb = _BigRat.(E)
+    if sol.exact
+        slack >= 0 || return false, nothing, true, sol.route
+        _optimal_under(Eb, λ, a) ||
+            throw(ExactVerificationError(:e_admissibility,
+                                         "the weights found for action $a do not make " *
+                                         "it optimal under their mixture"))
+        return true, λ, true, sol.route
+    end
+    # A rounded floating-point solution that was not certified optimal. A yes needs
+    # only a witness, so clean the weights up and check them exactly.
+    w = _clean_weights(λ)
+    w !== nothing && _optimal_under(Eb, w, a) && return true, w, true, sol.route
+    slack < -1e-6 * max(1, maximum(abs, Eb)) && return false, nothing, false, sol.route
+    throw(ExactVerificationError(:e_admissibility,
+                                 "the floating-point optimiser reports action $a " *
+                                 "E-admissible to its tolerance, but the rounded " *
+                                 "weights do not make it exactly optimal"))
 end
 
 function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,
-                rtol::Real=_default_rtol(eltype(problem.payoff)))
+                rtol::Real=_default_rtol(eltype(problem.payoff)), optimizer=nothing,
+                rounding_tol=_ROUNDING_TOLS)
     E, v = _expectation_matrix(problem, rule)
     tol = _tolerance(E, atol, rtol)
     T = eltype(E)
@@ -488,9 +549,13 @@ function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,
     idx = Int[]
     witnesses = Dict{Symbol,Vector}()
     weights = Dict{Symbol,Vector}()
+    exact = Dict{Symbol,Bool}()
+    route = :internal
     for a in axes(E, 1)
-        slack, λ = _e_admissibility_lp(E, a)
-        slack >= -tol || continue
+        admitted, λ, sure, route = _eadmissible_witness(E, a; tol, optimizer,
+                                                        rounding_tol)
+        exact[actions[a]] = sure
+        admitted || continue
         push!(idx, a)
         witnesses[actions[a]] = [_from_big(T,
                                            sum(λ[k] * v.priors[k][j] for k in eachindex(λ)))
@@ -498,7 +563,7 @@ function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,
         weights[actions[a]] = _from_big.(T, λ)
     end
     return DecisionResult(rule, actions, nothing, actions[idx], :max,
-                          (; witnesses, weights))
+                          (; witnesses, weights, exact, route))
 end
 
 # Rows of `S` not dominated by another row (all >=, one > by more than `tol`).
@@ -511,7 +576,7 @@ function _nondominated(S::AbstractMatrix, tol::Real)
 end
 
 function decide(problems::AbstractVector{<:DecisionProblem}, rule::ParetoFront;
-                atol::Real=0,
+                objectives=nothing, atol::Real=0,
                 rtol::Real=mapreduce(p -> _default_rtol(eltype(p.payoff)), max, problems;
                                      init=0))
     isempty(problems) && throw(ArgumentError("ParetoFront needs at least one objective"))
@@ -523,5 +588,17 @@ function decide(problems::AbstractVector{<:DecisionProblem}, rule::ParetoFront;
     end
     S = reduce(hcat, [aggregate(rule.aggregator, p) for p in problems])
     idx = _nondominated(S, _tolerance(S, atol, rtol))
-    return DecisionResult(rule, actions, S, actions[idx], :max, (;))
+    names = objectives === nothing ? _default_labels("objective", length(problems)) :
+            _labels(objectives)
+    length(names) == length(problems) ||
+        throw(ArgumentError("$(length(names)) objective names for " *
+                            "$(length(problems)) objectives"))
+    return DecisionResult(rule, actions, S, actions[idx], :max, (; objectives=names))
+end
+
+function decide(tables, belief::Union{AbstractBelief,AbstractVector{<:Real}},
+                rule::ParetoFront; feasible=nothing, baseline=nothing, kw...)
+    named = _named_tables(tables)
+    problems = [DecisionProblem(t, belief; feasible, baseline) for (_, t) in named]
+    return decide(problems, rule; objectives=first.(named), kw...)
 end

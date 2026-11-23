@@ -168,8 +168,10 @@ function _to_path(f, path::AbstractString)
 end
 
 """
-    export_garbling_witness(io::IO, e′::Experiment, e::Experiment)
-    export_garbling_witness(path::AbstractString, e′, e)
+    export_garbling_witness(io::IO, e′::Experiment, e::Experiment; optimizer=nothing,
+                            rounding_tol=(1e-8, 1e-10, 1e-12))
+    export_garbling_witness(path::AbstractString, e′, e; optimizer=nothing,
+                            rounding_tol=(1e-8, 1e-10, 1e-12))
 
 Write the proof that `e′` is a garbling of `e`: the two likelihoods and the matrix
 `G` found by [`is_garbling_of`](@ref), as JSON with schema `"garbling-witness/1"`
@@ -179,21 +181,28 @@ likelihood of `e`, rows = signals), `garbled` (the likelihood of `e′`) and `ga
 number a string `"n/d"` or `"n"` as in [`export_decision_certificate`](@ref).
 
 Both likelihoods must be of `Rational` or integer type
-([`InexactCertificateError`](@ref) otherwise): the programme is then solved exactly
-and no rounding is involved. Before writing, the witness is checked in exact
-arithmetic: `G` is nonnegative, every column of `G` sums to one, and `G * L_e`
-equals `L_e′` entry for entry. [`WitnessError`](@ref) is thrown when `e′` is not a
-garbling of `e`, or if that check fails.
+([`InexactCertificateError`](@ref) otherwise). By default the programme is solved
+exactly and no rounding is involved; `optimizer` and `rounding_tol` choose another
+route (see [`solve_program`](@ref)). The solver is never trusted: whatever found the
+witness, it is checked here in exact arithmetic before a byte is written: `G` is
+nonnegative, every column of `G` sums to one, and `G * L_e` equals `L_e′` entry for
+entry. [`WitnessError`](@ref) is thrown when `e′` is not a garbling of `e`, or if
+that check fails; [`ExactVerificationError`](@ref) when a floating-point optimiser
+reports a garbling that does not round to an exact one.
 
 The path form returns the path; the `IO` form returns `nothing`.
 """
-function export_garbling_witness(io::IO, e′::Experiment, e::Experiment)
+function export_garbling_witness(io::IO, e′::Experiment, e::Experiment; optimizer=nothing,
+                                 rounding_tol=_ROUNDING_TOLS)
     _require_exact("likelihood", e.likelihood)
     _require_exact("likelihood of the garbled experiment", e′.likelihood)
-    G = is_garbling_of(e′, e; atol=0)
+    result = garbling_result(e′, e; atol=0, optimizer, rounding_tol)
+    G = result.witness
     G === nothing &&
-        throw(WitnessError("the first experiment is not a garbling of the second: " *
-                           "the deficiency is positive and there is no witness"))
+        throw(WitnessError("the first experiment is not a garbling of the second" *
+                           (result.exact ? "" :
+                            ", to the tolerance of the floating-point optimiser") *
+                           ": there is no witness"))
     (all(>=(0), G) && all(isone, sum(G; dims=1)) && G * e.likelihood == e′.likelihood) ||
         throw(WitnessError("the garbling matrix found did not pass the exact check " *
                            "(nonnegative, columns summing to one, product equal to " *
@@ -207,13 +216,16 @@ function export_garbling_witness(io::IO, e′::Experiment, e::Experiment)
     return nothing
 end
 
-function export_garbling_witness(path::AbstractString, e′::Experiment, e::Experiment)
-    return _to_path(io -> export_garbling_witness(io, e′, e), path)
+function export_garbling_witness(path::AbstractString, e′::Experiment, e::Experiment;
+                                 kw...)
+    return _to_path(io -> export_garbling_witness(io, e′, e; kw...), path)
 end
 
 """
-    export_eadmissible_witness(io::IO, problem::DecisionProblem, action)
-    export_eadmissible_witness(path::AbstractString, problem, action)
+    export_eadmissible_witness(io::IO, problem::DecisionProblem, action;
+                               optimizer=nothing, rounding_tol=(1e-8, 1e-10, 1e-12))
+    export_eadmissible_witness(path::AbstractString, problem, action; optimizer=nothing,
+                               rounding_tol=(1e-8, 1e-10, 1e-12))
 
 Write the proof that `action` (a label) is E-admissible in `problem`: a prior in the
 credal set under which it maximises expected utility, with the convex weights that
@@ -226,17 +238,22 @@ the feasible actions); every other number is a string `"n/d"` or `"n"`.
 
 The belief is a [`CredalSet`](@ref), or a single prior read as a one-point set. The
 payoffs and priors must be of `Rational` or integer type
-([`InexactCertificateError`](@ref) otherwise): the E-admissibility programme is then
-solved exactly and no rounding is involved. Before writing, the witness is checked
-in exact arithmetic: the weights are nonnegative and sum to one, the prior is their
-mixture, and no action has a higher expected utility under it.
+([`InexactCertificateError`](@ref) otherwise). By default the E-admissibility
+programme is solved exactly and no rounding is involved; `optimizer` and
+`rounding_tol` choose another route (see [`solve_program`](@ref)). The solver is
+never trusted: whatever found the weights, the witness is checked here in exact
+arithmetic before a byte is written: the weights are nonnegative and sum to one, the
+prior is their mixture, and no action has a higher expected utility under it.
 [`WitnessError`](@ref) is thrown when the action is not E-admissible, or if that
-check fails; an `ArgumentError` when the action is not a feasible action.
+check fails; [`ExactVerificationError`](@ref) when a floating-point optimiser reports
+it E-admissible with weights that do not round to a witness; an `ArgumentError` when
+the action is not a feasible action.
 
 The path form returns the path; the `IO` form returns `nothing`.
 """
 function export_eadmissible_witness(io::IO, problem::DecisionProblem,
-                                    action::Union{Symbol,AbstractString})
+                                    action::Union{Symbol,AbstractString};
+                                    optimizer=nothing, rounding_tol=_ROUNDING_TOLS)
     label = Symbol(action)
     actions = feasible_actions(problem)
     a = findfirst(==(label), actions)
@@ -249,10 +266,14 @@ function export_eadmissible_witness(io::IO, problem::DecisionProblem,
     Q, priors = v.Q, v.priors
     _require_exact("payoff", Q)
     foreach(q -> _require_exact("credal set", q), priors)
-    slack, weights = _e_admissibility_lp(_expectations(Q, priors), a)
-    iszero(slack) ||
-        throw(WitnessError("$label is not E-admissible: under every prior in the " *
-                           "credal set some other action has a higher expected utility"))
+    admitted, weights, exact, _ = _eadmissible_witness(_expectations(Q, priors), a;
+                                                       optimizer, rounding_tol)
+    admitted ||
+        throw(WitnessError("$label is not E-admissible" *
+                           (exact ? "" :
+                            ", to the tolerance of the floating-point optimiser") *
+                           ": under every prior in the credal set some other action " *
+                           "has a higher expected utility"))
     prior = [sum(weights[k] * priors[k][j] for k in eachindex(weights))
              for j in axes(Q, 2)]
     eu = Q * prior
@@ -272,6 +293,6 @@ function export_eadmissible_witness(io::IO, problem::DecisionProblem,
 end
 
 function export_eadmissible_witness(path::AbstractString, problem::DecisionProblem,
-                                    action::Union{Symbol,AbstractString})
-    return _to_path(io -> export_eadmissible_witness(io, problem, action), path)
+                                    action::Union{Symbol,AbstractString}; kw...)
+    return _to_path(io -> export_eadmissible_witness(io, problem, action; kw...), path)
 end

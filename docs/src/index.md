@@ -13,6 +13,7 @@ every number it returns is a rational.
 | [`decide`](@ref) | apply a rule and get scores and the chosen actions |
 | [`Experiment`](@ref) | `L[z, θ] = P(z \| θ)`, an information source |
 | [`evpi`](@ref), [`evppi`](@ref), [`evsi`](@ref), [`enbs`](@ref) | the value of information |
+| [`information_can_change_decision`](@ref) | whether an experiment can change what is done (exactly when its EVSI is positive) |
 | [`DecisionReport`](@ref) | every applicable rule side by side |
 
 ## Quick start
@@ -75,9 +76,38 @@ julia> decide(robust, EAdmissible()).chosen
  :raise_levee
 ```
 
-`DecisionReport(problem; credal=ensemble, experiment=gauge)` prints all of this as
-one table, with the regret profile, the gain of each action over the baseline and
-the assumptions under which the numbers hold.
+`DecisionReport(problem; credal=ensemble, experiments=(; gauge))` prints all of this
+as aligned tables that fit 80 columns (and as Markdown or HTML tables in a notebook),
+with the regret profile, the gain of each action over the baseline, whether each
+experiment can change the decision, and the assumptions under which the numbers hold.
+
+## Utilities counted in individuals
+
+A payoff table can be assembled from tables of outcome counts with `+`, `-` and
+scalar `*` on tables with matching labels, or with [`combine_payoffs`](@ref).
+[`individuals_payoff`](@ref) is the utility that counts individuals and
+[`infection_payoff`](@ref) is uninfected − weight × infected. Several objectives
+kept apart go to [`ParetoFront`](@ref) as a named collection of tables sharing one
+belief.
+
+```jldoctest
+julia> using DecisionAnalysis
+
+julia> uninfected = PayoffTable([:nothing, :baths], [:absent, :present], [500 100; 470 250]);
+
+julia> infected = PayoffTable([:nothing, :baths], [:absent, :present], [0 250; 0 120]);
+
+julia> infection_payoff(; uninfected, infected, weight=1)
+PayoffTable{Int64}: 2 actions × 2 states
+  action   absent  present
+  -------  ------  -------
+  nothing     500     -150
+  baths       470      130
+
+julia> decide((; uninfected, fewer_infected=-infected), [1 // 2, 1 // 2], ParetoFront()).chosen
+1-element Vector{Symbol}:
+ :baths
+```
 
 ## Conventions
 
@@ -104,16 +134,57 @@ the assumptions under which the numbers hold.
   whose cell is learned; [`evsi`](@ref) takes the experiment. `EVSI ≤ EVPI` is a
   statement about the same states and a single prior.
 - **Robust value of information may be negative** and is returned as computed.
+- **Minimax regret depends on the menu of actions.** Adding or removing an action,
+  even one that is never chosen, can change its choice; the result of
+  [`MinimaxRegret`](@ref) and the report say so.
+- **A baseline under an imprecise belief gives a range.**
+  [`expected_gain_over_baseline`](@ref) returns `(lower, upper)` for a credal set
+  (the range of the expected gain) and for a scenario set (the range of the gain).
 - **[`enbs`](@ref) is for additive payoffs only.**
 
 ## Linear programmes
 
 E-admissibility, the garbling test, deficiency and the upper EVPI envelope are
-linear programmes. The package solves them itself, with a dense simplex method in
-exact rational arithmetic, so the answers are exact statements ("this action is
-E-admissible", "the deficiency is zero") and no solver has to be installed. Inputs
-in floating point are solved as the exact rationals they are. The solver is meant for
-the small problems of a decision table, not for large programmes.
+linear programmes. Each is written once, as a [JuMP](https://jump.dev) model, by an
+exported builder: [`eadmissibility_model`](@ref), [`garbling_model`](@ref),
+[`deficiency_model`](@ref) and [`evpi_envelope_model`](@ref). A builder returns a
+[`DecisionProgram`](@ref) holding a `JuMP.GenericModel{T}` with `T = Rational{BigInt}`
+for an exact problem, so the model can be inspected, extended or solved by hand.
+
+The functions that use them take an `optimizer` keyword, and there are three routes
+to the same model.
+
+| `optimizer` | what happens | answers |
+|---|---|---|
+| `nothing` (the default) | the built-in dense simplex in exact rational arithmetic, fed from the model's matrix form (`JuMP.lp_matrix_data`) | exact; no solver needs to be installed; for small problems |
+| an exact optimiser, e.g. `CDDLib.Optimizer{Rational{BigInt}}` | the rational model is solved by it | exact |
+| a floating-point optimiser, e.g. `HiGHS.Optimizer` | a `Float64` copy is solved, the solution is rounded to rationals and **verified exactly** | exact when verified; otherwise [`ExactVerificationError`](@ref) |
+
+JuMP is a dependency of the package; no solver is. Install CDDLib, HiGHS or any
+other JuMP solver yourself to use the second or third route.
+
+**The solver is never trusted.** Whatever route produced it, a witness (the prior
+under which an action is optimal, the garbling matrix) is checked in exact
+arithmetic before it is returned or exported, and an optimal value found in floating
+point (a deficiency, the EVPI envelope) is returned only if the rounded primal and
+dual solutions certify it exactly. A yes-or-no answer says how sure it is:
+`decide(problem, EAdmissible()).details.exact` and
+[`garbling_result`](@ref)`.exact` are `true` for an exact statement and `false` for
+one that holds to the tolerance of a floating-point optimiser (a "no" from HiGHS,
+for example). Inputs in floating point are solved as the exact rationals they are
+by the default route, and the answers are then numerical.
+
+```jldoctest quick
+julia> program = eadmissibility_model(robust, :raise_levee);
+
+julia> program.model isa DecisionAnalysis.JuMP.GenericModel{Rational{BigInt}}
+true
+
+julia> solution = solve_program(program);
+
+julia> solution.status, solution.objective, solution.exact
+(:optimal, 0//1, true)
+```
 
 ## Scope of version 0.1
 

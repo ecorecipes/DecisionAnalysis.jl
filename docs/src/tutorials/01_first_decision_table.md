@@ -44,7 +44,7 @@ estimates for any real site.
 
 ``` julia
 using DecisionAnalysis
-include(joinpath("..", "_common.jl"))   # Markdown tables and plot defaults, no analysis
+include(joinpath("..", "_common.jl"))   # plot defaults and small tables, no analysis
 
 actions = [:no_intervention, :deepen_ponds, :dig_scrapes, :deepen_and_dig]
 states = [:dry, :average, :wet]
@@ -52,9 +52,10 @@ toadlets = [ 200 1200 2000     # no intervention: the ponds dry out in a dry spr
              900 1400 1500     # deeper ponds hold water, and in a wet spring hold predators
              300 1700 2400     # more shallow ponds: more habitat, the same drying risk
             1000 1800 2000]    # both at once
-payoff = PayoffTable(actions, states, toadlets)
-payoff_markdown(payoff)
+payoff = individuals_payoff(PayoffTable(actions, states, toadlets))
 ```
+
+**PayoffTable{Int64}: 4 actions × 3 states**
 
 | action            | `dry` | `average` | `wet` |
 |:------------------|------:|----------:|------:|
@@ -64,9 +65,12 @@ payoff_markdown(payoff)
 | `deepen_and_dig`  |  1000 |      1800 |  2000 |
 
 `PayoffTable(actions, states, Q)` stores `Q[a, θ]`, with rows for
-actions and columns for states. Higher is better. The helper
-`payoff_markdown` comes from `vignettes/_common.jl` and only formats the
-table for display.
+actions and columns for states. Higher is better. `individuals_payoff`
+says what the utility is: the payoff of an action in a state *is* the
+count of individuals, so the table of counts is the payoff table (the
+function checks that no count is negative and returns it). A
+`PayoffTable` displays itself as a table; nothing else is needed to
+print it.
 
 The fourth action is the best or equal best in two of the three springs,
 but the site has machinery for one kind of work this season, so it
@@ -123,18 +127,18 @@ for every feasible action, and `decide` with `MaxExpectedUtility` picks
 the largest.
 
 ``` julia
-expected = aggregate(Expectation(), problem)
 result = decide(problem, MaxExpectedUtility())
-md_table(["action", "expected toadlets", "chosen"],
-         [[a, e, a in result.chosen]
-          for (a, e) in zip(feasible_actions(problem), expected)])
 ```
 
-| action            | expected toadlets | chosen |
-|:------------------|------------------:|-------:|
-| `no_intervention` |              1060 |     \- |
-| `deepen_ponds`    |              1270 |     \- |
-| `dig_scrapes`     |              1420 |    yes |
+**DecisionResult: MaxExpectedUtility (higher is better)**
+
+| action            | score | chosen |
+|:------------------|------:|-------:|
+| `no_intervention` |  1060 |     \- |
+| `deepen_ponds`    |  1270 |     \- |
+| `dig_scrapes`     |  1420 |    yes |
+
+First choice: dig_scrapes
 
 ``` julia
 first_choice(result), act_now_value(problem)
@@ -143,9 +147,9 @@ first_choice(result), act_now_value(problem)
     (:dig_scrapes, 1420//1)
 
 `decide` returns a `DecisionResult` with the scores, every chosen action
-(ties are all listed) and the rule. `first_choice` gives the single
-deterministic choice, and `act_now_value` the expected number of
-toadlets under it.
+(ties are all listed) and the rule, and it displays as the table above.
+`first_choice` gives the single deterministic choice, and
+`act_now_value` the expected number of toadlets under it.
 
 As a check by hand, for digging scrapes: 3/10 × 300 + 1/2 × 1700 + 1/5 ×
 2400 = 90 + 850 + 480 = 1420.
@@ -158,10 +162,12 @@ difference in every state, and `expected_gain_over_baseline` its
 expectation.
 
 ``` julia
-payoff_markdown(gain_over_baseline(problem); corner="gain in toadlets")
+gain_over_baseline(problem)
 ```
 
-| gain in toadlets  | `dry` | `average` | `wet` |
+**PayoffTable{Int64}: 3 actions × 3 states**
+
+| action            | `dry` | `average` | `wet` |
 |:------------------|------:|----------:|------:|
 | `no_intervention` |     0 |         0 |     0 |
 | `deepen_ponds`    |   700 |       200 |  -500 |

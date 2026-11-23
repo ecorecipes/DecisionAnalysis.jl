@@ -40,8 +40,10 @@ states = [:absent, :transient, :established]
 payoff = PayoffTable(actions, states,
                      [800 400 50; 700 600 300; 760 480 200; 500 450 420])
 problem = DecisionProblem(payoff, [7 // 10, 1 // 5, 1 // 10]; baseline=:no_control)
-payoff_markdown(payoff)
+payoff
 ```
+
+**PayoffTable{Int64}: 4 actions × 3 states**
 
 | action        | `absent` | `transient` | `established` |
 |:--------------|---------:|------------:|--------------:|
@@ -59,15 +61,16 @@ action that is best for that state.
 
 ``` julia
 R = regret_table(problem)
-labelled_table("regret in voles", feasible_actions(problem), states, R)
 ```
 
-| regret in voles | `absent` | `transient` | `established` |
-|:----------------|---------:|------------:|--------------:|
-| `no_control`    |        0 |         200 |           370 |
-| `trap_mink`     |      100 |           0 |           120 |
-| `refuges`       |       40 |         120 |           220 |
-| `translocate`   |      300 |         150 |             0 |
+**RegretTable{Int64}: regret, 4 actions × 3 states**
+
+| action        | `absent` | `transient` | `established` |
+|:--------------|---------:|------------:|--------------:|
+| `no_control`  |        0 |         200 |           370 |
+| `trap_mink`   |      100 |           0 |           120 |
+| `refuges`     |       40 |         120 |           220 |
+| `translocate` |      300 |         150 |             0 |
 
 Reading the first row: with no mink, no control is the best action and
 has no regret. With transient mink it is 200 voles behind trapping, and
@@ -171,16 +174,17 @@ reads regret as a share of what was achievable. Unlike regret it changes
 if a constant is added to the payoffs.
 
 ``` julia
-labelled_table("relative regret", feasible_actions(problem), states,
-               relative_regret_table(problem); digits=3)
+relative_regret_table(problem)
 ```
 
-| relative regret | `absent` | `transient` | `established` |
-|:----------------|---------:|------------:|--------------:|
-| `no_control`    |        0 |       0.333 |         0.881 |
-| `trap_mink`     |    0.125 |           0 |         0.286 |
-| `refuges`       |     0.05 |         0.2 |         0.524 |
-| `translocate`   |    0.375 |        0.25 |             0 |
+**RegretTable{Float64}: relative regret, 4 actions × 3 states**
+
+| action        | `absent` | `transient` | `established` |
+|:--------------|---------:|------------:|--------------:|
+| `no_control`  |      0.0 |    0.333333 |      0.880952 |
+| `trap_mink`   |    0.125 |         0.0 |      0.285714 |
+| `refuges`     |     0.05 |         0.2 |       0.52381 |
+| `translocate` |    0.375 |        0.25 |           0.0 |
 
 ``` julia
 first_choice(decide(problem,
@@ -200,8 +204,10 @@ colony off from the rest of the river.
 ``` julia
 bigger = PayoffTable(vcat(actions, :fence), states, vcat(payoff.Q, [300 300 700]))
 problem5 = DecisionProblem(bigger, problem.belief; baseline=:no_control)
-payoff_markdown(bigger)
+bigger
 ```
+
+**PayoffTable{Int64}: 5 actions × 3 states**
 
 | action        | `absent` | `transient` | `established` |
 |:--------------|---------:|------------:|--------------:|
@@ -241,6 +247,30 @@ trapping and translocation has come to depend on an option that neither
 rule recommends. This is a failure of the independence of irrelevant
 alternatives, and it is a property of the rule, not of this table.
 
+The result of a regret-based rule carries this warning with it, and
+displays it under its scores:
+
+``` julia
+after
+```
+
+**DecisionResult: MinimaxRegret (lower is better)**
+
+| action        | score | chosen |
+|:--------------|------:|-------:|
+| `no_control`  |   650 |     \- |
+| `trap_mink`   |   400 |     \- |
+| `refuges`     |   500 |     \- |
+| `translocate` |   300 |    yes |
+| `fence`       |   500 |     \- |
+
+First choice: translocate
+
+Note: Regret is measured against the best feasible action in each state,
+so this rule depends on the menu of actions: adding or removing an
+action, even one that is never chosen, can change the choice
+(independence of irrelevant alternatives fails).
+
 Expected utility does not behave like this. An action’s expected payoff
 does not depend on the other rows, so adding the fence leaves the choice
 where it was.
@@ -260,7 +290,7 @@ png_figure(grouped_bars(feasible_actions(problem),
                         title="Maximum regret before and after adding the fence"))
 ```
 
-![](03_regret_files/figure-commonmark/cell-17-output-1.png)
+![](03_regret_files/figure-commonmark/cell-18-output-1.png)
 
 ## What to take away
 

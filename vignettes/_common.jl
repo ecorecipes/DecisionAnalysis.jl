@@ -1,4 +1,6 @@
-# Shared presentation helpers for the vignettes: Markdown tables and plot defaults.
+# Shared presentation helpers for the vignettes: plot defaults, and a small Markdown
+# table for summaries assembled by hand. Payoff tables, regret tables, rule results and
+# reports need no helper: DecisionAnalysis displays them as tables itself.
 # Nothing here computes a result; every number comes from DecisionAnalysis.
 
 using Markdown: Markdown
@@ -66,15 +68,6 @@ A Markdown table of the matrix `M` with labelled rows and columns.
 function labelled_table(corner, row_labels, column_labels, M::AbstractMatrix; digits=2)
     return md_table(vcat(corner, collect(column_labels)),
                     [vcat(row_labels[i], collect(M[i, :])) for i in axes(M, 1)]; digits)
-end
-
-"""
-    payoff_markdown(table; corner="action", digits=2)
-
-The payoff table of a `PayoffTable` (rows = actions, columns = states) as Markdown.
-"""
-function payoff_markdown(table; corner="action", digits=2)
-    return labelled_table(corner, table.actions, table.states, table.Q; digits)
 end
 
 """

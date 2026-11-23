@@ -43,14 +43,15 @@ certificate checker instantiate the same definitions at `K = ℚ`. There is no s
 | Julia | Lean definition | What is proved about it |
 |:--|:--|:--|
 | `act_now_value`; `decide(p, MaxExpectedUtility())` | `expectedUtility`, `actNowValue`, `IsBayes`, `maximisers` | attained (`exists_isBayes`); the chosen set is exactly the optimal actions (`mem_maximisers`) |
-| `first_choice` | `firstArgmax`, `firstArgmin`, `bayesAction`, `minimaxRegretAction`, `gammaMaximinAction` | optimal (`firstArgmax_spec`), first among ties (`lt_of_lt_firstArgmax`), determined by those two properties (`eq_firstArgmax`), depends only on the ranking (`firstArgmax_congr_of_order`) |
+| `first_choice` | `firstArgmax`, `firstArgmin`, `bayesAction`, `minimaxRegretAction`, `gammaMaximinAction` | optimal (`firstArgmax_spec`), first among ties (`lt_of_lt_firstArgmax`), determined by those two properties (`eq_firstArgmax`), depends only on the ranking (`firstArgmax_congr_of_order`), unchanged by a positive rescaling with a state-dependent shift (`bayesAction_rescale`) |
 | `value_with_information`, `evsi` | `valueWithInformation`, `evsi` (joint form, no division) | equals the posterior form `Σ_z P(z) max_a E[u | z]` (`valueWithInformation_eq_posterior_form`); zero-probability signals contribute zero (`signalValue_eq_zero`) |
+| `information_can_change_decision(problem, experiment)` | `¬ ∃ a, ∀ z, 0 < signalProbability p e z → ∀ a', signalValue u p e z a' ≤ signalValue u p e z a` | equivalent to `evsi > 0` (`evsi_eq_zero_iff`, `evsi_eq_zero_iff_of_pos`, with `evsi_nonneg`) |
 | `evpi` | `perfectValue`, `evpi` | `evpi_nonneg`, `minOver_expectedRegret_eq_evpi` |
 | `evppi(problem, partition)` | `partialValue`, `evppi` | equals the EVSI of the deterministic experiment `θ ↦ cell(θ)` (`evppi_eq_evsi`) |
 | `regret_table`, `expected_regret`, `max_regret`; `decide(p, MinimaxRegret())` | `regret`, `expectedRegret`, `maxRegret`, `IsMinimaxRegret` | `expectedRegret_eq`, `regret_nonneg` |
 | `bayes_invert` | `signalProbability`, `posterior` | normalised when `P(z) ≠ 0` (`posterior_normalised`), nonnegative, marginals sum to one, posteriors average to the prior |
-| `garble`, `is_garbling_of` | `garble`, `IsGarblingOf` | `garble` is `Kernel.comp` of FiniteKernels (`garble_eq_comp`); preorder (`IsGarblingOf.refl`, `.trans`) |
-| `decide(p, GammaMaximin())`, `EAdmissible()`, `Maximal()`, `IntervalDominance()` | `IsGammaMaximin`, `IsEAdmissible` (over the convex hull), `IsMaximal`, `IsIntervalUndominated` | inclusions below |
+| `garble`, `is_garbling_of`, `garbling_result` (programme: `garbling_model`) | `garble`, `IsGarblingOf` | `garble` is `Kernel.comp` of FiniteKernels (`garble_eq_comp`); preorder (`IsGarblingOf.refl`, `.trans`) |
+| `decide(p, GammaMaximin())`, `EAdmissible()` (programme: `eadmissibility_model`), `Maximal()`, `IntervalDominance()` | `IsGammaMaximin`, `IsEAdmissible` (over the convex hull), `IsMaximal`, `IsIntervalUndominated` | inclusions below; a maximal action is not strictly beaten by one rival at every prior of the hull (`IsMaximal.not_dominated_on_hull`) |
 
 ### By Julia property test
 
@@ -65,17 +66,25 @@ certificate checker instantiate the same definitions at `K = ℚ`. There is no s
 | `test_voi.jl`: positive affine maps keep the Bayes and minimax-regret actions and scale EVPI, EVSI and regret | `isBayes_rescale`, `evpi_rescale`, `evsi_rescale`, `evppi_rescale`, `regret_rescale`, `isMinimaxRegret_rescale` (T7) |
 | `test_voi.jl`: signals of probability zero contribute nothing | `signalValue_eq_zero`, `maxOver_signalValue_eq_zero` |
 | `test_experiments.jl`: Bayesian inversion (marginal sums to one, posteriors average to the prior) | `sum_signalProbability`, `posterior_normalised`, `sum_signalProbability_mul_posterior` |
-| `test_experiments.jl`: `is_garbling_of` witness (`G * L == L′`, `G` stochastic) | `Certificate.GarblingWitnessOk.isGarblingOf`, `Certificate.RawGarbling.accepts_sound` |
+| `test_experiments.jl`, `test_programs.jl`: `is_garbling_of` / `garbling_result` witness (`G * L == L′`, `G` stochastic), by each solver route | `Certificate.GarblingWitnessOk.isGarblingOf`, `Certificate.RawGarbling.accepts_sound` |
 | `test_credal.jl`: Γ-maximin value below every member's expected utility | `IsGammaMaximin.gammaMaximinValue_le`, `gammaMaximinValue_le_actNowValue` (T12) |
 | `test_credal.jl`: member Bayes ⊆ E-admissible ⊆ maximal ⊆ interval dominance; Γ-maximin choices are maximal | `IsBayes.isEAdmissible`, `IsEAdmissible.isMaximal`, `IsMaximal.isIntervalUndominated`, `IsGammaMaximin.isMaximal` (T12) |
-| `test_credal.jl`: every E-admissibility witness is a prior in the set under which the action is Bayes | `Certificate.EAdmissibleWitnessOk.isEAdmissible` |
+| `test_credal.jl`, `test_programs.jl`: every E-admissibility witness is a prior in the set under which the action is Bayes, by each solver route | `Certificate.EAdmissibleWitnessOk.isEAdmissible` |
+| `test_lean_mirror.jl`: a maximal action is not strictly beaten by one rival at every prior of the hull | `IsMaximal.not_dominated_on_hull` (T12) |
 | `test_rules.jl`: ties, all returned and first in table order chosen | `mem_maximisers`, `firstArgmax_mem_maximisers`, `lt_of_lt_firstArgmax`, `eq_firstArgmax` |
-| `test_rules.jl`: minimax regret violates independence of irrelevant alternatives | `minimaxRegret_violates_iia` (T8; a different instance from the Julia test's) |
+| `test_lean_mirror.jl`: `first_choice` depends only on the ranking of the scores, in any ordered type | `firstArgmax_congr_of_order` |
+| `test_lean_mirror.jl`: the first Bayes action is unchanged by `s * Q[a, θ] + b[θ]` with `s > 0` | `bayesAction_rescale`, `expectedUtility_rescale` (T7) |
+| `test_rules.jl`: minimax regret violates independence of irrelevant alternatives; `test_api.jl`: the result of `MinimaxRegret` and the report carry the warning | `minimaxRegret_violates_iia` (T8; a different instance from the Julia test's) |
+| `test_api.jl`: `information_can_change_decision(p, e) == (evsi(p, e) > 0)` on random rational problems | `evsi_eq_zero_iff`, `evsi_eq_zero_iff_of_pos` (T14) |
 | `test_fixtures.jl`: the three worked examples | `Finite/Examples.lean` (T9), every figure |
 | `test_certificates.jl`: exported claims recomputed | `Certificate.check_sound`, `Certificate.certificate_spec` |
 
 Tested in Julia but **not** proved here: the `2Bε` decision-loss bound (T10) and the claims
-about `deficiency` and `robust_evsi`; see `Roadmap.lean`.
+about `deficiency` and `robust_evsi`; see `Roadmap.lean`. The linear programmes themselves
+(`eadmissibility_model`, `garbling_model`, `deficiency_model`, `evpi_envelope_model`, solved
+by the built-in simplex or by a JuMP optimiser) are not modelled: whatever solver produced
+it, a witness is checked exactly in Julia and then by the checkers below, whose soundness is
+what is proved.
 
 ### By certificate
 
@@ -84,8 +93,8 @@ about `deficiency` and `robust_evsi`; see `Roadmap.lean`.
 | Schema | Written by | Checker | Soundness theorem |
 |:--|:--|:--|:--|
 | `decision-certificate/1` | `export_decision_certificate` | `Certificate.check` | `Certificate.certificate_spec`: every claim equals the verified definition; `bayes_actions` and `minimax_regret_actions` list exactly the optimal actions; `evpi ≥ 0` and is the minimum expected regret; `0 ≤ evsi ≤ evpi` |
-| `garbling-witness/1` | `export_garbling_witness`: the matrix returned by `is_garbling_of` | `Certificate.checkGarbling` | `Certificate.RawGarbling.accepts_sound`: `IsGarblingOf e′ e`, hence value(e′) ≤ value(e) for every problem |
-| `e-admissible-witness/1` | `export_eadmissible_witness`: weights and prior from the E-admissibility programme | `Certificate.checkEAdmissible` | `Certificate.RawEAdmissible.accepts_sound`: `IsEAdmissible`, hence `IsMaximal` |
+| `garbling-witness/1` | `export_garbling_witness`: the matrix returned by `is_garbling_of` (programme `garbling_model`, any `optimizer`; verified exactly before writing) | `Certificate.checkGarbling` | `Certificate.RawGarbling.accepts_sound`: `IsGarblingOf e′ e`, hence value(e′) ≤ value(e) for every problem |
+| `e-admissible-witness/1` | `export_eadmissible_witness`: weights and prior from the E-admissibility programme (`eadmissibility_model`, any `optimizer`; verified exactly before writing) | `Certificate.checkEAdmissible` | `Certificate.RawEAdmissible.accepts_sound`: `IsEAdmissible`, hence `IsMaximal` |
 
 Numbers are JSON strings `"n/d"` or `"n"`; indices are JSON integers from zero; payoff rows are
 actions; likelihood rows are signals; `garbling[z′][z] = P(z′ | z)`. The witness schemas are
@@ -128,10 +137,13 @@ were written by the Julia package itself.
 Proved results that suggest or constrain functionality (the full list is in `Roadmap.lean`):
 
 * `minimaxRegret_violates_iia`: the minimax-regret choice depends on the menu, including on
-  actions that are never chosen; `DecisionReport` should warn, and feasibility filters change
-  the choice.
-* `evsi_eq_zero_iff`: EVSI is zero exactly when one action is optimal after every signal;
-  this gives a cheap "this information cannot change the decision" check.
+  actions that are never chosen, and feasibility filters change the choice. Done in the
+  package: the result of `MinimaxRegret` carries the warning (`details.note`) and
+  `DecisionReport` repeats it.
+* `evsi_eq_zero_iff`: EVSI is zero exactly when one action is optimal after every signal.
+  Done in the package: `information_can_change_decision(problem, experiment)` is that check,
+  and `DecisionReport` says of an experiment that fails it that it cannot change the
+  decision.
 * `signalValue_eq_zero`, `valueWithInformation_eq_posterior_form`: `value_with_information`
   needs no guard for zero-probability signals, and `bayes_invert` is right to return
   `nothing` for them.

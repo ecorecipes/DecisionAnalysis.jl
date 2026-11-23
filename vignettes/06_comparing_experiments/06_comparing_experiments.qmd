@@ -33,13 +33,13 @@ include(joinpath("..", "_common.jl"))
 
 actions = [:no_intervention, :antifungal_baths, :disinfect_pond]
 states = [:absent, :low_prevalence, :high_prevalence]
-uninfected = [500 300 100; 470 380 250; 350 340 320]
-infected = [0 150 250; 0 60 120; 0 10 20]
+uninfected = PayoffTable(actions, states, [500 300 100; 470 380 250; 350 340 320])
+infected = PayoffTable(actions, states, [0 150 250; 0 60 120; 0 10 20])
 prior = FiniteBelief(states, [1 // 2, 3 // 10, 1 // 5])
 
 function bd_problem(w)
-    return DecisionProblem(PayoffTable(actions, states, uninfected .- w .* infected),
-                           prior; baseline=:no_intervention)
+    return DecisionProblem(infection_payoff(; uninfected, infected, weight=w), prior;
+                           baseline=:no_intervention)
 end
 
 md_table(["w", "best action now", "its expected gain over no intervention", "EVPI"],

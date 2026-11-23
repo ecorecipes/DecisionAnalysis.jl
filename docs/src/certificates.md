@@ -16,9 +16,17 @@ and exits with 0 when it accepts, 1 when it rejects and 2 when the file cannot b
 decoded. This page is the definition of the formats; they are a contract, and a
 change of meaning needs a new schema string.
 
-The two witnesses come from linear programmes. The package solves those exactly for
-rational problems, and checks each witness in exact arithmetic before writing it, so
-an exported witness is never a rounded floating-point solution.
+The two witnesses come from linear programmes, stated as JuMP models by
+[`garbling_model`](@ref) and [`eadmissibility_model`](@ref). By default the package
+solves them exactly for rational problems with its built-in simplex; the exporters
+also take an `optimizer` keyword (see [`solve_program`](@ref)), so the programme can
+be solved by an exact optimiser such as `CDDLib.Optimizer{Rational{BigInt}}` or by a
+floating-point one such as `HiGHS.Optimizer`, whose solution is then rounded to
+rationals. The solver is never trusted: whatever route found it, each witness is
+checked in exact arithmetic before a byte is written, so an exported witness is
+never an unverified floating-point solution, and the file is the same kind of object
+for the Lean checker whichever route produced it. If a rounded solution does not
+pass the check, [`ExactVerificationError`](@ref) is thrown and nothing is written.
 
 ## Encoding common to all three
 
@@ -130,7 +138,7 @@ type; otherwise [`InexactCertificateError`](@ref) is thrown. The belief must be 
 
 The proof that an experiment `e′` is a garbling of an experiment `e`, written by
 `export_garbling_witness(io_or_path, e′, e)` from the matrix that
-[`is_garbling_of`](@ref) finds.
+[`is_garbling_of`](@ref) finds (the witness of [`garbling_result`](@ref)).
 
 | member | type | meaning |
 |---|---|---|

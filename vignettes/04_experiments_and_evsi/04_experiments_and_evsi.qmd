@@ -53,17 +53,19 @@ using Plots
 
 actions = [:no_intervention, :antifungal_baths, :disinfect_pond]
 states = [:absent, :low_prevalence, :high_prevalence]
-uninfected = [500 300 100     # no intervention
-              470 380 250     # baths: some handling losses, fewer infections
-              350 340 320]    # disinfection: heavy handling losses, Bd nearly removed
-infected = [0 150 250
-            0  60 120
-            0  10  20]
-labelled_table("uninfected frogs", actions, states, uninfected)
+uninfected = PayoffTable(actions, states,
+                         [500 300 100     # no intervention
+                          470 380 250     # baths: some handling losses, fewer infections
+                          350 340 320])   # disinfection: heavy losses, Bd nearly removed
+infected = PayoffTable(actions, states,
+                       [0 150 250
+                        0  60 120
+                        0  10  20])
+uninfected
 ```
 
 ```{julia}
-labelled_table("infected frogs", actions, states, infected)
+infected
 ```
 
 The belief is that Bd is absent with probability 1/2, at low prevalence with 3/10 and
@@ -74,8 +76,8 @@ given `w`, with no intervention as the baseline.
 prior = FiniteBelief(states, [1 // 2, 3 // 10, 1 // 5])
 
 function bd_problem(w)
-    return DecisionProblem(PayoffTable(actions, states, uninfected .- w .* infected),
-                           prior; baseline=:no_intervention)
+    return DecisionProblem(infection_payoff(; uninfected, infected, weight=w), prior;
+                           baseline=:no_intervention)
 end
 
 md_table(["action", "expected utility, w = 0", "gain over no intervention, w = 0",
@@ -234,6 +236,18 @@ the manager would do anyway, so the kit is worth nothing. At `w = 1` a positive 
 leads to disinfection and the same kit has a positive value. Whether information is
 worth collecting depends on the decision it serves.
 
+`information_can_change_decision` asks that question directly. It is true exactly when
+no single action is best after every result that can occur, and that is exactly when
+the EVSI is positive. It does not compute the EVSI.
+
+```{julia}
+md_table(["test", "can change the decision, w = 0", "can change the decision, w = 1"],
+         [[name, information_can_change_decision(bd_problem(0), e),
+           information_can_change_decision(bd_problem(1), e)]
+          for (name, e) in ["swab" => swab, "field kit" => field_kit,
+                            "uninformative" => uninformative]])
+```
+
 ## Net benefit, only where the cost is additive
 
 `enbs` subtracts the cost of an experiment from its EVSI. That subtraction is only
@@ -270,7 +284,10 @@ separate actions "sample, then act", and `enbs` would not apply.
 - `evsi(problem, experiment)` is the expected gain from seeing the signal before
   choosing, in the unit of the payoff. It lies between zero and `evpi(problem)`.
 - Information is worth nothing when no result would change the action, however much it
-  changes the belief.
+  changes the belief. `information_can_change_decision` checks this, and is equivalent
+  to a positive EVSI.
+- `infection_payoff(; uninfected, infected, weight)` builds the utility uninfected −
+  weight × infected from the two tables of counts.
 - For a disease, the value of a test depends on the weight `w` given to infected
   animals. Report it at `w = 0` and `w = 1` at least.
 - `enbs` subtracts a cost only when that cost is additive in the payoff. Here costs are
