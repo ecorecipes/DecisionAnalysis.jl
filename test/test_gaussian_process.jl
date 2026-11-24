@@ -33,7 +33,10 @@ end
         @test evppi(problem, (:x1, :x2, :x3, :x4, :x5, :x6)).method ===
               :GaussianProcessRegression
         @test evppi(problem, :site).method === :Grouping
-        @test evppi(problem, (:x1, :site)).method === :Grouping
+        # A continuous parameter with a non-numeric one: grouping would make every draw
+        # a cell, so the spline regression takes the non-numeric one as a factor.
+        @test evppi(problem, (:x1, :site)).method === :SplineRegression
+        @test_throws ArgumentError evppi(problem, (:x1, :site), Grouping())
         # An explicit method overrides the rule.
         @test evppi(problem, :x1, GaussianProcessRegression()).method ===
               :GaussianProcessRegression

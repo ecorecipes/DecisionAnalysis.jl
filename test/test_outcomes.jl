@@ -251,6 +251,54 @@ end
                                             seed=7, on_error=:ignore)
     end
 
+    @testset "the model's own seed convention" begin
+        pond = ToyPond(0, 0.0, 0.0, false)
+        draws = (; id=[11, 12, 13], frogs=[20, 40, 60], survival=[0.3, 0.5, 0.7])
+        convention(θ, r) = UInt64(1000 * θ.id + r)
+        t = outcomes(pond, [:none, :fence], draws; replicates=4, run_seed=convention)
+        # Every run used the generator the convention names, the same for both actions.
+        for d in 1:3, r in 1:4
+            θ = (; id=draws.id[d], frogs=draws.frogs[d], survival=draws.survival[d])
+            u = rand(Xoshiro(convention(θ, r)))
+            @test t.values[1, d, r, 3] == u && t.values[2, d, r, 3] == u
+        end
+        # So runs made elsewhere by the same convention are reproduced exactly, and a
+        # new action shares random numbers with them: the two go in one table.
+        stored = [(; draw=draws.id[d], action=:none, replicate=r,
+                   DecisionAnalysis.outcome(DecisionAnalysis.simulate(
+                       DecisionAnalysis.with_parameters(pond, (; frogs=draws.frogs[d],
+                                                                survival=draws.survival[d]));
+                       rng=Xoshiro(convention((; id=draws.id[d]), r))))...)
+                  for d in 1:3 for r in 1:4]
+        old = OutcomeTable(stored; outcomes=[:uninfected, :infected, :first_draw])
+        new = outcomes(pond, [:fence], draws; replicates=4, run_seed=convention)
+        @test old.values[1, :, :, :] == t.values[1, :, :, :]
+        @test new.values[1, :, :, :] == t.values[2, :, :, :]
+        @test new.values[1, :, :, 3] == old.values[1, :, :, 3]
+        # One of `seed` and `run_seed`; integer seeds; no two runs alike.
+        @test_throws ArgumentError outcomes(pond, [:none], draws; seed=1,
+                                            run_seed=convention)
+        @test_throws ArgumentError outcomes(pond, [:none], draws; run_seed=(θ, r) -> 0.5)
+        @test_throws ArgumentError outcomes(pond, [:none], draws; replicates=2,
+                                            run_seed=(θ, r) -> θ.id)
+    end
+
+    @testset "single_replicate of an outcome table" begin
+        pond = ToyPond(0, 0.0, 0.0, false)
+        draws = (; frogs=[20, 40], survival=[0.3, 0.5])
+        one = outcomes(pond, [:none, :fence], draws; seed=3)
+        many = outcomes(pond, [:none, :fence], draws; replicates=3, seed=3)
+        @test single_replicate(one) && !single_replicate(many)
+        for t in (one, many)
+            @test single_replicate(t) ==
+                  single_replicate(payoff_table(t, IndividualsUtility(:uninfected)))
+        end
+        # A cell left with one usable run by a failure is flagged too.
+        runs = [(; draw=1, action=a, replicate=r, n=r, status=(a == :b && r == 2) ? "x" : "ok")
+                for a in (:a, :b) for r in 1:2]
+        @test single_replicate(OutcomeTable(runs; outcomes=[:n], status=:status))
+    end
+
     @testset "outcomes read with the problem; a deterministic model" begin
         # `outcome(prob, solution)` is called by the driver; its fallback is
         # `outcome(solution)`, which the first toy relies on.

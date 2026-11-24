@@ -81,8 +81,15 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   Every one has the form `Σ_i w_i max_a g[a, i] − max_a Σ_i w_i Q[a, i]` with `g` the fitted conditional
   means (top of `src/voi_sample.jl`), and each is tested against exact enumeration on a finite problem
   turned into a sample and against the closed forms of the R `voi` normal model (analytic EVPI 0.4798107).
-  `evppi` without a method chooses by the focal parameters as `voi` does: `Grouping` when any is not
-  numeric, `SplineRegression` for one to four, `GaussianProcessRegression` from five (`_GP_FROM`).
+  `evppi` without a method chooses by the focal parameters as `voi` does: `Grouping` when some is not
+  numeric and none is floating-point, `SplineRegression` for one to four (and for a floating-point
+  parameter named with a non-numeric one), `GaussianProcessRegression` from five (`_GP_FROM`).
+- **No information is worth more than perfect information, and an estimate that says otherwise is
+  flagged, not capped.** Every estimate made from fitted conditional means carries
+  `details.sample_evpi`, `details.policy_gain` and `details.above_sample_evpi`; the flag (value above the
+  EVPI of the same sample by more than twice the standard error) logs a warning and adds a note to the
+  report. Cell-mean methods never raise it. `Grouping()` without `bins` throws on a floating-point
+  parameter that makes most draws cells of their own.
 - **A non-linear utility is applied to each run before anything is averaged** (`_run_utilities`), and
   its expected utility is not a count of individuals; `certainty_equivalent` returns to individuals. A
   test holds `InfectionUtility` equal to the `AdditiveUtility` with unscaled counts.
@@ -120,7 +127,9 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `total_variation`, `bayes_invert` and the certificate exports throw `BeliefFormError`.
 - `OutcomeTable.values[action, draw, replicate, outcome]`. Failed runs are kept and counted
   (`run_counts`, `failed_runs`) and left out of means. `outcomes` seeds the run of `(draw, replicate)`
-  identically for every action (common random numbers); every random number is a seeded `Xoshiro`.
+  identically for every action (common random numbers); every random number is a seeded `Xoshiro`. With
+  `run_seed = (θ, r) -> integer` the seed of a run comes from the model's own convention instead of
+  `seed`, so that new runs share random numbers with runs stored elsewhere.
 
 ## Layout
 

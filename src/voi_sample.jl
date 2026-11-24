@@ -50,7 +50,17 @@ A sample-based estimate of a value of information, as returned by [`evpi`](@ref)
   overstates the bias under common random numbers (see [`crn_correlation`](@ref)).
 - `details`: method-specific diagnostics (act-now value and action, effective sample
   sizes, residual variance, ...). For importance sampling the posterior effective
-  sample sizes are part of the estimate and are printed with it.
+  sample sizes are part of the estimate and are printed with it. The estimates made
+  from fitted conditional means also carry a **check of the fit**: `sample_evpi`,
+  the plain EVPI of the same sample; `policy_gain`, the weighted mean of the policy
+  gains, which is what following the fitted policy gains on the payoffs of the
+  sample and is never above `sample_evpi`; and `above_sample_evpi`, `true` when
+  `value` exceeds `sample_evpi` by more than twice the standard error. No
+  information is worth more than perfect information, and a set of cell means
+  respects that on every sample, so the flag is raised only by a regression whose
+  fitted values are not conditional means (too few draws for its coefficients, or a
+  misspecified form). The estimate is then wrong by more than its standard error
+  says, a warning is logged, and the value is returned as computed, not capped.
 
 `Float64(e)` and `e.value` give the number; arithmetic is deliberately not defined,
 so that an error cannot be dropped by accident.
@@ -76,6 +86,9 @@ function Base.show(io::IO, e::VOIEstimate)
           _cell(e.standard_error), " (standard error); act-now bias ",
           _cell(e.bias.act_now))
     e.bias.cells === nothing || print(io, ", cell-noise bias ", _cell(e.bias.cells))
+    get(e.details, :above_sample_evpi, false) &&
+        print(io, "; ABOVE the EVPI of the sample, ", _cell(e.details.sample_evpi),
+              ": the fit is poor, do not use")
     haskey(e.details, :median_ess) &&
         print(io, "; posterior effective sample size: median ", _cell(e.details.median_ess),
               ", smallest ", _cell(e.details.minimum_ess), " of ", e.details.draws,
@@ -128,6 +141,12 @@ scenario label or a group, and it is `evppi(problem, partition)` with the partit
 read from the draws. With `bins = k`, a single numeric focal parameter is first cut
 into `k` bins of equal weight. Cells with few draws make the estimate noisy and
 bias its value-with-information term upwards; the result reports the smallest cell.
+
+Without `bins`, a floating-point focal parameter that takes a different value at
+most draws is not a grouping variable: every draw would be a cell of its own and the
+result would be the EVPI of the sample, whichever parameter was named. That throws
+an `ArgumentError`; give `bins`, or use [`StrongOakley`](@ref),
+[`Sadatsafavi`](@ref) or a regression.
 """
 struct Grouping <: AbstractVOIMethod
     bins::Union{Nothing,Int}
@@ -435,6 +454,15 @@ function _fit(method::Grouping, columns::NamedTuple, Q, w)
         ncells = method.bins
     else
         cell, ncells = _cells(columns)
+        n = length(cell)
+        continuous = [k for (k, c) in pairs(columns) if eltype(c) <: AbstractFloat]
+        !isempty(continuous) && n >= 2 && 2 * ncells > n &&
+            throw(ArgumentError("Grouping() found $ncells cells in $n draws: " *
+                                "$(join(continuous, ", ")) is continuous, so nearly " *
+                                "every draw is a cell of its own and the result would " *
+                                "be the EVPI whatever the parameter. Use " *
+                                "Grouping(; bins=k) for one numeric parameter, " *
+                                "StrongOakley(), Sadatsafavi() or a regression"))
     end
     sizes = zeros(Int, ncells)
     foreach(c -> sizes[c] += 1, cell)
@@ -578,7 +606,8 @@ function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTu
     value, v0, a = _voi_from_fit(G, Q, w)
     rng = Xoshiro(seed)
     bias = (; act_now=_act_now_bias(Q, w, rng), cells)
-    se = _weighted_mean_se(_policy_gains(method, G, Q, w, a), w)
+    gains = _policy_gains(method, G, Q, w, a)
+    se = _weighted_mean_se(gains, w)
     if bootstrap > 0
         se = _bootstrap_se(length(w), bootstrap, rng) do idx
             wb = Float64.(w[idx])
@@ -588,10 +617,31 @@ function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTu
             return first(_voi_from_fit(Gb, Qb, wb))
         end
     end
+    sample_evpi = dot(w, [maximum(view(Q, :, i)) for i in axes(Q, 2)]) - v0
+    above = _above_sample_evpi(value, sample_evpi, se, v0)
+    above &&
+        @warn "The $quantity estimate by $(_method_name(method)), $(_cell(value)), is " *
+              "above the EVPI of the same sample, $(_cell(sample_evpi)), by more than " *
+              "twice its standard error. No information is worth more than perfect " *
+              "information, so the fitted values are not conditional means here (too " *
+              "few draws for the fit, or a misspecified regression) and the estimate " *
+              "should not be used. The standard error does not show this. Use fewer " *
+              "knots or parameters, StrongOakley() or Grouping(; bins), or more draws."
     details = merge((; act_now_value=v0, act_now_index=a, draws=length(w),
                      effective_sample_size=Float64(effective_sample_size(w)),
-                     bootstrap=Int(bootstrap)), info, extra)
+                     bootstrap=Int(bootstrap), sample_evpi,
+                     policy_gain=sum(Float64(w[i]) * gains[i] for i in eachindex(gains)),
+                     above_sample_evpi=above), info, extra)
     return VOIEstimate(quantity, _method_name(method), value, se, bias, details)
+end
+
+# Whether an estimate is above the plain EVPI of the same sample by more than twice its
+# standard error (and more than rounding). A set of cell means never is (Jensen: the
+# maximum of a mean is at most the mean of the maxima); a regression can be, when its
+# fitted values are not conditional means.
+function _above_sample_evpi(value, sample_evpi, se::Real, v0)
+    scale = max(1.0, abs(Float64(v0)), abs(Float64(sample_evpi)))
+    return Float64(value) - Float64(sample_evpi) > 2 * se + sqrt(eps()) * scale
 end
 
 # EVPI
@@ -700,10 +750,15 @@ end
 # -----
 
 # The default method by the number of focal parameters, as the R package `voi` chooses:
-# a regression with smooths up to four, a Gaussian process from five on.
+# a regression with smooths up to four, a Gaussian process from five on. A parameter
+# that is not numeric is grouped; when it comes with a continuous one, grouping would
+# make every draw a cell, and the spline regression takes it as a factor instead.
 const _GP_FROM = 5
 function _default_method(columns::NamedTuple)
-    all(_is_numeric, columns) || return Grouping()
+    if !all(_is_numeric, columns)
+        return any(c -> eltype(c) <: AbstractFloat, columns) ? SplineRegression() :
+               Grouping()
+    end
     return length(columns) < _GP_FROM ? SplineRegression() : GaussianProcessRegression()
 end
 
@@ -728,10 +783,13 @@ error and biases ([`VOIEstimate`](@ref)). Methods:
 
 **Without a method, the method is chosen by the focal parameters**, by the rule of
 the R package `voi`: a regression with smooths for up to four parameters and a
-Gaussian process from five on. Here that is `Grouping()` when any focal parameter is
-not numeric, `SplineRegression()` for one to four numeric parameters (the built-in
-stand-in for the generalised additive model, which needs GAM.jl: pass
-`GAMRegression()` to use it) and `GaussianProcessRegression()` for five or more. The
+Gaussian process from five on. Here that is `Grouping()` when some focal parameter is
+not numeric and none is floating-point, `SplineRegression()` for one to four numeric
+parameters (the built-in stand-in for the generalised additive model, which needs
+GAM.jl: pass `GAMRegression()` to use it) and `GaussianProcessRegression()` for five
+or more. A floating-point parameter named together with a non-numeric one gets
+`SplineRegression()`, which takes the non-numeric one as a factor (grouping the two
+would make every draw a cell of its own). The
 method used is recorded in the `method` field of the result. The single-parameter
 methods and `Grouping` need no regression and are useful cross-checks on it. All of them average over the
 simulation noise in the cells, provided each block, segment or cell holds many
@@ -739,8 +797,14 @@ draws.
 
 A regression estimate is only as good as its fit. Fitted values are not conditional
 means when the regression is misspecified or has too few draws for its coefficients,
-and the estimate is then not bounded by the EVPI: a value above the plain EVPI of a
-table with little cell noise is a sign of a poor fit, not of valuable information.
+and the estimate is then not bounded by the EVPI: a value above the plain EVPI of
+the same sample is a sign of a poor fit, not of valuable information, and **its
+standard error does not show it**. Such an estimate is flagged
+(`details.above_sample_evpi`, with `details.sample_evpi` and `details.policy_gain`
+beside it: see [`VOIEstimate`](@ref)) and a warning is logged; the value is returned
+as computed. `Grouping()` with no `bins` on a continuous parameter, where nearly
+every draw is a cell of its own, would return the EVPI whatever the parameter is,
+and throws an `ArgumentError` instead.
 
 `bootstrap` and `seed` are as for [`evpi`](@ref).
 

@@ -266,6 +266,16 @@ function replicate_counts(t::OutcomeTable)
 end
 
 """
+    single_replicate(t::OutcomeTable) -> Bool
+
+Whether some action and draw of the table have exactly one usable run
+([`replicate_counts`](@ref)), so that the payoff table made from it would be flagged
+(`single_replicate(payoff_table(t, utility))`): such a cell is one outcome of the
+model, not a conditional expectation, and has no standard error.
+"""
+single_replicate(t::OutcomeTable) = any(==(1), replicate_counts(t))
+
+"""
     run_counts(t::OutcomeTable) -> NamedTuple
 
 How the runs of the table divide: `(; runs, ok, failed, absent)`. `runs` is the
@@ -319,6 +329,15 @@ function _run_seed(seed::Integer, d::Integer, r::Integer)
     return _splitmix64(_splitmix64(_splitmix64(seed % UInt64) + UInt64(d)) + UInt64(r))
 end
 
+_seed_of_run(seed::Integer, ::Nothing, θ, d::Integer, r::Integer) = _run_seed(seed, d, r)
+function _seed_of_run(::Nothing, run_seed, θ, d::Integer, r::Integer)
+    s = run_seed(θ, r)
+    s isa Integer ||
+        throw(ArgumentError("`run_seed(θ, r)` must return an integer seed, got " *
+                            "$(typeof(s)) at draw $d, replicate $r"))
+    return s
+end
+
 _named_actions(actions::NamedTuple) = [k => v for (k, v) in pairs(actions)]
 _named_actions(actions::AbstractDict) = [Symbol(k) => v for (k, v) in actions]
 function _named_actions(actions)
@@ -334,7 +353,8 @@ function _outcome_tuple(o)
 end
 
 """
-    outcomes(prob, actions, draws; replicates=1, seed, on_error=:record) -> OutcomeTable
+    outcomes(prob, actions, draws; replicates=1, seed, run_seed=nothing,
+             on_error=:record) -> OutcomeTable
 
 Run a model over draws × actions × replicates and collect the named outcomes. The
 model is reached through the adapter verbs only, which must have methods for the
@@ -354,11 +374,23 @@ type of `prob`: each run is
 - `replicates`: runs per cell. A stochastic model needs several, so that a cell of
   the payoff table is a conditional expectation and has a standard error; a table
   with one is flagged ([`single_replicate`](@ref)).
-- `seed`: an integer, required. **Common random numbers**: the run of replicate `r`
-  at draw `d` gets a `Random.Xoshiro` whose seed is a fixed integer hash of
-  `(seed, d, r)`, the same for every action, so the difference between two actions
-  in a cell is not blurred by different random numbers. How long two runs stay
-  comparable after an intervention is up to the model (see [`simulate`](@ref)).
+- `seed`: an integer, required unless `run_seed` is given. **Common random
+  numbers**: the run of replicate `r` at draw `d` gets a `Random.Xoshiro` whose seed
+  is a fixed integer hash of `(seed, d, r)`, the same for every action, so the
+  difference between two actions in a cell is not blurred by different random
+  numbers. How long two runs stay comparable after an intervention is up to the
+  model (see [`simulate`](@ref)).
+- `run_seed`: the model's own seed convention, in place of `seed`: a function
+  `run_seed(θ, r)` of the draw (its row of parameters, a named tuple) and the
+  replicate number `r` (from 1) that returns the integer seed of that run's
+  `Xoshiro`. It is called once per draw and replicate, so the random numbers are
+  still common to the actions. Use it when runs of the same model made elsewhere (a
+  stored table, an earlier call) seeded their generators by a rule of their own, so
+  that new runs share random numbers with them and the two can be put in one table:
+  an action then differs from a stored one by the action alone. The function must
+  be deterministic and should give different seeds to different runs; two runs with
+  the same seed throw an `ArgumentError`, because their outcomes would be copies and
+  not replicates. Give `seed` or `run_seed`, not both.
 
 A run that throws is kept as a failed run with the status `error:<exception type>`
 (see [`failed_runs`](@ref)); an `InterruptException` is rethrown. If every run fails,
@@ -368,9 +400,13 @@ message and stack trace: use it while writing an adapter or a menu of actions, w
 failed run is a mistake to find and not an outcome of the model to count.
 """
 function outcomes(prob, actions, draws; replicates::Integer=1,
-                  seed::Union{Nothing,Integer}=nothing, on_error::Symbol=:record)
-    seed === nothing &&
+                  seed::Union{Nothing,Integer}=nothing, run_seed=nothing,
+                  on_error::Symbol=:record)
+    seed === nothing && run_seed === nothing &&
         throw(ArgumentError("give `seed`: runs are reproducible only with a stated seed"))
+    seed === nothing || run_seed === nothing ||
+        throw(ArgumentError("give `seed` or `run_seed`, not both: with `run_seed` the " *
+                            "seed of every run comes from the function"))
     on_error in (:record, :throw) ||
         throw(ArgumentError("on_error must be :record or :throw, got :$on_error"))
     replicates >= 1 || throw(ArgumentError("replicates must be at least 1"))
@@ -385,11 +421,14 @@ function outcomes(prob, actions, draws; replicates::Integer=1,
     state = fill(_OK, length(named), nd, replicates)
     names = nothing
     first_error = nothing
+    seeds = [_seed_of_run(seed, run_seed, rows[d], d, r) for d in 1:nd, r in 1:replicates]
+    run_seed === nothing || allunique(seeds) ||
+        throw(ArgumentError("`run_seed` gave the same seed to two runs, whose outcomes " *
+                            "would be copies of each other and not replicates"))
     for d in 1:nd, r in 1:replicates
-        run_seed = _run_seed(seed, d, r)
         for (a, (_, act)) in enumerate(named)
             try
-                rng = Xoshiro(run_seed)
+                rng = Xoshiro(seeds[d, r])
                 acted = apply_action(with_parameters(prob, rows[d]), act)
                 o = _outcome_tuple(outcome(acted, simulate(acted; rng)))
                 names === nothing && (names = keys(o))

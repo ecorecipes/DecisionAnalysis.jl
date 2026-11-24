@@ -408,4 +408,70 @@ using GAM: GAM
         @test gains[2].standard_error ≈ est[2].standard_error
         @test_throws MissingBaselineError expected_gain_estimates(noisy)
     end
+
+    @testset "an estimate above the EVPI of its sample is flagged" begin
+        # No intervention is best at every draw, so the EVPI of the sample is exactly
+        # zero and nothing can be learned. The payoff of acting has a deep step that a
+        # cubic spline overshoots beside it, so its fitted values rise above zero there:
+        # the regression reports a positive EVPPI with a small standard error.
+        n = 100
+        x = collect(1:n) ./ n
+        act = [0.4 < v <= 0.5 ? -40.0 : -1.0 for v in x]
+        problem = DecisionProblem(PayoffTable([zeros(n)'; act']; actions=[:none, :act]),
+                                  SampleBelief((; x)); baseline=:none)
+        @test iszero(evpi(problem))
+        e = @test_logs (:warn, r"above the EVPI of the same sample") evppi(problem, :x,
+                                                                           SplineRegression())
+        @test e.value > 0.5 && e.standard_error < 0.05
+        @test e.details.above_sample_evpi
+        @test iszero(e.details.sample_evpi)
+        # Following the fitted policy loses on the payoffs themselves.
+        @test e.details.policy_gain < 0
+        @test occursin("ABOVE the EVPI of the sample", sprint(show, e))
+        # The value is returned as computed, not capped.
+        @test e.value == Float64(e)
+        # The same through the default method and in the report's notes.
+        @test_logs (:warn,) evppi(problem, :x)
+        report = @test_logs (:warn,) match_mode = :any DecisionReport(problem;
+                                                                      parameters=:x)
+        @test any(occursin("above the EVPI of the same sample", note)
+                  for note in report.assumptions)
+        # Cell means cannot exceed it (the maximum of a mean is at most the mean of
+        # the maxima), on this problem or on a noisy one, and are never flagged.
+        for method in (StrongOakley(), Sadatsafavi(), Sadatsafavi(; separators=2),
+                       Grouping(; bins=5))
+            c = @test_logs evppi(problem, :x, method)
+            @test iszero(c.value) && !c.details.above_sample_evpi
+            @test iszero(c.details.policy_gain)
+        end
+        rng = Xoshiro(11)
+        noisy = DecisionProblem(PayoffTable(randn(rng, 3, 80)),
+                                SampleBelief((; x=randn(rng, 80)); weights=rand(rng, 80)))
+        for method in (StrongOakley(), Sadatsafavi(), Grouping(; bins=8), SampleAverage())
+            c = method isa SampleAverage ? evpi(noisy, method) : evppi(noisy, :x, method)
+            @test c.value <= c.details.sample_evpi + 1e-12
+            @test c.details.policy_gain ≈ c.value
+            @test !c.details.above_sample_evpi
+        end
+        @test evpi(noisy, SampleAverage()).details.sample_evpi ≈ evpi(noisy)
+    end
+
+    @testset "Grouping refuses a continuous parameter without bins" begin
+        rng = Xoshiro(5)
+        n = 40
+        belief = SampleBelief((; x=randn(rng, n), k=repeat(1:4, 10),
+                               half=repeat([0.5, 1.5], 20)))
+        problem = DecisionProblem(PayoffTable(randn(rng, 2, n)), belief)
+        err = try
+            evppi(problem, :x, Grouping())
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("x is continuous", err.msg)
+        @test_throws ArgumentError evppi(problem, (:k, :x), Grouping())
+        # With bins, or a parameter that does group the draws, it works as before.
+        @test evppi(problem, :x, Grouping(; bins=4)).details.cells == 4
+        @test evppi(problem, :k, Grouping()).details.cells == 4
+        @test evppi(problem, :half, Grouping()).details.cells == 2
+    end
 end

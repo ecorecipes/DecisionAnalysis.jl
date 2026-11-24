@@ -399,6 +399,15 @@ function _monte_carlo(problem::DecisionProblem, parameters, regression, seed::In
                                          f isa AbstractString ? Symbol(f) :
                                          f isa Symbol ? f : Tuple(_focal_names(f));
                                          seed)) for f in named]
+    poor = [q.name for q in partial if q.estimate.details.above_sample_evpi]
+    regressed !== nothing && regressed.details.above_sample_evpi &&
+        pushfirst!(poor, "all parameters")
+    isempty(poor) ||
+        push!(notes,
+              "The regression estimate for $(join(poor, "; ")) is above the EVPI of " *
+              "the same sample by more than twice its standard error. No information " *
+              "is worth more than perfect information: the fit is poor (too few draws " *
+              "for the regression) and that estimate should not be used.")
     push!(notes,
           "Selection bias (the optimiser's curse) is reported, not removed. It " *
           "belongs to the best reported value and the chosen action: a maximum of " *
