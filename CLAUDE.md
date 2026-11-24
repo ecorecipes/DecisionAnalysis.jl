@@ -90,7 +90,8 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `ImportanceSampling` and `GaussianApproximation` are measured, and `test/test_standard_errors.jl` holds
   the standard errors against the spread over independent repetitions.
 - **Cross-language fixtures are contracts too.** `test/fixtures/voi/` and `test/fixtures/validation/` are
-  written by the scripts of `validation/` (R `voi` and `cvar`; Python with scipy) and carry their
+  written by the scripts of `validation/` (R `voi` and `cvar`; Python with scipy; Python 2.7 with
+  `improb`) and carry their
   provenance. Never edit them by hand: re-run the script and report any number that moved. The test
   suite reads them and needs neither R nor Python; the chemotherapy data of `voi` are not copied here
   (money appears only as that validation target), and their comparison runs with `DECISIONANALYSIS_R=1`.
@@ -177,12 +178,13 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   attitude and multi-attribute utilities), `test_gaussian_process.jl`, `test_standard_errors.jl`
   (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`,
   `test_additions.jl` (separating problem, upper-EVPI prior, the maximality shortcut, sharper
-  constants), `test_validation.jl` (the cross-language fixtures) and `test_bridge.jl` (the
+  constants), `test_validation.jl` and `test_validation_improb.jl` (the cross-language fixtures) and `test_bridge.jl` (the
   influence-diagram extension; its real tests are `test/influence_diagrams/runtests.jl`).
 - `validation/`: the scripts that write the cross-language fixtures (`voi_reference.R`,
-  `cvar_reference.R`, `chemo_data.R`, `finite_reference.py`, `make_sample.jl`), `compare_voi.jl`, which
-  prints our estimates beside those of `voi`, `requirements.txt` and a README with the versions used and
-  the findings. The Python environment is `validation/.venv` (ignored).
+  `cvar_reference.R`, `chemo_data.R`, `finite_reference.py`, `improb_reference.py`, `make_sample.jl`),
+  `compare_voi.jl`, which prints our estimates beside those of `voi`, `requirements.txt`,
+  `requirements-py27.txt` and a README with the versions used and the findings. The Python environments
+  are `validation/.venv` and, for `improb` (Python 2.7), `validation/.venv27` (both ignored).
 - `vignettes/NN_name/NN_name.qmd`: fifteen Quarto vignettes (Julia engine), basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
@@ -206,6 +208,7 @@ DECISIONANALYSIS_R=1 julia --project -e 'using Pkg; Pkg.test()'      # also comp
 DECISIONANALYSIS_ID=1 julia --project -e 'using Pkg; Pkg.test()'     # also run the influence-diagram bridge tests in their own environment
 Rscript validation/voi_reference.R && Rscript validation/cvar_reference.R   # rewrite the R fixtures
 validation/.venv/bin/python validation/finite_reference.py           # rewrite the Python fixture (see validation/README.md)
+validation/.venv27/bin/python validation/improb_reference.py         # rewrite the improb fixture (Python 2.7; after finite_reference.py)
 julia scripts/render_vignettes.jl [NN ...] [--no-execute]         # vignettes: code runs once (quarto to gfm), then pandoc makes HTML and PDF from the .md
 julia scripts/sync_vignettes.jl [--check]                         # copy the rendered Markdown into docs/src/tutorials
 ```

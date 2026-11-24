@@ -22,6 +22,7 @@ docs/Manifest-v*.toml
 
 # The Python environment of validation/ (see validation/README.md).
 validation/.venv/
+validation/.venv27/
 validation/__pycache__/
 
 # The environment of the gated influence-diagram bridge tests is resolved on demand.

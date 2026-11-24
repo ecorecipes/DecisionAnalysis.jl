@@ -1,8 +1,9 @@
 # Validation against other software
 
-Comparisons of DecisionAnalysis.jl with established R packages and with independent
-Python code. The scripts here write small fixture files, with their provenance, under
-`test/fixtures/`; the Julia test suite (`test/test_validation.jl`) only reads those
+Comparisons of DecisionAnalysis.jl with established R packages, with independent
+Python code and with the Python package `improb`. The scripts here write small fixture
+files, with their provenance, under `test/fixtures/`; the Julia test suite
+(`test/test_validation.jl`, `test/test_validation_improb.jl`) only reads those
 fixtures, so it needs neither R nor Python.
 
 Money appears in this directory and in the fixtures only as a published validation
@@ -17,6 +18,7 @@ else in the package: utilities are counted in individuals.
 | CVaR and quantile | R `cvar` 0.6.1 | `cvar_reference.R` | `test/fixtures/validation/cvar_reference.json` |
 | Maximin, maximax, Hurwicz, Laplace, minimax regret, expected utility and regret, EVPI, EVSI, quantile (exact) | textbook definitions written independently in Python with `fractions.Fraction` | `finite_reference.py` | `test/fixtures/validation/finite_reference.json` |
 | CVaR (Rockafellar-Uryasev programme), lower and upper expectations, E-admissibility, maximality, interval dominance, the garbling test, Le Cam's deficiency, the upper EVPI envelope | `scipy.optimize.linprog` (HiGHS), from formulations written independently of `src/programs.jl` | `finite_reference.py` | the same file |
+| Lower and upper expectations over a credal set, Γ-maximin, maximality, interval dominance, E-admissibility (exact) | Python `improb` 0.1.1 (`pycddlib` 1.0.4), under Python 2.7 | `improb_reference.py` | `test/fixtures/validation/improb_reference.json`, on the payoff tables and credal sets of `finite_reference.json` |
 
 The finite checks run on the three worked examples of
 `test/fixtures/worked_examples.json` and on 30 random problems (seed 20261123).
@@ -25,6 +27,9 @@ The finite checks run on the three worked examples of
 
 - R 4.6.0 (2026-04-24), `voi` 1.0.3, `mgcv` 1.9.4, `cvar` 0.6.1, `jsonlite` 2.0.0.
 - Python 3.9.6, `numpy` 2.0.2, `scipy` 1.13.1 (`requirements.txt`).
+- Python 2.7.15 (conda-forge, `osx-64`, under Rosetta on Apple silicon), `improb` 0.1.1,
+  `pycddlib` 1.0.4 (its bundled cddlib, built against conda-forge `gmp` 6.3.0 with
+  Apple clang 21.0.0), `micromamba` 2.10.0 (`requirements-py27.txt`).
 - Julia 1.12.6, GAM.jl 0.3.0 (for `GAMRegression`).
 
 ## How to run
@@ -43,6 +48,9 @@ python3 -m venv validation/.venv
 validation/.venv/bin/pip install -r validation/requirements.txt
 validation/.venv/bin/python validation/finite_reference.py
 
+# Python 2.7 with improb: a second local environment (ignored by git); see below
+validation/.venv27/bin/python validation/improb_reference.py
+
 # Julia: the suite reads the fixtures
 julia --project -e 'using Pkg; Pkg.test()'
 # ... and, with R and voi installed, also compares on voi's chemotherapy data
@@ -57,7 +65,81 @@ The chemotherapy data (`chemo_nb`, `chemo_pars`) ship with `voi`, which is licen
 under the GPL-3, and are not copied into this repository: `chemo_data.R` writes them to
 a temporary directory from the installed package.
 
+### The Python 2.7 environment for `improb`
+
+`improb` 0.1.1 (2011) is Python 2 code and needs `pycddlib` of its time. What worked,
+on macOS 26 on Apple silicon, without sudo and without touching the system Python
+(there is no Python 2.7 for `osx-arm64` on conda-forge, hence `osx-64` and Rosetta; on
+an Intel machine or on Linux leave out `--platform` and `-arch x86_64`):
+
+```sh
+# A self-contained micromamba binary, anywhere outside the repository
+mkdir -p "$TMPDIR/mm" && curl -sL https://micro.mamba.pm/api/micromamba/osx-arm64/latest |
+    tar -xj -C "$TMPDIR/mm" bin/micromamba
+export MAMBA_ROOT_PREFIX="$TMPDIR/mamba-root"      # package cache; not in $HOME
+"$TMPDIR/mm/bin/micromamba" create -y --no-rc -p validation/.venv27 -c conda-forge \
+    --platform osx-64 python=2.7 pip gmp
+
+# pycddlib 1.0.4 from its source archive (it bundles cddlib), against that GMP
+P="$PWD/validation/.venv27"
+CC="clang -arch x86_64" ARCHFLAGS="-arch x86_64" \
+CFLAGS="-I$P/include -Wno-error=implicit-function-declaration -Wno-error=incompatible-function-pointer-types -Wno-error=int-conversion" \
+LDFLAGS="-L$P/lib -Wl,-rpath,$P/lib" \
+    "$P/bin/python" -m pip install --no-binary :all: pycddlib==1.0.4
+# improb imports cdd in its setup.py, so it comes second, without dependency resolution
+"$P/bin/python" -m pip install --no-deps --no-binary :all: improb==0.1.1
+```
+
+Both builds succeeded at the first attempt with these pins (pip 20.1.1, the last line
+of pip for Python 2.7); no other `pycddlib` version was tried, and Cython is not needed
+because the source archive of `pycddlib` 1.0.4 ships its generated C. The conda-forge
+package `cddlib` is not needed. micromamba leaves two small registry files in the home
+directory (`~/.conda/environments.txt`, `~/.mamba/pkgs/urls.txt`) and pip its download
+cache.
+
 ## Results
+
+### Credal rules against `improb`
+
+33 problems (the three worked examples, of which `flood` has a credal set and the other
+two a single prior, and the 30 random problems), 115 actions: 230 lower and upper
+expectations, 345 yes or no answers (maximal, interval-dominant, E-admissible) and 33
+Γ-maximin choices, **no disagreement, and no change to `src/`**. Both sides are exact,
+so every comparison is an equality of rationals or of sets, with no tolerance. The
+problems tell the rules apart: in 3 the E-admissible set is smaller than the maximal
+set, in 8 interval dominance keeps more than maximality, one has a Γ-maximin tie and
+one a redundant generating point.
+
+How the same credal set is given to both sides. A `CredalSet` is a list of generating
+points. `improb` holds a lower prevision as bounds on expectations; the set is built
+as `LowPoly(pspace, credalset=points, number_type='fraction')`, which hands the points
+to cddlib, takes the facets of their convex hull and stores one bound per facet. Lower
+and upper expectations are then `improb`'s natural extension, a linear programme over
+the facets (`LowPoly.get_lower`, `get_upper`), where ours are a minimum and a maximum
+over the points: the two routes share nothing. The script turns the facets back into
+extreme points and the fixture records them; the test checks that they are among our
+points and that our results on them alone are unchanged.
+
+Conventions, the same on both sides:
+
+- Γ-maximin (`OptLowPrevMaxMin`): every action that attains the largest lower
+  expectation is returned.
+- Maximality (`OptLowPrevMax`): `a` is rejected when some `b` has a **strictly**
+  positive lower expectation of `b − a`; ours rejects `a` when some `b` is strictly
+  better at every generating point, which is the same statement. Two actions with the
+  same expectations everywhere are both kept.
+- Interval dominance (`OptLowPrevMaxInterval`): `a` is rejected when some `b` has lower
+  expectation **strictly** above the upper expectation of `a`; ours keeps `a` when its
+  upper expectation is at least the largest lower expectation.
+- **E-admissibility is not an operator of `improb`** (neither in 0.1.1 nor on the
+  master branch of `mcmtroffaes/improb`; its `OptAdmissible` is pointwise dominance
+  between gambles, another notion). The script composes it from `improb`'s primitives:
+  `a` is E-admissible exactly when the lower prevision of the credal set with the
+  added assessments "the lower expectation of `a − b` is at least 0" for every other
+  `b` avoids sure loss (`LowPoly.set_lower`, `LowPoly.is_avoiding_sure_loss`), that is,
+  when the set of priors under which `a` is optimal is not empty. The arithmetic is
+  `improb`'s and cddlib's; the reduction is the script's, so this row is a weaker
+  check than the other four.
 
 ### Finite rules and linear programmes
 
@@ -176,10 +258,12 @@ pounds at 20,000 pounds per QALY; a validation target only).
 - No CRAN package was found for the payoff-table criteria (maximin, maximax, Hurwicz,
   Laplace, minimax regret) or for the imprecise-probability rules (Γ-maximin,
   maximality, E-admissibility): a search of the titles and descriptions of all CRAN
-  packages for those terms found only design-of-experiments packages. The Python
-  package `improb` (lower previsions and these rules) does not build on Python 3
-  (version 0.1.1 is from the Python 2 era). These rules are therefore checked against
-  independent Python code and `linprog`, not against an established package.
+  packages for those terms found only design-of-experiments packages. The payoff-table
+  criteria are therefore checked against independent Python code only. The
+  imprecise-probability rules are checked against the Python package `improb`, which
+  does not build on Python 3 (version 0.1.1 is from the Python 2 era) and runs in a
+  Python 2.7 environment of its own (above); it has no operator for E-admissibility,
+  which is composed from its primitives.
 - Robust value of information under a rule (`robust_evpi`'s rule-specific value,
   `robust_evsi`), the risk-attitude and multi-attribute utilities, `voi_profile` and
   `optimal_design` have no counterpart in the packages above; they are tested against

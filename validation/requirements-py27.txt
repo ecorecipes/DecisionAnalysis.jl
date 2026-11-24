@@ -1,0 +1,5 @@
+# Python 2.7 environment of validation/improb_reference.py (validation/.venv27).
+# Build pycddlib from its source archive against GMP first, then improb without
+# dependency resolution; see validation/README.md for the exact commands.
+pycddlib==1.0.4
+improb==0.1.1
