@@ -2,8 +2,9 @@
 
 ## Local setup
 
-The ecosystem packages depend on each other through `[sources]` entries that point at sibling directories.
-Clone this package beside FiniteKernels.jl:
+The ecosystem packages depend on each other through `[sources]` URLs, so Julia needs no sibling clones.
+The Lean project in `proofs/` path-requires the FiniteKernels proofs, so clone this package beside
+FiniteKernels.jl:
 
 ```sh
 git clone https://github.com/ecorecipes/FiniteKernels.jl

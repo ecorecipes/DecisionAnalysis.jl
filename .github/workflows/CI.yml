@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: DecisionAnalysis.jl
-      # The sibling that Project.toml finds through `[sources]` at ../FiniteKernels.jl.
+      # The sibling whose proofs the Lean project path-requires; Julia finds FiniteKernels by URL.
       - uses: actions/checkout@v4
         with:
           repository: ecorecipes/FiniteKernels.jl

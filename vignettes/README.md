@@ -64,9 +64,8 @@ its least intervention where it has neither (vignette 16).
   published model; the numbers read from that table are labelled as such, and
   everything computed from them is illustrative.
 - **Vignettes 11 to 13 and 15 share a toy simulator**, `_toy_pond.jl`. **Vignette 14 needs
-  `Chytridiomycosis.jl`** cloned beside this package (the vignette environment finds it
-  through a `[sources]` path, `../../Chytridiomycosis.jl`); the package itself does not
-  depend on it. Vignette 12 loads GAM.jl for the optional regression backend.
+  `Chytridiomycosis.jl`**, which the vignette environment finds through a `[sources]` URL; the
+  package itself does not depend on it. Vignette 12 loads GAM.jl for the optional regression backend.
 
 ## Rendering: the code runs once
 

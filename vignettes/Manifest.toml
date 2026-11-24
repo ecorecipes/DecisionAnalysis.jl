@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "8b2110c9676155a3ab8e56498360d14cdaccd508"
+project_hash = "e7482bb6e32c3e7d1a9c1a2d4b812679a8b5855f"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -157,7 +157,9 @@ version = "1.18.8+1"
 
 [[deps.Chytridiomycosis]]
 deps = ["CommonSolve", "Dates", "Distributions", "DynamicalResilience", "LinearAlgebra", "LogDensityProblems", "OrdinaryDiffEqTsit5", "Random", "ResilienceCore", "SciMLBase", "StructuredPopulationCore", "TOML"]
-path = "../../Chytridiomycosis.jl"
+git-tree-sha1 = "08bebdc76726cd97670799bbde2469101afc3442"
+repo-rev = "main"
+repo-url = "https://github.com/ecorecipes/Chytridiomycosis.jl"
 uuid = "225de920-55da-40a7-8ddb-3f32ee84be8d"
 version = "0.2.0"
 
@@ -306,14 +308,18 @@ uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
 version = "1.16.2+0"
 
 [[deps.DecisionAnalysis]]
-deps = ["FiniteKernels", "JuMP", "LinearAlgebra", "Random", "Statistics", "Tables"]
+deps = ["FiniteKernels", "JuMP", "LinearAlgebra", "Random", "ResilienceCore", "Statistics", "StructuredPopulationCore", "Tables"]
 path = ".."
 uuid = "6a9d793e-d09c-4461-8cb4-55c12d181024"
 version = "0.1.0"
-weakdeps = ["GAM"]
 
     [deps.DecisionAnalysis.extensions]
     DecisionAnalysisGAMExt = "GAM"
+    DecisionAnalysisInfluenceDiagramsExt = "InfluenceDiagrams"
+
+    [deps.DecisionAnalysis.weakdeps]
+    GAM = "f5b95e24-6450-466f-92b1-fee0c65c0d6b"
+    InfluenceDiagrams = "cd3dbe2d-275d-4a8e-841a-d44f7f7abf07"
 
 [[deps.DelimitedFiles]]
 deps = ["Mmap"]
@@ -465,7 +471,6 @@ version = "1.7.0"
 [[deps.DynamicalResilience]]
 deps = ["ForwardDiff", "LinearAlgebra", "Random", "ResilienceCore", "SciMLBase", "Statistics", "StructuredPopulationCore"]
 git-tree-sha1 = "bf87d9a5e3aa253da9b1b3d08dd655f783f9bddf"
-repo-rev = "main"
 repo-url = "https://github.com/ecorecipes/DynamicalResilience.jl"
 uuid = "54629d0c-0bd5-4489-a333-4d325b057304"
 version = "0.3.1"
@@ -595,7 +600,9 @@ version = "3.4.1"
 
 [[deps.FiniteKernels]]
 deps = ["LinearAlgebra", "Random", "ResilienceCore", "StructuredPopulationCore"]
-path = "../../FiniteKernels.jl"
+git-tree-sha1 = "84d801e5eaa3bed9510ef0777081570a5a56782a"
+repo-rev = "main"
+repo-url = "https://github.com/ecorecipes/FiniteKernels.jl"
 uuid = "2ee73795-50db-4096-9573-22982ed4949b"
 version = "0.1.0"
 
@@ -666,7 +673,6 @@ version = "1.11.0"
 [[deps.GAM]]
 deps = ["DifferentiationInterface", "Distributions", "ForwardDiff", "GLM", "LinearAlgebra", "OSQP", "PSIS", "Printf", "Random", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsModels", "Tables"]
 git-tree-sha1 = "85f629959d4cd37626ca09a75a901a2c31df678a"
-repo-rev = "main"
 repo-url = "https://github.com/ecorecipes/GAM.jl"
 uuid = "f5b95e24-6450-466f-92b1-fee0c65c0d6b"
 version = "0.3.0"

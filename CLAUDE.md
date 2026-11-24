@@ -7,17 +7,18 @@ simulator runs. The Catlab-free core of the decision layer of the ecorecipes eco
 ## Place in the ecosystem
 
 Model packages produce outcomes; this package analyses the payoff table they give. It depends on
-FiniteKernels (finite spaces, kernels and states) through a `[sources]` path to the sibling directory
-`../FiniteKernels.jl`, on `JuMP` (to state linear programmes; never on a solver), and on `LinearAlgebra`,
+FiniteKernels (finite spaces, kernels and states) through a `[sources]` URL
+(the Lean project in `proofs/` still path-requires the sibling clone `../FiniteKernels.jl`), on `JuMP` (to state linear programmes; never on a solver), and on `LinearAlgebra`,
 `Random`, `Statistics` and `Tables`. FiniteKernels brings
-ResilienceCore and StructuredPopulationCore by URL; Pkg follows the sources of a path dependency, so they
-are not listed here. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
+ResilienceCore and StructuredPopulationCore; Pkg does not follow the `[sources]` of a URL dependency, so
+both are listed in `[deps]` and `[sources]` here although the code never loads them (Aqua is told so).
+Keep every `[sources]` entry a URL, in this file and in the docs, vignette and test environments. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
 generics, forwards to this package and re-exports its names (ADR 0009). No model package depends on this
 one: a model package writes a table of runs (or the user gives methods to the adapter verbs). An adapter
 for one model package is a weak-dependency extension inside that model package, triggered by this one;
 generic bridges (GAM, InfluenceDiagrams) are extensions on this side. `GAM` (ecorecipes/GAM.jl, by URL
 source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl`) and a test dependency;
-`Chytridiomycosis` appears only in the vignette environment, by path. `InfluenceDiagrams`
+`Chytridiomycosis` appears only in the vignette environment, by URL (with DynamicalResilience, which it needs). `InfluenceDiagrams`
 (ecorecipes/InfluenceDiagrams.jl) is a weak dependency for `normal_form`
 (`ext/DecisionAnalysisInfluenceDiagramsExt.jl`) and **nothing more**: it brings GATlab and ACSets (not
 Catlab), so it is in `[weakdeps]` only, never in `[extras]` or the docs or vignette environments, and its

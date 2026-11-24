@@ -8,4 +8,4 @@ Documenter = "1"
 
 [sources]
 DecisionAnalysis = {path = ".."}
-FiniteKernels = {path = "../../FiniteKernels.jl"}
+FiniteKernels = {url = "https://github.com/ecorecipes/FiniteKernels.jl"}

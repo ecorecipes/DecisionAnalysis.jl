@@ -19,5 +19,5 @@ BayesianNetworkFormats = {url = "https://github.com/ecorecipes/BayesianNetworkFo
 BayesianNetworkInference = {url = "https://github.com/ecorecipes/BayesianNetworkInference.jl"}
 BayesianNetworks = {url = "https://github.com/ecorecipes/BayesianNetworks.jl"}
 DecisionAnalysis = {path = "../.."}
-FiniteKernels = {path = "../../../FiniteKernels.jl"}
+FiniteKernels = {url = "https://github.com/ecorecipes/FiniteKernels.jl"}
 InfluenceDiagrams = {url = "https://github.com/ecorecipes/InfluenceDiagrams.jl"}

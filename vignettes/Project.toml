@@ -2,6 +2,7 @@
 CDDLib = "3391f64e-dcde-5f30-b752-e11513730f60"
 Chytridiomycosis = "225de920-55da-40a7-8ddb-3f32ee84be8d"
 DecisionAnalysis = "6a9d793e-d09c-4461-8cb4-55c12d181024"
+DynamicalResilience = "54629d0c-0bd5-4489-a333-4d325b057304"
 FiniteKernels = "2ee73795-50db-4096-9573-22982ed4949b"
 GAM = "f5b95e24-6450-466f-92b1-fee0c65c0d6b"
 HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
@@ -11,9 +12,10 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
 [sources]
-Chytridiomycosis = {path = "../../Chytridiomycosis.jl"}
+Chytridiomycosis = {url = "https://github.com/ecorecipes/Chytridiomycosis.jl"}
+DynamicalResilience = {url = "https://github.com/ecorecipes/DynamicalResilience.jl"}
 DecisionAnalysis = {path = ".."}
-FiniteKernels = {path = "../../FiniteKernels.jl"}
+FiniteKernels = {url = "https://github.com/ecorecipes/FiniteKernels.jl"}
 GAM = {url = "https://github.com/ecorecipes/GAM.jl"}
 
 [compat]

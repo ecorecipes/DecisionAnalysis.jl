@@ -116,8 +116,16 @@ an optional source of problems, each loaded as a weak-dependency extension.
 
 ## Installation
 
-The ecosystem packages are not registered. Clone this package beside `FiniteKernels.jl`, which it finds
-through a `[sources]` path:
+The ecosystem packages are not registered; they are found through `[sources]` URLs, so one
+command installs the package:
+
+```julia
+using Pkg
+Pkg.add(url="https://github.com/ecorecipes/DecisionAnalysis.jl")
+```
+
+To work on the package, clone it and run the suite. Only the Lean project in `proofs/` needs
+`FiniteKernels.jl` cloned beside it:
 
 ```sh
 git clone https://github.com/ecorecipes/FiniteKernels.jl
