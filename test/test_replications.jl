@@ -121,8 +121,9 @@ end
             # Slow oracle for the two-stage value.
             slow = maximum(stages) do g
                 return sum(eachindex(states)) do k
-                    return w[k] * maximum(-S1[r, k] for r in eachindex(courses)
-                                          if first_stage[r] == g)
+                    return w[k] * maximum(-S1[r, k]
+                                          for r in eachindex(courses)
+                                              if first_stage[r] == g)
                 end
             end
             @test slow == r.value
@@ -201,10 +202,12 @@ end
 
         # Learning by doing: observe the weighted score of one action with normal error.
         Q = Float64.(permutedims(score))
-        fp = DecisionProblem(PayoffTable(actions, states, Q), FiniteBelief(states, Float64.(w)))
+        fp = DecisionProblem(PayoffTable(actions, states, Q),
+                             FiniteBelief(states, Float64.(w)))
         total = evpi(fp)
         fraction(a, sd; bins=1200) = evsi(fp,
-                                          gaussian_experiment(Q[findfirst(==(a), actions), :],
+                                          gaussian_experiment(Q[findfirst(==(a), actions),
+                                                                :],
                                                               sd; states, bins)) / total
         for r in fix["evsi"]["figure_readings"]
             @test abs(fraction(Symbol(r["action"]), r["sd"]) - r["fraction"]) <=
@@ -250,7 +253,8 @@ end
         X = BigRat.(fix["table4"]["shortfall"])
         levels = fix["levels"]
         triples = [(r, c, i) for r in 1:3 for c in 1:3 for i in 1:3]
-        states = [Symbol(levels[r], "_", levels[c], "_", levels[i]) for (r, c, i) in triples]
+        states = [Symbol(levels[r], "_", levels[c], "_", levels[i])
+                  for (r, c, i) in triples]
         @test length(X) == 27 == length(unique(states))
         joint(m) = [m[r] * m[c] * m[i] for (r, c, i) in triples]
         loss(x, b, gamma) = x >= b ? x - b : gamma * (b - x)
@@ -268,7 +272,8 @@ end
             ours = [Float64(evpi(problem(belief, g))) for g in gammas]
             @test maximum(abs, ours .- curve) <= tol
         end
-        @test all(iszero(evpi(problem(b, 0 // 1))) for b in ("none", "low", "medium", "severe"))
+        @test all(iszero(evpi(problem(b, 0 // 1)))
+                  for b in ("none", "low", "medium", "severe"))
         # The medium curve was printed from a prior that sums to 0.99.
         m = joint(rational_vector(fix["beliefs"]["medium"]))
         slip = nb["medium_misprint"]
@@ -283,7 +288,8 @@ end
         # The article's text.
         text = fix["article_text"]
         @test abs(Float64(evpi(problem("none", 4 // 5))) -
-                  text["evpi_none_gamma08"]["value"]) <= text["evpi_none_gamma08"]["tolerance"]
+                  text["evpi_none_gamma08"]["value"]) <=
+              text["evpi_none_gamma08"]["tolerance"]
         @test maximum(Float64(evpi(problem("low", g))) for g in gammas) < 45.3    # not 33
         @test abs(Float64(evpi(problem("severe", 1 // 1))) - 81.8) < 0.05          # not 91
 
@@ -311,7 +317,8 @@ end
         for (name, curve) in par["evpi"]
             x = exact_vector(par["collapsed_shortfall"][name])
             used = rational_vector(par["belief"][name])
-            ours3 = [Float64(evpi(DecisionProblem(PayoffTable(actions, [:Low, :Medium, :High],
+            ours3 = [Float64(evpi(DecisionProblem(PayoffTable(actions,
+                                                              [:Low, :Medium, :High],
                                                               table(x, g)), used)))
                      for g in gammas]
             @test maximum(abs, ours3 .- curve) <= 0.006
@@ -362,11 +369,13 @@ end
                                [exact_vector(fix["table2"]["payoff"][a])
                                 for a in fix["actions"]]))
         prior = rational_vector(fix["prior"])
-        problem = DecisionProblem(PayoffTable(actions, states, Q), FiniteBelief(states, prior);
+        problem = DecisionProblem(PayoffTable(actions, states, Q),
+                                  FiniteBelief(states, prior);
                                   baseline=:a0)
         @test first_choice(decide(problem, MaxExpectedUtility())) == :a1
         @test act_now_value(problem) == target(fix, "prior_value")["value"]
-        @test act_now_value(problem) + evpi(problem) == target(fix, "perfect_value")["value"]
+        @test act_now_value(problem) + evpi(problem) ==
+              target(fix, "perfect_value")["value"]
         @test evpi(problem) == target(fix, "evpi")["value"]
         value = exact_number(fix["table2"]["good_state_value"])
         general(p, c) = DecisionProblem(PayoffTable(actions, states,
@@ -387,7 +396,8 @@ end
         binary(q) = Experiment([q 1-q; 1-q q]; signals=[:reads_bad, :reads_good], states)
         @test iszero(evsi(problem, binary(1 // 2)))
         @test evsi(problem, binary(1 // 1)) == evpi(problem)
-        @test evsi(problem, binary(93 // 100)) < published < evsi(problem, binary(94 // 100))
+        @test evsi(problem, binary(93 // 100)) < published <
+              evsi(problem, binary(94 // 100))
         # Monitoring is worthless until it can change the decision.
         @test !information_can_change_decision(problem, binary(9 // 10))
         @test information_can_change_decision(problem, binary(19 // 20))
@@ -407,7 +417,8 @@ end
         shown = Float64.(exact_vector(t1["printed_average"]))
         @test maximum(abs, Float64.(lambda1 * fill(1 // 3, 3)) .- shown) <= 0.0101
         @test agrees(-act_now_value(problem), fix, "table1_minimum_of_average")
-        @test agrees(-act_now_value(problem) - evpi(problem), fix, "table1_average_of_lowest")
+        @test agrees(-act_now_value(problem) - evpi(problem), fix,
+                     "table1_average_of_lowest")
         @test agrees(evpi(problem), fix, "table1_evpi")
         @test agrees(100 * evpi(problem) / -act_now_value(problem), fix,
                      "table1_improvement_percent")
@@ -511,7 +522,8 @@ end
             r = two_stage_value(prob, [1, 1, 2, 2, 3, 3]; partition=part)
             @test r.act_now <= r.value <= r.act_now + evppi(prob, part)
             @test two_stage_value(prob, [1, 1, 2, 2, 3, 3]; partition=fill(0, 4)).gain == 0
-            @test r.value == maximum(r.values) && r.chosen == r.first_stages[r.values .== r.value]
+            @test r.value == maximum(r.values) &&
+                  r.chosen == r.first_stages[r.values .== r.value]
         end
         masked = DecisionProblem(PayoffTable([:a, :b, :c], [:s, :t], [9 9; 1 0; 0 1]),
                                  [1 // 2, 1 // 2]; feasible=[:b, :c])
@@ -519,7 +531,8 @@ end
         @test two_stage_value(masked, [:x, :y, :y]).value == 1
         @test_throws ArgumentError two_stage_value(p, [:a])
         @test_throws ArgumentError two_stage_value(p, [:a, :b]; partition=[1, 2])
-        credal = DecisionProblem(PayoffTable([4 0; 1 2]), CredalSet([[1 // 2, 1 // 2], [1 // 4, 3 // 4]]))
+        credal = DecisionProblem(PayoffTable([4 0; 1 2]),
+                                 CredalSet([[1 // 2, 1 // 2], [1 // 4, 3 // 4]]))
         @test_throws BeliefFormError two_stage_value(credal, [:a, :b])
         # gaussian_experiment: a proper experiment, nearly perfect when the error is
         # small and nearly useless when it is large; argument checks.
