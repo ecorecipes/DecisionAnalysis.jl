@@ -47,7 +47,9 @@ an optional source of problems, each loaded as a weak-dependency extension.
   from a `FiniteKernel`; `bayes_invert`, `garble`, `is_garbling_of` (returns a witness matrix),
   `garbling_result` (the same with a statement of whether the answer is exact) and `deficiency`, the last
   three by linear programme.
-- **Value of information.** `evpi`, `evppi` (over a partition of the states), `evsi`, `enbs`,
+- **Value of information.** `evpi`, `evppi` (over a partition of the states; `hypothesis_partition` for the
+  value of confirming or refuting one hypothesis), `two_stage_value` (an adaptive policy that chooses a first
+  stage, learns, and chooses again), `evsi` (`gaussian_experiment` for a measurement with normal error), `enbs`,
   `value_with_information`, and `information_can_change_decision` (true exactly when EVSI is positive: no
   single action is optimal after every signal); under a credal set `robust_evpi` and `robust_evsi`, which keep the
   rule-specific value and the EVPI envelope apart and never clamp a negative value.
@@ -166,10 +168,11 @@ information_can_change_decision(problem, gauge)                       # true: EV
 
 ## Vignettes
 
-Fourteen vignettes in [`vignettes/`](vignettes/) go from a first decision table to Lean-checked
-certificates, sample-based analysis and an application to chytridiomycosis,
+Twenty vignettes in [`vignettes/`](vignettes/). The first fifteen go from a first decision table to
+Lean-checked certificates, sample-based analysis and an application to chytridiomycosis,
 on ecological examples whose outcomes are counted in individuals and always compared with no intervention
-(all numbers illustrative). Each is rendered to Markdown, HTML and PDF beside its `.qmd`, with the code run
+(all numbers illustrative). Vignettes 16 to 20 are replications of published analyses, listed after the
+table. Each is rendered to Markdown, HTML and PDF beside its `.qmd`, with the code run
 once: `julia scripts/render_vignettes.jl` (see [`vignettes/README.md`](vignettes/README.md)). The Markdown
 is also published as the Tutorials of the documentation, copied by `julia scripts/sync_vignettes.jl`.
 
@@ -190,6 +193,23 @@ is also published as the Tutorials of the documentation, copied by `julia script
 | 13 | [EVSI from a sample](vignettes/13_evsi_methods/13_evsi_methods.md) | Regression on summaries, importance sampling with its effective sample size, the Gaussian approximation, net benefit in animals, `optimal_design` |
 | 14 | [Bd epizootic response](vignettes/14_bd_epizootic_response/14_bd_epizootic_response.md) | The Drawert et al. (2017) model from a cached table of runs: gains, rules, groups, EVPI, EVPPI and the EVSI of a survey |
 | 15 | [Risk attitude and several attributes](vignettes/15_risk_attitude_and_attributes/15_risk_attitude_and_attributes.md) | Certainty equivalents and risk premiums in animals, exponential and power utilities on simulator runs, additive and multiplicative utilities over uninfected and infected counts |
+
+### Replications of published analyses
+
+Five vignettes reproduce value-of-information analyses from the epidemiological and ecological literature
+from the tables printed in the papers, show each result beside the published one, and say where the two
+differ and why. The unit is the paper's own (a score, a count of beds, a growth rate, or the authors'
+valuation in money); the baseline is the paper's status quo or least intervention. The same comparisons,
+with the provenance of every number, are `test/fixtures/replications/*.json` and
+`test/test_replications.jl`.
+
+| | Vignette | Paper | What is reproduced, and what is not |
+|---|---|---|---|
+| 16 | [Adaptive culling for foot-and-mouth disease](vignettes/16_replication_shea_fmd/16_replication_shea_fmd.md) | Shea et al. 2014, *PLOS Biology* | EVPI of 45.9 and 61.2 million pounds once a misprint in the paper's Table 2 is corrected; the two-stage adaptive policy and the third of the EVPI it recovers (`two_stage_value`). The measles case study is not replicated. |
+| 17 | [Learning by doing for whooping cranes](vignettes/17_replication_runge_cranes/17_replication_runge_cranes.md) | Runge et al. 2011, *Biological Conservation* | EVPI 0.117 (19.9%), the value of testing each hypothesis (`hypothesis_partition`), and the EVSI of trying a strategy and observing it with error (`gaussian_experiment`), which agrees with the paper's figure. |
+| 18 | [ICU beds, and EVPXI against EVPPI](vignettes/18_replication_eze_icu/18_replication_eze_icu.md) | Eze et al. 2023, *BMC Health Services Research* | The EVPI curves and the authors' notebook; not the article's Table 5 nor two numbers in its text. Three different "partial" values on one table. |
+| 19 | [Biological and operational uncertainty in weed control](vignettes/19_replication_li_thistle/19_replication_li_thistle.md) | Li et al. 2021, *Journal of Applied Ecology* | Table 1 (EVPI 0.15) and the matrix models; the joint analysis is **not** reproduced, and the vignette shows where it parts. Partial values do not add. |
+| 20 | [The value of imperfect water-quality monitoring](vignettes/20_replication_luhede_monitoring/20_replication_luhede_monitoring.md) | Luhede et al. 2024, *Ecological Economics* | The perfect-information results exactly; the value of imperfect monitoring is quoted, not recomputed (its likelihood is unpublished), and set against the EVSI and break-even cost of monitoring programmes. |
 
 ## Conventions
 

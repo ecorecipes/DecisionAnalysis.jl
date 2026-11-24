@@ -209,6 +209,76 @@ pounds at 20,000 pounds per QALY; a validation target only).
 | EVPPI of the pair, GAM tensor | 332.34506 | 333.87573 | 5.58 | −1.53 |
 | EVPPI of five parameters, Gaussian process, first 1500 draws | 339.22751 | 339.35972 | 14.1 | −0.13 |
 
+### Published analyses
+
+Five published value-of-information analyses are recomputed from the tables printed in
+the papers and their supplements. Unlike the comparisons above, no script writes these
+fixtures: `test/fixtures/replications/<name>.json` were transcribed from the sources
+named in each file (DOI, table or figure, licence, date and place of retrieval), and
+`test/test_replications.jl` asserts our result against the published number to the
+precision printed. Downloaded papers and supplements are kept outside the repository
+and are not copied into it; only the small input tables are, with attribution. The
+unit of each is the paper's own.
+
+| Paper | Quantity | Published | Ours | Agreement |
+|:--|:--|--:|--:|:--|
+| Shea et al. 2014, PLOS Biol. (CC0) | EVPI, GBP million, case 1; case 2 | 45.9; 61.2 | 45.9; 61.2 | yes, after correcting one entry of Table 2 (below) |
+| | best fixed cost, case 1; case 2 | 696.0; 540.7 | 696.0; 540.6 | to rounding |
+| | adaptive cost by first stage (Table S2), 8 values | | | within 0.5 (Table S1 is in whole millions) |
+| | adaptive gain, case 1; case 2 | 0.78; 20.1 (32.85% of EVPI) | 0.78; 20.07 (32.8%) | yes |
+| | weight on the UK kernel below which more than 80% is recovered; above which less than 2% | 0.13; 0.41 | 0.13; 0.43 | second from rounded Table S1 |
+| Runge et al. 2011, Biol. Conserv. | best expected score; with perfect information; EVPI | 0.590; 0.707; 0.117 (19.9%) | 0.590; 0.707; 0.117 (19.9%) | yes |
+| | share of EVPI by hypothesis tested | 54, 32, 8, 6% | 53.6, 32.2, 8.5, 5.7% | yes; they sum to the EVPI exactly |
+| | fledging rate: best; with perfect information | 0.185; 0.232 (25.7%) | 0.185; 0.233 (25.7%) | to rounding |
+| | EVSI / EVPI of trying a strategy, read from Figure 3 at four points | 0.31, 0.17, 0.36, 0.17 | 0.308, 0.164, 0.355, 0.170 | to reading precision |
+| | error up to which killing flies is most informative and gives over 60% of EVPI | "0.03 or less" | most informative to 0.028, over 60% to 0.023 | approximately |
+| Eze et al. 2023, BMC Health Serv. Res. (CC BY) | EVPI in ICU beds at 11 weights, three beliefs (authors' notebook) | 33 values | | within 0.06 (Table 4 is in whole beds) |
+| | EVPI, medium belief | 11 values | | only with the notebook's prior, which sums to 0.99 |
+| | EVPXI of each scenario (authors' notebook) | 27 values | | within 0.06 |
+| | EVPXI of each scenario (article, Table 5) | 27 values | | **no** (below) |
+| | EVPI quoted in the text: 65; 33; 91 | 65; 33; 91 | 65.1; 44.9; 81.8 | first only |
+| | "per-parameter EVPI" (authors' notebook) | 33 values | | exact from the notebook's own collapsed inputs |
+| Li et al. 2021, J. Appl. Ecol. (CC BY) | Table 1: EVPI; improvement | 0.15; 14.9% | 0.147; 14.8% (15.0% from unrounded growth rates) | to rounding |
+| | growth rates of Table S8, 65 records by 3 models | 195 values | | within 0.0006, from matrices rebuilt from the supplement |
+| | joint EVPI; biological; operational, % | 15.6; 8.5; 10.5 | 8.0; 0.0; 8.0 | **no** (below) |
+| Luhede et al. 2024, Ecol. Econ. (CC BY) | value under the prior; with perfect information; EVPI, EUR million per year | 110; 119; 9 | 110; 119; 9 | exact |
+| | EVPI at cost 100, prior 0.5; prior of the peak at cost 50 | 50; 0.75 | 50; 0.75 | exact |
+| | value of imperfect monitoring | 2.21 | not computable | likelihood unpublished |
+
+The authors' code was available for one of the five (Eze et al.: a Jupyter notebook
+and a workbook on GitHub, without a licence). It was read, not executed, and its
+printed outputs are the targets marked "authors' notebook"; nothing else is taken from
+it. No R code accompanies any of the five.
+
+What the comparisons found:
+
+- **Shea et al. 2014, Table 2.** The entry for contiguous-premises culling under the
+  fat kernel is printed as 221.1, a repeat of the entry beside it. The table's own
+  weighted averages (696.0 and 540.7) need 378.1 and Table S1 has 378. With the printed
+  entry the EVPI would be 6.7 and 8.9 million pounds, not the 45.9 and 61.2 of the text.
+- **Eze et al. 2023.** Equation 6 as printed (minimum inside the sum) would make every
+  EVPXI equal to the EVPI; the notebook computes the EVPPI of the partition {scenario},
+  {the rest}, which is what we reproduce. Table 5 of the article does not follow from
+  the belief in its caption (a product belief centred on *medium* values comes within
+  0.63 beds in every row). The medium-belief curve comes from a prior summing to 0.99
+  (a spreadsheet cell multiplies the wrong marginals). The case-severity curve of the
+  "per-parameter EVPI" was computed under the belief (0.33, 0.33, 0.34), not the severe
+  belief, through an index one place off. The collapsed shortfalls in the notebook are
+  not the means of the article's Table 4. The text's 33 and 91 beds are 44.9 and 81.8
+  in the article's own table and notebook. The statement that child infectiousness has
+  no value is true of the collapsed calculation only: its EVPPI is 7.9 beds, and 16
+  beds once the other two parameters are known.
+- **Li et al. 2021.** With fecundity-only effects at the quartiles of Table S8, the
+  best agent in each cell of the paper's Table 2 is reproduced for Australia and the
+  USA and not for New Zealand (18 of 27 cells differ). Under fecundity-only effects the
+  best agent is the same under every model, so the value of resolving biological
+  uncertainty is necessarily zero; the published 8.5% implies that the effect of
+  *T. horridus* entered the authors' calculation in another way. Unresolved: the Dryad
+  deposit (doi:10.5061/dryad.83bk3j9rf) could not be retrieved.
+- **No bug was found in the package.** Three functions were added because the
+  replications needed them: `hypothesis_partition`, `two_stage_value` and
+  `gaussian_experiment`.
+
 ## Findings
 
 1. **A defect on our side, fixed.** `Sadatsafavi(; separators=2)` searched the two cuts
@@ -269,3 +339,16 @@ pounds at 20,000 pounds per QALY; a validation target only).
   `optimal_design` have no counterpart in the packages above; they are tested against
   explicit oracles in the test suite only.
 - `voi`'s chemotherapy EVSI examples and its `earth`, `bart` and `inla` regressions.
+
+### Published analyses not replicated
+
+Of the 14 papers of `lab/reviews/voi_epidemiology_ecology_review.md`, nine were not
+replicated. Impalli et al. 2025 (PLOS Comput. Biol.) and the measles case study of
+Shea et al. 2014 print no table of outcomes: their targets exist only as figures, and
+each needs the authors' simulation model. Meeyai et al. 2015 and Phillips et al. 2023
+publish model code but not the probabilistic-sensitivity output that a
+value-of-information calculation starts from; Kim et al. 2017 and Zang et al. 2020 are
+author manuscripts without either. Christensen et al. 2026 and Bal et al. 2018 are
+free to read at the publisher, which refuses automated retrieval, and have no copy in
+an open repository; Moore and Runge 2012 and Raymond et al. 2020 are behind a paywall.
+

@@ -104,10 +104,12 @@ export AbstractTransform, IdentityTransform, RegretTransform, RelativeRegretTran
        GammaMaximin, Satisfice, EAdmissible, Maximal, IntervalDominance, ParetoFront,
        DecisionResult, first_choice, decide
 # Experiments
-export Experiment, signal_labels, random_experiment, BayesianInversion, bayes_invert,
-       garble, is_garbling_of, garbling_result, GarblingResult, deficiency
+export Experiment, signal_labels, random_experiment, gaussian_experiment,
+       BayesianInversion, bayes_invert, garble, is_garbling_of, garbling_result,
+       GarblingResult, deficiency
 # Value of information
-export act_now_value, value_with_information, evpi, evppi, evsi, enbs,
+export act_now_value, value_with_information, evpi, evppi, hypothesis_partition,
+       two_stage_value, evsi, enbs,
        information_can_change_decision, RobustVOI,
        robust_evpi, robust_evsi, voi_profile, expected_variance_reduction,
        optimal_design, normal_form

@@ -34,7 +34,13 @@ pages = Any["Home" => "index.md", "Certificates" => "certificates.md",
                                 "Risk attitude and multi-attribute utilities" => "api/utilities.md",
                                 "Linear programmes, reports, certificates and exceptions" => "api/programmes.md"]]
 tutorials = tutorial_pages()
+# Vignettes named NN_replication_* reproduce published analyses and get a heading of
+# their own, so that nobody takes their numbers for the illustrations of the others.
+is_replication(page) = occursin("_replication_", last(page))
+replications = filter(is_replication, tutorials)
+tutorials = filter(!is_replication, tutorials)
 isempty(tutorials) || push!(pages, "Tutorials" => tutorials)
+isempty(replications) || push!(pages, "Replications of published analyses" => replications)
 
 # Source links need a commit to point at. A checkout without commits (a fresh
 # scaffold, a tarball) builds without them instead of failing.

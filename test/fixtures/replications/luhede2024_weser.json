@@ -1,0 +1,33 @@
+{
+  "name": "luhede2024_weser",
+  "citation": "Luhede A, Yaqine H, Bahmanbijari R, Roemer M, Upmann T (2024) The value of information in water quality monitoring and management. Ecological Economics 219:108128",
+  "doi": "10.1016/j.ecolecon.2024.108128",
+  "licence": "CC BY 4.0",
+  "retrieved": "2026-11-23, publisher PDF from the institutional repository epic.awi.de (eprint 59378)",
+  "decision": "Whether to take a management action on a water body of the Weser whose ecological state (good or bad) is uncertain",
+  "unit": "payoff in millions of euros per year (the paper's valuation: 200 for a water body in the good state, action cost 90)",
+  "baseline": "a0",
+  "actions": ["a0", "a1"],
+  "action_names": {"a0": "no action", "a1": "management action (always reaches or keeps the good state)"},
+  "states": ["x0_bad", "x1_good"],
+  "prior": ["9/10", "1/10"],
+  "table2": {
+    "provenance": "Table 2 of the article, payoff v(a, x): rows = actions, columns = states x0 (bad), x1 (good)",
+    "payoff": {"a0": ["0", "200"], "a1": ["110", "110"]},
+    "good_state_value": "200",
+    "action_cost": "90"
+  },
+  "targets": [
+    {"id": "prior_value", "value": 110, "tolerance": 0, "where": "Table 3, PV"},
+    {"id": "perfect_value", "value": 119, "tolerance": 0, "where": "Table 3"},
+    {"id": "evpi", "value": 9, "tolerance": 0, "where": "Table 3"},
+    {"id": "evpi_cost100_prior_half", "value": 50, "tolerance": 0, "where": "Section 4, Figure 2b: medium cost c = 100, p = 0.5"},
+    {"id": "evpi_peak_prior_cost50", "value": 0.75, "tolerance": 0, "where": "Section 4, Figure 2a: with c = 50 the value is highest at p = 0.75"}
+  ],
+  "not_replicated": {
+    "posterior_value": 112.21,
+    "imperfect_information_value": 2.21,
+    "confidence_interval": [2.06, 2.84],
+    "reason": "The likelihood of the monitoring signal is a gamma distribution (bad state) and a four-parameter beta distribution (good state) fitted to total-nitrogen measurements of the Weser; neither the data ('available on request') nor the fitted parameters are published."
+  }
+}

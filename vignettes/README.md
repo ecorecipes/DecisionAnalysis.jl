@@ -1,6 +1,8 @@
 # Vignettes
 
-Fifteen vignettes, ordered from basic to advanced, that together cover the package. Each
+Twenty vignettes. The first fifteen, ordered from basic to advanced, together cover the
+package on illustrative examples; 16 to 20 are replications of published analyses and
+have a section of their own below. Each
 lives in its own directory `NN_name/NN_name.qmd` and is rendered to GitHub-flavoured
 Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTML
 (`NN_name.html`) and PDF (`NN_name.pdf`). All rendered files are kept next to the
@@ -24,16 +26,40 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 | 14 | [Bd epizootic response](14_bd_epizootic_response/14_bd_epizootic_response.md) | The cached Drawert et al. (2017) outcome table of `Chytridiomycosis.jl`: count and infection utilities, gains with standard errors, groups as scenarios, the weight sweep, EVPI, EVPPI, and the EVSI of a pre-intervention survey by importance sampling |
 | 15 | [Risk attitude and several attributes](15_risk_attitude_and_attributes/15_risk_attitude_and_attributes.md) | `LinearUtility`, `ExponentialUtility`, `PowerUtility`, `certainty_equivalent`, `risk_premium`, a non-linear utility applied per run, `AdditiveUtility`, `MultiplicativeUtility` |
 
+## Replications of published analyses
+
+Vignettes 16 to 20 reproduce published value-of-information analyses from the tables
+printed in the papers and their supplements. Their numbers are the papers', not
+illustrations; each result is shown beside the published one, and each vignette says
+what was reproduced, what was not and why, and then adds something the paper did not
+report. The same comparisons, with the provenance and licence of every input, are
+`test/fixtures/replications/*.json` and `test/test_replications.jl`.
+
+| | Vignette | Paper and unit | Covers |
+|---|---|---|---|
+| 16 | [Adaptive culling for foot-and-mouth disease](16_replication_shea_fmd/16_replication_shea_fmd.md) | Shea et al. 2014, doi:10.1371/journal.pbio.1001970; cost of livestock lost, GBP million (the paper's valuation) | a misprint found in the paper's Table 2; `evpi`; `two_stage_value` for the adaptive policy and the share of EVPI it recovers; regret; a credal set over the kernel weights; a coarser partition for what monitoring must establish |
+| 17 | [Learning by doing for whooping cranes](17_replication_runge_cranes/17_replication_runge_cranes.md) | Runge et al. 2011, doi:10.1016/j.biocon.2010.12.020; weighted score on 0-1, and fledging rate | `hypothesis_partition` (the paper's "EVPXI"); `gaussian_experiment` and the EVSI of trying a strategy; the trial net of the score forgone; `robust_evpi` |
+| 18 | [ICU beds, and EVPXI against EVPPI](18_replication_eze_icu/18_replication_eze_icu.md) | Eze et al. 2023, doi:10.1186/s12913-023-09479-4; mismatch in ICU beds | EVPI against a weight in the loss; the value of testing a scenario, the collapsed "per-parameter EVPI" and the EVPPI of a parameter as three different numbers; non-additivity; a credal set of the paper's four beliefs |
+| 19 | [Biological and operational uncertainty in weed control](19_replication_li_thistle/19_replication_li_thistle.md) | Li et al. 2021, doi:10.1111/1365-2664.13904; population growth rate λ | a payoff table from matrix models; `evppi` by model, by effectiveness and by agent; non-additivity of partial values; a replication that fails in part, with the reason |
+| 20 | [The value of imperfect water-quality monitoring](20_replication_luhede_monitoring/20_replication_luhede_monitoring.md) | Luhede et al. 2024, doi:10.1016/j.ecolecon.2024.108128; EUR million per year (the paper's valuation) | `evsi` of single and repeated imperfect readings; `information_can_change_decision`; break-even cost and the best programme against its price; `optimal_design`; `robust_evsi` |
+
+Their conventions differ from those of vignettes 1 to 15 in two ways: **the unit is
+the paper's own** (individuals or another count where the paper has no valuation, money
+where the paper supplies one, always labelled as the paper's), and **no cost is
+invented**: where a paper gives no cost of information, the vignette reports the
+break-even cost. The baseline is the paper's no-intervention or status-quo action, or
+its least intervention where it has neither (vignette 16).
+
 ## Conventions of the examples
 
-- **Utility is counted in individuals, never in money**: the number of animals of the
+- **In vignettes 1 to 15, utility is counted in individuals, never in money**: the number of animals of the
   focal species. For an infectious disease there are two counts, uninfected individuals
   (higher is better) and infected individuals (lower is better), combined as
   uninfected − w × infected and shown at w = 0, at w = 1 and as a sweep. Infected but
   living animals are not counted as population.
 - **Every vignette has a no-intervention action**, sets it as the `baseline` of the
   `DecisionProblem`, and reports each action's gain over it.
-- **All numbers are illustrative.** They are not data and not estimates for any real
+- **All numbers of vignettes 1 to 15 are illustrative.** They are not data and not estimates for any real
   system, and each vignette says so. Vignette 14 reads a cached table of runs of a
   published model; the numbers read from that table are labelled as such, and
   everything computed from them is illustrative.

@@ -1,0 +1,683 @@
+{
+ "name": "li2021_thistle",
+ "citation": "Li S-L, Keller J, Runge MC, Shea K (2021) Weighing the unknowns: Value of Information for biological and operational uncertainty in invasion management. Journal of Applied Ecology 58:1621-1630",
+ "doi": "10.1111/1365-2664.13904",
+ "licence": "CC BY 4.0 (article and supporting information)",
+ "retrieved": "2026-11-23, full text XML and supporting files (JPE-58-1621-s002.xlsx, Tables S1-S8) from Europe PMC, PMC8453580; the Dryad deposit doi:10.5061/dryad.83bk3j9rf was not retrievable (API: 'cannot be viewed', landing page 404)",
+ "decision": "Which biological control agent to release against musk thistle (Carduus nutans), under uncertainty about the demography of the invaded population (three matrix models) and about how effective each agent will be",
+ "unit": "long-term population growth rate lambda of the weed (dimensionless, dominant eigenvalue of a 4-stage matrix model); lower is better, so payoffs are entered as minus lambda",
+ "baseline": "no_management",
+ "states": [
+  "Australia",
+  "New_Zealand",
+  "USA"
+ ],
+ "table1": {
+  "provenance": "Table 1 of the article: lambda by model (rows) and action (columns), fixed effectiveness from Shea et al. 2006 (R. conicus: seed production -30%; T. horridus: growth -87%; U. solstitialis: seed production -70%)",
+  "actions": [
+   "no_management",
+   "R_conicus",
+   "T_horridus",
+   "U_solstitialis"
+  ],
+  "lambda": {
+   "Australia": [
+    "1.20",
+    "0.93",
+    "0.50",
+    "0.59"
+   ],
+   "New_Zealand": [
+    "2.68",
+    "2.14",
+    "2.47",
+    "1.31"
+   ],
+   "USA": [
+    "1.75",
+    "1.50",
+    "0.72",
+    "1.07"
+   ]
+  },
+  "printed_average": [
+   "1.88",
+   "1.52",
+   "1.23",
+   "0.99"
+  ]
+ },
+ "targets": [
+  {
+   "id": "table1_average_of_lowest",
+   "value": 0.84,
+   "tolerance": 0.005,
+   "where": "Table 1"
+  },
+  {
+   "id": "table1_minimum_of_average",
+   "value": 0.99,
+   "tolerance": 0.005,
+   "where": "Table 1"
+  },
+  {
+   "id": "table1_evpi",
+   "value": 0.15,
+   "tolerance": 0.005,
+   "where": "Table 1 and Results 3.3"
+  },
+  {
+   "id": "table1_improvement_percent",
+   "value": 14.9,
+   "tolerance": 0.15,
+   "where": "Table 1",
+   "note": "14.8 from the two-decimal entries of Table 1 and 15.0 from the seven-digit lambdas of Table S8; the printed 14.9 lies between"
+  }
+ ],
+ "matrices": {
+  "provenance": "Tables S5 (Kybeyan, Australia), S6 (Midland, New Zealand) and S7 (Kansas, USA) of the supporting information; stages SB, S, M, L; entry [i][j] is the transition from stage j to stage i",
+  "A": {
+   "Australia": [
+    [
+     0.443,
+     0.158430812,
+     6.61047845,
+     206.5575808
+    ],
+    [
+     0.0039168,
+     0.007796462,
+     0.243364,
+     7.6090655
+    ],
+    [
+     0.00040368,
+     0.003057318,
+     0.03137504,
+     0.7930786
+    ],
+    [
+     0.00047952,
+     0.010046479,
+     0.06125185,
+     0.9449927
+    ]
+   ],
+   "New_Zealand": [
+    [
+     0.0382,
+     11.6684,
+     282.5608,
+     415.5972
+    ],
+    [
+     0.1847,
+     1.513,
+     34.9261,
+     51.367
+    ],
+    [
+     0.0,
+     0.0091,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0056,
+     0.022,
+     0.0
+    ]
+   ],
+   "USA": [
+    [
+     0.2597,
+     0.09163091,
+     9.2152853,
+     256.844683
+    ],
+    [
+     0.025119,
+     0.02495052,
+     0.9921935,
+     27.654015
+    ],
+    [
+     0.004881,
+     0.17393494,
+     0.4155895,
+     5.373591
+    ],
+    [
+     0.0,
+     0.02716974,
+     0.137946,
+     0.0
+    ]
+   ]
+  }
+ },
+ "vital_rates": {
+  "provenance": "Table S2 of the supporting information. sigma = survival of SB, S, M, L; beta = bolting of surviving S, M, L; pi = potential seed production of S, M, L; phi = seed escaping floral herbivory; nu = new seed entering the seed bank; epsilon = new seed establishing as seedling; gamma3, gamma4 = growth of an establishing seed to M and L.",
+  "values": {
+   "Australia": {
+    "sigma": [
+     0.443,
+     0.0167,
+     0.0818,
+     0.4393
+    ],
+    "gamma3": 0.0841,
+    "gamma4": 0.0999,
+    "beta": [
+     0.1765,
+     0.5385,
+     0.9362
+    ],
+    "pi": [
+     125.0,
+     349.0,
+     1168.0
+    ],
+    "phi": 1.0,
+    "nu": 0.43,
+    "epsilon": 0.0194
+   },
+   "New_Zealand": {
+    "sigma": [
+     0.0382,
+     0.1164,
+     0.6813,
+     0.7532
+    ],
+    "gamma3": 0.0,
+    "gamma4": 0.0,
+    "beta": [
+     0.262,
+     0.9516,
+     0.9828
+    ],
+    "pi": [
+     2437.0,
+     2776.0,
+     3576.0
+    ],
+    "phi": 1.0,
+    "nu": 0.157,
+    "epsilon": 0.0194
+   },
+   "USA": {
+    "sigma": [
+     0.2597,
+     0.2182,
+     0.5633,
+     0.7474
+    ],
+    "gamma3": 0.1627,
+    "gamma4": 0.0,
+    "beta": [
+     0.018,
+     0.3596,
+     1.0
+    ],
+    "pi": [
+     100.0,
+     195.0,
+     1473.0
+    ],
+    "phi": 1.0,
+    "nu": 0.2333,
+    "epsilon": 0.03
+   }
+  },
+  "fecundity_part": "Table S3 (the vital-rate equations) is an image and was not transcribed. The seed-production part of column j in {S, M, L} was reconstructed as s_j = sigma_j beta_j pi_j phi and F[SB, j] = s_j nu, F[S, j] = s_j epsilon (1 - gamma3 - gamma4), F[M, j] = s_j epsilon gamma3, F[L, j] = s_j epsilon gamma4 (after Shea and Kelly 1998 and Jongejans et al. 2008); a reduction f of fecundity gives A - f F. The reconstruction is checked against every fecundity row of Table S8 (lambda_check)."
+ },
+ "effectiveness": {
+  "provenance": "Table S8 of the supporting information: every literature record of an agent acting alone on fecundity (proportional reduction; negative for T. horridus where plants compensated), with the published lambda under each model (Australia, New Zealand, USA)",
+  "reduction": {
+   "R_conicus": [
+    0.028,
+    0.0283,
+    0.042,
+    0.061,
+    0.072,
+    0.088,
+    0.09,
+    0.09,
+    0.143,
+    0.153526970954,
+    0.195020746888,
+    0.222,
+    0.23,
+    0.26,
+    0.28,
+    0.3,
+    0.32,
+    0.32,
+    0.336,
+    0.345,
+    0.36,
+    0.363,
+    0.381,
+    0.386,
+    0.44,
+    0.45,
+    0.45,
+    0.467,
+    0.489,
+    0.495850622407,
+    0.52,
+    0.52,
+    0.57,
+    0.68,
+    0.723707664884,
+    0.733,
+    0.733,
+    0.737,
+    0.770053475936,
+    0.78,
+    0.8,
+    0.8,
+    0.8,
+    0.843137254902,
+    0.88,
+    0.933,
+    0.933,
+    0.973,
+    0.973
+   ],
+   "T_horridus": [
+    -0.505347593583,
+    -0.23768115942,
+    -0.00487804878,
+    0.080430879713,
+    0.3,
+    0.591549295775,
+    0.596685082873,
+    0.72
+   ],
+   "U_solstitialis": [
+    0.04,
+    0.06,
+    0.072,
+    0.088,
+    0.11,
+    0.45,
+    0.63,
+    0.7
+   ]
+  },
+  "lambda_check": {
+   "R_conicus": [
+    [
+     1.1766124,
+     2.6344744,
+     1.7266496
+    ],
+    [
+     1.1763321,
+     2.6339457,
+     1.7264165
+    ],
+    [
+     1.163535,
+     2.6097687,
+     1.7157377
+    ],
+    [
+     1.1458083,
+     2.5761325,
+     1.7008158
+    ],
+    [
+     1.1355573,
+     2.556601,
+     1.692116
+    ],
+    [
+     1.1206629,
+     2.5281135,
+     1.6793801
+    ],
+    [
+     1.1188026,
+     2.524546,
+     1.6777812
+    ],
+    [
+     1.1188026,
+     2.524546,
+     1.6777812
+    ],
+    [
+     1.0696256,
+     2.4294438,
+     1.6348268
+    ],
+    [
+     1.0598885,
+     2.4104197,
+     1.6261561
+    ],
+    [
+     1.0216209,
+     2.3349664,
+     1.5915012
+    ],
+    [
+     0.9968455,
+     2.285484,
+     1.5685389
+    ],
+    [
+     0.9895168,
+     2.2707437,
+     1.5616616
+    ],
+    [
+     0.9621129,
+     2.2151779,
+     1.5355812
+    ],
+    [
+     0.9439183,
+     2.1778687,
+     1.5179288
+    ],
+    [
+     0.9257896,
+     2.1403351,
+     1.5000536
+    ],
+    [
+     0.9077323,
+     2.1025662,
+     1.4819455
+    ],
+    [
+     0.9077323,
+     2.1025662,
+     1.4819455
+    ],
+    [
+     0.8933423,
+     2.0721734,
+     1.4672842
+    ],
+    [
+     0.8852711,
+     2.0550055,
+     1.4589666
+    ],
+    [
+     0.8718585,
+     2.0262729,
+     1.4449874
+    ],
+    [
+     0.8691821,
+     2.020508,
+     1.4421737
+    ],
+    [
+     0.8531692,
+     1.9857865,
+     1.4251626
+    ],
+    [
+     0.8487355,
+     1.9761003,
+     1.4203973
+    ],
+    [
+     0.8012989,
+     1.8702608,
+     1.3677483
+    ],
+    [
+     0.7926141,
+     1.8503969,
+     1.3577458
+    ],
+    [
+     0.7926141,
+     1.8503969,
+     1.3577458
+    ],
+    [
+     0.7779312,
+     1.8164232,
+     1.3405466
+    ],
+    [
+     0.7590934,
+     1.7720538,
+     1.3179068
+    ],
+    [
+     0.7532681,
+     1.7581398,
+     1.310765
+    ],
+    [
+     0.7328998,
+     1.7086993,
+     1.2852211
+    ],
+    [
+     0.7328998,
+     1.7086993,
+     1.2852211
+    ],
+    [
+     0.6916717,
+     1.6042001,
+     1.2303452
+    ],
+    [
+     0.6070052,
+     1.3613565,
+     1.0977722
+    ],
+    [
+     0.5764686,
+     1.2581807,
+     1.0390929
+    ],
+    [
+     0.5702564,
+     1.235605,
+     1.0260506
+    ],
+    [
+     0.5702564,
+     1.235605,
+     1.0260506
+    ],
+    [
+     0.5676144,
+     1.22581,
+     1.0203686
+    ],
+    [
+     0.5465596,
+     1.1429131,
+     0.9716998
+    ],
+    [
+     0.5405065,
+     1.1172091,
+     0.9563923
+    ],
+    [
+     0.5287504,
+     1.0642924,
+     0.924544
+    ],
+    [
+     0.5287504,
+     1.0642924,
+     0.924544
+    ],
+    [
+     0.5287504,
+     1.0642924,
+     0.924544
+    ],
+    [
+     0.5053582,
+     0.9433096,
+     0.8499581
+    ],
+    [
+     0.4875571,
+     0.8297302,
+     0.7775464
+    ],
+    [
+     0.465466,
+     0.6375961,
+     0.6493163
+    ],
+    [
+     0.465466,
+     0.6375961,
+     0.6493163
+    ],
+    [
+     0.4513717,
+     0.4389873,
+     0.5087749
+    ],
+    [
+     0.4513717,
+     0.4389873,
+     0.5087749
+    ]
+   ],
+   "T_horridus": [
+    [
+     1.6807817,
+     3.538529,
+     2.101593
+    ],
+    [
+     1.4266616,
+     3.092596,
+     1.92216
+    ],
+    [
+     1.2073726,
+     2.692241,
+     1.752007
+    ],
+    [
+     1.1277066,
+     2.541602,
+     1.685417
+    ],
+    [
+     0.9257896,
+     2.140335,
+     1.500054
+    ],
+    [
+     0.6743597,
+     1.558164,
+     1.205773
+    ],
+    [
+     0.6702795,
+     1.547095,
+     1.199827
+    ],
+    [
+     0.578976,
+     1.267121,
+     1.044237
+    ]
+   ],
+   "U_solstitialis": [
+    [
+     1.1654024,
+     2.613302,
+     1.717301
+    ],
+    [
+     1.1467407,
+     2.577906,
+     1.701604
+    ],
+    [
+     1.1355573,
+     2.556601,
+     1.692116
+    ],
+    [
+     1.1206629,
+     2.528114,
+     1.67938
+    ],
+    [
+     1.1002165,
+     2.488787,
+     1.661706
+    ],
+    [
+     0.7926141,
+     1.850397,
+     1.357746
+    ],
+    [
+     0.6442807,
+     1.474297,
+     1.160351
+    ],
+    [
+     0.592773,
+     1.314724,
+     1.071436
+    ]
+   ]
+  },
+  "other_records": [
+   {
+    "agent": "T_horridus",
+    "target": "growth",
+    "effect": 0.867,
+    "lambda": [
+     0.4954306,
+     2.466425,
+     0.7215094
+    ]
+   }
+  ],
+  "quantiles": "The article uses the 25%, 50% and 75% quantiles of each agent's effectiveness (Table 2). The quantile rule is not stated; R's default (type 7, linear interpolation) is used here."
+ },
+ "published_joint": {
+  "provenance": "Results 3.4 and Table 2 (an image of the optimal agent in each of 27 x 3 cells; no lambda values are printed)",
+  "evpi_percent": 15.6,
+  "biological_percent": 8.5,
+  "operational_percent": 10.5,
+  "optimal_overall": "T_horridus",
+  "optimal_by_model": {
+   "Australia": "R_conicus",
+   "New_Zealand": "T_horridus",
+   "USA": "R_conicus"
+  },
+  "optimal_count_over_27_combinations": {
+   "T_horridus": 17,
+   "R_conicus": 8,
+   "U_solstitialis": 2
+  },
+  "table2_pattern": {
+   "provenance": "Read from the image of Table 2; rows are the 27 combinations in the order R. conicus (slowest), T. horridus, U. solstitialis (fastest), each at 0.25, 0.5, 0.75. R, T, U = the agent with the lowest lambda.",
+   "Australia": "RRURRUTTTRRURRUTTTRRRRRRRRR",
+   "USA": "RRURRUTTTRRURRUTTTRRRRRRRRR",
+   "New_Zealand": "TTTTTTTTTTTTTTTTTTRRRTTTTTT"
+  },
+  "new_zealand_cells_that_differ": 18,
+  "status": "not reproduced",
+  "resolution": "With fecundity-only effects at the type-7 quantiles of Table S8 the Australia and USA columns of Table 2 are reproduced cell for cell, but the New Zealand column is not: in our reconstruction the best agent in each cell is the same under all three models (a fecundity reduction lowers lambda monotonically in each, so the agent with the largest reduction wins everywhere), and T. horridus (quartiles of fecundity reduction -0.06, 0.19, 0.59) is best for New Zealand in 6 of 27 cells, whereas Table 2 shows it best in 24; 18 cells differ. Consequently we get R. conicus as the best agent overall and under every model, a joint EVPI of 8.0% and partial values of 0.0% (biological) and 8.0% (operational), against the published 15.6%, 8.5% and 10.5%. The published lambdas of Table S8 for New Zealand agree with our matrices to 6e-4, so the difference lies in how the T. horridus effect entered the authors' joint analysis, which cannot be settled without their code (the Dryad deposit could not be retrieved)."
+ }
+}

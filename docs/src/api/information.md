@@ -8,6 +8,7 @@ The definitions on finite problems. The same functions, called with a method or 
 Experiment
 signal_labels
 random_experiment
+gaussian_experiment
 bayes_invert
 BayesianInversion
 garble
@@ -24,6 +25,8 @@ act_now_value
 value_with_information
 evpi
 evppi
+hypothesis_partition
+two_stage_value
 evsi
 enbs
 information_can_change_decision

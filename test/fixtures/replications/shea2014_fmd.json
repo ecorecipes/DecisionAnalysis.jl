@@ -1,0 +1,55 @@
+{
+  "name": "shea2014_fmd",
+  "citation": "Shea K, Tildesley MJ, Runge MC, Fonnesbeck CJ, Ferrari MJ (2014) Adaptive management and the value of information: learning via intervention in epidemiology. PLOS Biology 12(10):e1001970",
+  "doi": "10.1371/journal.pbio.1001970",
+  "licence": "CC0 1.0 (public domain dedication; article and supporting information)",
+  "retrieved": "2026-11-23, publisher XML and PDF, and supporting files S4 (Table S1) and S5 (Table S2) from journals.plos.org",
+  "decision": "Culling policy for a foot-and-mouth disease outbreak in a UK-like livestock landscape, under uncertainty about the dispersal kernel",
+  "unit": "cost of livestock lost to disease and culling, millions of pounds sterling (the paper's valuation, 2001 market prices); lower is better, so payoffs are entered as minus the cost",
+  "baseline": "IP",
+  "baseline_note": "The paper has no no-intervention action; culling infected premises only (IP) is the least intervention and is used as the baseline.",
+  "actions": ["IP", "DC", "CP", "RC"],
+  "action_names": {"IP": "cull infected premises only", "DC": "IP plus dangerous contacts", "CP": "IP plus DC plus contiguous premises", "RC": "IP plus DC plus 3 km ring cull"},
+  "states": ["K1_thin", "K2_UK", "K3_fat"],
+  "weights": {"case1": ["1/4", "1/2", "1/4"], "case2": ["1/3", "1/3", "1/3"]},
+  "weights_note": "Table 2 prints case 2 as (0.33, 0.33, 0.33); the printed averages are reproduced with exact thirds, not with 0.33.",
+  "table2": {
+    "provenance": "Table 2 of the article, rows = kernels, columns = actions IP, DC, CP, RC; transcribed from the publisher XML and checked against the PDF",
+    "cost_as_printed": {"K1_thin": ["84.5", "55.1", "81.7", "259.8"], "K2_UK": ["5129.3", "1901.3", "1162.2", "2537.7"], "K3_fat": ["284.1", "221.1", "221.1", "381.7"]},
+    "correction": {"state": "K3_fat", "action": "CP", "printed": "221.1", "corrected": "378.0", "reason": "The printed entry repeats the DC entry of the same row. The weighted averages printed for CP in both cases (696.0 and 540.7) need K1 + K3 = 459.8 for CP, hence K3 = 378.1 to one decimal; Table S1 gives 378 for the fixed CP strategy under K3 (and 82 and 1162 for K1 and K2). 378.0 is used. With the printed 221.1 the CP averages would be 656.8 and 488.3 and the EVPI 6.7 and 8.9."},
+    "printed_weighted_average": {"case1": ["2656.8", "1019.7", "696.0", "1429.2"], "case2": ["1832.6", "725.8", "540.7", "1059.7"]},
+    "printed_best": {"case1": "650.1", "case2": "479.5"}
+  },
+  "tableS1": {
+    "provenance": "Table S1 (supporting file S4, DOCX): cost in millions of pounds of each two-stage strategy under each kernel, printed as whole numbers. Columns are ordered stage 1 = IP, DC, CP, RC and within each stage 2 = IP, DC, CP, RC (the paper writes 3R for RC).",
+    "stages": ["IP", "DC", "CP", "RC"],
+    "cost": {
+      "K1_thin": [84, 74, 87, 149, 59, 55, 99, 239, 81, 81, 82, 205, 130, 129, 165, 260],
+      "K2_UK": [5129, 2238, 1676, 3395, 4991, 1901, 1285, 2779, 4662, 1823, 1162, 2074, 4917, 1875, 1284, 2538],
+      "K3_fat": [284, 283, 306, 326, 223, 221, 379, 287, 379, 376, 378, 438, 310, 310, 446, 382]
+    }
+  },
+  "tableS2": {
+    "provenance": "Table S2 (supporting file S5, DOCX): expected cost of each first-stage action when the kernel is learned after one month and the second stage is then the best for it",
+    "first_stage_cost": {"K1_thin": ["73.5", "55.1", "80.5", "129.3"], "K2_UK": ["1676.1", "1285.5", "1162.2", "1284.4"], "K3_fat": ["283.0", "221.1", "376.1", "310.0"]},
+    "printed_weighted_average": {"case1": ["927.1", "711.8", "695.3", "752.0"], "case2": ["677.5", "520.5", "539.6", "574.6"]}
+  },
+  "targets": [
+    {"id": "best_fixed_case1", "value": 696.0, "tolerance": 0.05, "where": "Table 2; Results, 'Fixed strategies'"},
+    {"id": "best_fixed_case2", "value": 540.7, "tolerance": 0.1, "where": "Table 2", "note": "exact thirds give 540.63, printed 540.7; the difference is rounding of the unprinted K3 entry"},
+    {"id": "perfect_case1", "value": 650.1, "tolerance": 0.06, "where": "Table 2, Best column"},
+    {"id": "perfect_case2", "value": 479.5, "tolerance": 0.05, "where": "Table 2, Best column"},
+    {"id": "evpi_case1", "value": 45.9, "tolerance": 0.05, "where": "Results text"},
+    {"id": "evpi_case2", "value": 61.2, "tolerance": 0.05, "where": "Results text"},
+    {"id": "evpi_percent_case1", "value": 6.6, "tolerance": 0.05, "where": "Results text"},
+    {"id": "evpi_percent_case2", "value": 11.3, "tolerance": 0.05, "where": "Results text"},
+    {"id": "adaptive_cost_case1", "value": 695.3, "tolerance": 0.06, "where": "Results text and Table S2; first stage CP"},
+    {"id": "adaptive_cost_case2", "value": 520.5, "tolerance": 0.25, "where": "Table S2; first stage DC", "note": "from the whole-number Table S1 we get 520.33; from the one-decimal Table S2 entries 520.57"},
+    {"id": "adaptive_gain_case1", "value": 0.78, "tolerance": 0.01, "where": "Results text (1.7% of EVPI)"},
+    {"id": "adaptive_gain_case2", "value": 20.1, "tolerance": 0.1, "where": "Results text (32.85% of EVPI)"},
+    {"id": "adaptive_share_case2_percent", "value": 32.85, "tolerance": 0.1, "where": "Results and Discussion"},
+    {"id": "share_above_80_percent_when_UK_weight_below", "value": 0.13, "tolerance": 0.01, "where": "Results text, Figure 3D"},
+    {"id": "share_below_2_percent_when_UK_weight_above", "value": 0.41, "tolerance": 0.03, "where": "Results text, Figure 3D", "note": "from the whole-number Table S1 the share falls below 2% at a weight of 0.43, where the best first stage changes from DC to CP; the paper worked from unrounded costs"}
+  ],
+  "not_replicated": "The measles case study (EVPI of about 10,000 cases, 12% of about 84,000) has no printed table; it needs the age-structured SEIR model of Text S1D and its targets are read from Figure 5 only."
+}

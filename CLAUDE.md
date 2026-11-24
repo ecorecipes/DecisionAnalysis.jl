@@ -103,8 +103,16 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   action is on average worth less than its reported score; with exact payoffs and a sampled belief EVPI is
   biased downwards; in general **the sign of the bias of EVPI is indefinite** (Lean
   `evpi_bias_sign_indefinite`). Never write that noise "biases EVPI upwards".
-- **No monetary costs anywhere.** Utility is counted in individuals; `enbs` on an estimate takes a cost in
-  individuals and is for additive payoffs only.
+- **No monetary costs in the package's own examples.** Utility is counted in individuals; `enbs` on an
+  estimate takes a cost in individuals and is for additive payoffs only. Money appears only as a published
+  figure in its paper's own unit: the `voi` validation target, and the replication fixtures and vignettes
+  whose source values outcomes in money (Shea et al. 2014, Luhede et al. 2024).
+- **Replication fixtures are contracts with the literature.** `test/fixtures/replications/*.json` hold the
+  small input tables of published analyses, the published numbers, and for each its DOI, table or figure,
+  licence and how it was transcribed; `resolution` fields record why a number of ours differs from the
+  paper's. Change a target only against the paper itself, never to make a test pass. `two_stage_value` is
+  derived from the definitions of `src/voi.jl` and has no Lean counterpart; `hypothesis_partition` only
+  builds a partition for `evppi`.
 - A `SampleBelief` is a single prior over its draws (weights normalised, exactly for integer and rational
   weights; default `1 // n`). State-wise rules on it are flagged `details.sample_dependent`; `Laplace`,
   `total_variation`, `bayes_invert` and the certificate exports throw `BeliefFormError`.
@@ -140,9 +148,10 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - `src/regret.jl`: regret tables (`RegretTable`, a labelled matrix) and profiles.
 - `src/rules.jl`: transforms, `RobustnessMetric`, selectors, `DecisionRule`, the named rules, the
   set-valued rules, `DecisionResult`, `decide`.
-- `src/experiments.jl`: `Experiment`, `bayes_invert`, `garble`, `is_garbling_of`, `garbling_result`,
+- `src/experiments.jl`: `Experiment`, `gaussian_experiment`, `bayes_invert`, `garble`, `is_garbling_of`, `garbling_result`,
   `deficiency`.
-- `src/voi.jl`: `evpi`, `evppi`, `evsi`, `enbs`, `value_with_information`,
+- `src/voi.jl`: `evpi`, `evppi`, `hypothesis_partition`, `two_stage_value`, `evsi`, `enbs`,
+  `value_with_information`,
   `information_can_change_decision`, `robust_evpi`, `robust_evsi` (`RobustVOI.upper_prior`), and the
   stub of `normal_form`, whose method is in `ext/DecisionAnalysisInfluenceDiagramsExt.jl`.
 - `src/voi_sample.jl`: `VOIEstimate`, the methods (`SampleAverage`, `Grouping`, `StrongOakley`,
@@ -178,24 +187,31 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   attitude and multi-attribute utilities), `test_gaussian_process.jl`, `test_standard_errors.jl`
   (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`,
   `test_additions.jl` (separating problem, upper-EVPI prior, the maximality shortcut, sharper
-  constants), `test_validation.jl` and `test_validation_improb.jl` (the cross-language fixtures) and `test_bridge.jl` (the
+  constants), `test_validation.jl` and `test_validation_improb.jl` (the cross-language fixtures),
+  `test_replications.jl` (published analyses, from `test/fixtures/replications/`) and `test_bridge.jl` (the
   influence-diagram extension; its real tests are `test/influence_diagrams/runtests.jl`).
 - `validation/`: the scripts that write the cross-language fixtures (`voi_reference.R`,
   `cvar_reference.R`, `chemo_data.R`, `finite_reference.py`, `improb_reference.py`, `make_sample.jl`),
   `compare_voi.jl`, which prints our estimates beside those of `voi`, `requirements.txt`,
   `requirements-py27.txt` and a README with the versions used and the findings. The Python environments
   are `validation/.venv` and, for `improb` (Python 2.7), `validation/.venv27` (both ignored).
-- `vignettes/NN_name/NN_name.qmd`: fifteen Quarto vignettes (Julia engine), basic to advanced (1 to 10 the
+- `vignettes/NN_name/NN_name.qmd`: twenty Quarto vignettes (Julia engine), 1 to 15 basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
-  multi-attribute utilities on the toy simulator), each rendered to
+  multi-attribute utilities on the toy simulator), and 16 to 20 the replications of published analyses
+  (`NN_replication_*`: Shea et al. 2014, Runge et al. 2011, Eze et al. 2023, Li et al. 2021, Luhede et al.
+  2024; `docs/make.jl` lists them under a heading of their own), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for
   ad hoc summaries; package objects display themselves), `vignettes/_pandoc/`
-  (HTML style, LaTeX preamble). Vignette rules: utility is counted in individuals, never money (for a disease,
-  uninfected − w × infected, shown at w = 0 and 1); every vignette has a no-intervention action as the
-  `baseline` and reports gains over it; examples are ecological and every number is labelled illustrative
-  (in vignette 14, every number not read from the cached table, and nothing is presented as a published
-  result).
+  (HTML style, LaTeX preamble). Vignette rules: utility is in the example's own unit, individuals where no
+  valuation exists (for a disease, uninfected − w × infected, shown at w = 0 and 1) and money where the
+  source provides one, with the unit and its source stated plainly and no cost ever invented (where a paper
+  gives no cost of information, report the break-even cost); every vignette has a no-intervention or
+  status-quo action as the `baseline` and reports gains over it; in vignettes 1 to 15 examples are
+  ecological and every number is labelled illustrative (in vignette 14, every number not read from the
+  cached table, and nothing is presented as a published result); in the replications every input is a
+  table printed in the paper or its supplement, every result is shown beside the published one, and what
+  was not reproduced is said, with the reason.
 - `scripts/render_vignettes.jl` (run-once render) and `scripts/sync_vignettes.jl` (copy to `docs/src/tutorials`).
 
 ## Commands

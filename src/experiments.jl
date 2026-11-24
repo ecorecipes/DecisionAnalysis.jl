@@ -76,6 +76,56 @@ function Experiment(likelihood::AbstractMatrix{T};
                                       cost; kw...)
 end
 
+"""
+    gaussian_experiment(means::AbstractVector{<:Real}, sd::Real; states=nothing,
+                        bins=400, width=8, cost=0)
+
+A measurement with normally distributed error, as a finite [`Experiment`](@ref): under
+state `θ` the observation is `Normal(means[θ], sd)`, and the signal is the bin of a
+regular grid that the observation falls in. The grid has `bins` bins and runs from
+`minimum(means) − width × sd` to `maximum(means) + width × sd`.
+
+`likelihood[z, θ]` is the normal density at the midpoint of bin `z`, normalised so that
+each column sums to one (midpoint rule; the mass beyond `width` standard deviations is
+below `1e-14` at the default). The experiment is therefore a discretised version of
+the continuous measurement, and its [`evsi`](@ref) approaches that of the continuous
+measurement as `bins` grows; check convergence by doubling `bins`. The entries are
+`Float64`, so the result is not exact arithmetic. `sd` must be positive (a measurement
+without error reveals the partition of the states by their means; use
+[`evppi`](@ref)).
+
+This is the experiment behind "learning by doing" with measurement error: `means` is
+the row of the payoff table of the action that is tried, and the observed outcome
+updates the weights of the hypotheses (Runge, Converse and Lyons 2011).
+
+```jldoctest
+julia> e = gaussian_experiment([0.0, 1.0], 0.5; states=[:low, :high], bins=200);
+
+julia> p = DecisionProblem(PayoffTable([:a, :b], [:low, :high], [1.0 0.0; 0.0 1.0]),
+                           [0.5, 0.5]);
+
+julia> round(evsi(p, e); digits=3), evpi(p)
+(0.341, 0.5)
+```
+"""
+function gaussian_experiment(means::AbstractVector{<:Real}, sd::Real; states=nothing,
+                             bins::Integer=400, width::Real=8, cost::Real=0)
+    isempty(means) && throw(ArgumentError("gaussian_experiment needs at least one mean"))
+    all(isfinite, means) || throw(ArgumentError("the means must be finite, got $means"))
+    (isfinite(sd) && sd > 0) ||
+        throw(ArgumentError("the standard deviation must be positive and finite, got $sd"))
+    bins >= 2 || throw(ArgumentError("bins must be at least 2, got $bins"))
+    (isfinite(width) && width > 0) ||
+        throw(ArgumentError("width must be positive and finite, got $width"))
+    lo = Float64(minimum(means)) - width * sd
+    hi = Float64(maximum(means)) + width * sd
+    step = (hi - lo) / bins
+    mids = [lo + (z - 0.5) * step for z in 1:bins]
+    L = [exp(-abs2((x - mu) / sd) / 2) for x in mids, mu in means]
+    L ./= sum(L; dims=1)
+    return Experiment(L; signals=_default_labels("bin", bins), states, cost)
+end
+
 function _space_labels(X::FiniteSpace)
     return ndims(X) == 1 ? copy(only(factors(X)).labels) :
            [Symbol(join(s, "_")) for s in joint_states(X)]

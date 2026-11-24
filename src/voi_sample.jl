@@ -1091,10 +1091,10 @@ The expected net benefit of sampling from an estimated EVSI:
 `population · EVSI − cost`, returned as `(; value, standard_error)` with the standard
 error of the estimate scaled by `population`.
 
-**Only for additive payoffs, and in individuals.** The payoff must be a count of
-individuals in which the study's cost can be stated (animals removed or killed by the
-sampling, for example), and paying it must lower every payoff by the same amount
-whatever the action and the state. There are no monetary costs in this package. When
+**Only for additive payoffs, in the payoff's own unit.** The study's cost must be stated
+in the unit of the payoff (individuals removed or killed by the sampling for a count,
+money where the payoff is a published valuation), and paying it must lower every payoff
+by the same amount whatever the action and the state. Never invent a cost. When
 the cost of a study is not additive in the payoff, it belongs in the outcomes of a
 larger problem that has "run the study" among its actions.
 """

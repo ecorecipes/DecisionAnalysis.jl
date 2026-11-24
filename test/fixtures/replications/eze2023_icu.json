@@ -1,0 +1,63 @@
+{
+  "name": "eze2023_icu",
+  "citation": "Eze PU, Geard N, Baker CM, Campbell PT, Chades I (2023) Value of information analysis for pandemic response: intensive care unit preparedness at the onset of COVID-19. BMC Health Services Research 23:485",
+  "doi": "10.1186/s12913-023-09479-4",
+  "licence": "CC BY 4.0 (article). The authors' repositories github.com/KingPeter2014/VoIAnalysis and github.com/KingPeter2014/VOIProject carry no licence; nothing is copied from them except the numbers their notebook prints, quoted as the authors' results.",
+  "retrieved": "2026-11-23, full text XML from Europe PMC (PMC10182758); notebook VoIAnalysisPaper.ipynb and workbook EVPXIData2.xlsx read (not executed) from the authors' repository at its head commit",
+  "decision": "How many intensive-care beds to add before a COVID-19 outbreak in a notional urban population of 450,000",
+  "unit": "ICU beds: V(a, s) = X(s) - B(a) when the shortfall X(s) exceeds the beds added B(a), and gamma (B(a) - X(s)) otherwise, with 0 <= gamma <= 1 the weight on beds allocated in excess. Lower is better, so payoffs are entered as minus V.",
+  "baseline": "add_0",
+  "actions": ["add_0", "add_50", "add_100", "add_150", "add_200"],
+  "beds_added": [0, 50, 100, 150, 200],
+  "parameters": ["R0", "CS", "CI"],
+  "levels": ["Low", "Medium", "High"],
+  "states_note": "27 scenarios in the order of Table 4: R0 varies slowest, then case severity (CS), then child infectiousness (CI).",
+  "table4": {
+    "provenance": "Table 4 of the article: shortfall in ICU beds X(s), printed as whole numbers (the workbook holds the same column to two decimals, labelled as the upper 95% limit of the simulations)",
+    "shortfall": [0, 0, 0, 0, 0, 0, 0, 0, 345, 0, 0, 0, 0, 29, 74, 552, 1075, 1406, 0, 0, 0, 46, 102, 157, 1389, 1584, 1485]
+  },
+  "beliefs": {
+    "provenance": "Table 3 of the article: marginal probabilities of Low, Medium, High, the same for each of the three parameters, which are independent",
+    "none": ["1/3", "1/3", "1/3"],
+    "low": ["1/2", "1/5", "3/10"],
+    "medium": ["3/10", "1/2", "1/5"],
+    "severe": ["1/5", "3/10", "1/2"]
+  },
+  "gammas": ["0", "1/10", "1/5", "3/10", "2/5", "1/2", "3/5", "7/10", "4/5", "9/10", "1"],
+  "notebook": {
+    "provenance": "Printed output of the authors' notebook (cells 21 and 24: EVPI at gamma = 0, 0.1, ..., 1; cell 41: EVPXI of each scenario at gamma = 1 under the severe belief; cell 28: 'per-parameter EVPI' under the marginal belief (0.2, 0.3, 0.5)). The notebook uses the two-decimal shortfalls, so agreement with Table 4 is to about 0.06 beds.",
+    "tolerance": 0.06,
+    "evpi": {
+      "none": [0.0, 12.88, 25.91, 39.03, 50.63, 57.41, 61.44, 64.12, 65.13, 64.94, 64.81],
+      "low": [0.0, 15.28, 30.63, 42.72, 45.17, 45.11, 45.05, 44.99, 44.93, 44.87, 44.83],
+      "severe": [0.0, 8.21, 16.67, 25.31, 33.94, 42.57, 51.2, 59.83, 68.46, 75.78, 81.78]
+    },
+    "evpi_medium_as_printed": [0.0, 14.47, 28.47, 35.41, 39.26, 41.94, 44.63, 44.25, 43.84, 43.43, 43.1],
+    "medium_note": "The medium belief of the workbook sums to 0.99 (sheet 'Sheet1', cell F21 multiplies the wrong cells: High x High x Medium in place of High x Low x Medium, giving 0.02 where 0.03 is meant); the notebook warns 'Belief in State is not a probability distribution'. With the misprinted cell and no renormalisation the printed curve is reproduced to 0.06 beds; with the proper prior it changes by up to 0.3 beds.",
+    "medium_misprint": {"scenario": 20, "used": "1/50", "intended": "3/100"},
+    "evpxi_severe_gamma1": [1.2, 1.8, 3.0, 1.8, 2.7, 4.5, 3.0, 4.5, 2.5, 1.8, 2.7, 4.5, 2.7, 2.7, 2.32, 1.5, 2.25, 4.81, 3.0, 4.5, 7.5, 3.0, 2.06, 1.06, 2.5, 4.81, 9.81],
+    "parameter": {
+      "collapsed_shortfall": {"CS": ["0", "65.0", "982.89"], "R0": ["30.96", "451.12", "565.82"], "CI": ["265.0057687", "381.8242251", "401.0615308"]},
+      "belief": {"CS": ["33/100", "33/100", "17/50"], "R0": ["1/5", "3/10", "1/2"], "CI": ["1/5", "3/10", "1/2"]},
+      "belief_note": "The notebook lists four beliefs, (0.33, 0.33, 0.34) and then (0.2, 0.3, 0.5) three times, and reads the first for case severity, the second for R0 and the third for child infectiousness; so the case-severity curve of Figure 3 was computed under the near-uniform belief, not the severe one. Under (0.2, 0.3, 0.5) the same collapsed inputs give 76.0 beds at gamma = 1 in place of 67.5 (the notebook also prints that curve, in a later cell).",
+      "evpi": {
+        "CS": [0.0, 9.9, 19.8, 29.7, 39.6, 50.32, 55.78, 60.24, 64.2, 65.85, 67.5],
+        "R0": [0.0, 3.0, 6.0, 9.0, 12.0, 15.0, 18.0, 21.0, 24.0, 27.0, 30.0],
+        "CI": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      },
+      "evpi_CS_under_severe_belief": [0.0, 7.0, 14.0, 21.0, 28.0, 35.75, 43.8, 51.85, 59.9, 67.95, 76.0],
+      "note": "The collapsed shortfalls hard-coded in the notebook are not the unweighted means of Table 4 over the other two parameters (those are 0, 45.3, 870.7 for CS; 38.3, 348.4, 529.2 for R0; 220.8, 310.0, 385.2 for CI); they appear to come from an earlier set of simulations."
+    }
+  },
+  "article_text": {
+    "evpi_none_gamma08": {"value": 65, "tolerance": 0.5, "where": "Results: 'the financial or health cost of 65 ICU beds' at gamma = 0.8", "status": "reproduced (65.1) under the no-prior-knowledge belief"},
+    "evpi_low": {"value": 33, "where": "Results: 'the EVPI of 33 ICU beds for belief in low outbreak'", "status": "not reproduced: Table 4 and the notebook give 44.9 at gamma = 0.8 and at most 45.2 at any gamma on the grid"},
+    "evpi_severe_gamma1": {"value": 91, "where": "Results: 'belief in severe outbreak has the highest EVPI of 91 ICU beds' at gamma = 1", "status": "not reproduced: Table 4 gives 81.8 and the notebook prints 81.78"}
+  },
+  "table5": {
+    "provenance": "Table 5 of the article: EVPXI at gamma = 1 'with a prior strong belief in severe outbreak', by scenario 1 to 27",
+    "evpxi": [0, 0, 0, 0, 0, 0, 0, 0, 4.00, 0, 0, 0, 0, 1.80, 3.8, 4.00, 10.63, 6.40, 0, 0, 0, 1.00, 5.20, 4.90, 1.60, 4.00, 2.40],
+    "status": "not reproduced",
+    "resolution": "Equation 6 as printed puts the minimum inside the sum over the remaining scenarios, which would make every EVPXI equal to the EVPI (81.8). The notebook instead takes the minimum of the expected cost over the remaining scenarios, that is, the EVPPI of the partition {s}, {every other scenario}; under the severe belief of Table 3 that gives the values of notebook cell 41, which we reproduce, not those of Table 5 (in particular 1.2 to 7.5 beds for the scenarios with no shortfall, where Table 5 prints 0, and 2.25 for scenario 17, where it prints 10.63). No belief of Table 3 gives Table 5; the nearest product belief found by search, R0 (0.3, 0.5, 0.2), CS (0.3, 0.5, 0.2), CI (0.2, 0.5, 0.3) at gamma = 0.8, is within 0.63 beds in every row, which suggests that the table was made with an earlier prior."
+  }
+}

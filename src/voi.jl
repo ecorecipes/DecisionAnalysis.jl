@@ -7,6 +7,10 @@
 #   EVPI                      = Σ_θ p(θ) max_a Q[a, θ] − V0
 #   EVPPI(partition)          = Σ_cells max_a Σ_{θ ∈ cell} p(θ) Q[a, θ] − V0
 #
+# `two_stage_value` is derived from these (the largest, over first stages, of the
+# informed value of the problem restricted to that first stage) and has no Lean
+# counterpart of its own.
+#
 # The joint form has no division, so a signal of probability zero contributes zero and
 # needs no special case.
 
@@ -191,6 +195,110 @@ function evppi(problem::DecisionProblem, partition::AbstractVector)
         return maximum(view(Q, :, cols) * view(p, cols))
     end
     return informed - maximum(Q * p)
+end
+
+"""
+    hypothesis_partition(states, hypothesis)
+    hypothesis_partition(problem::DecisionProblem, hypothesis)
+
+The two-cell partition that a perfect test of one hypothesis reveals: the state
+`hypothesis` on its own, and every other state together (labelled `:other`). Passed to
+[`evppi`](@ref) it gives the value of confirming or refuting that hypothesis, with the
+weights of the remaining states kept in proportion when it is refuted. This is the
+quantity that Runge, Converse and Lyons (2011) and Eze et al. (2023) call "EVPXI" for
+a hypothesis; it is an EVPPI over a particular partition, not a new definition, and it
+is not the value of learning one parameter of a state that is a tuple of parameters.
+
+```jldoctest
+julia> p = DecisionProblem(PayoffTable([4 0 0; 1 2 3]), [1 // 2, 1 // 4, 1 // 4]);
+
+julia> hypothesis_partition(p, :s1)
+3-element Vector{Symbol}:
+ :s1
+ :other
+ :other
+
+julia> evppi(p, hypothesis_partition(p, :s1)), evpi(p)
+(5//4, 5//4)
+```
+"""
+function hypothesis_partition(states::AbstractVector, hypothesis)
+    labels = _labels(states)
+    h = Symbol(hypothesis)
+    h in labels ||
+        throw(ArgumentError("the hypothesis $(repr(h)) is not one of the states $labels"))
+    h === :other &&
+        throw(ArgumentError("a state named :other cannot be the hypothesis, because " *
+                            ":other labels the cell of the remaining states"))
+    return Symbol[s === h ? h : :other for s in labels]
+end
+function hypothesis_partition(problem::DecisionProblem, hypothesis)
+    return hypothesis_partition(problem.payoff.states, hypothesis)
+end
+
+"""
+    two_stage_value(problem::DecisionProblem, first_stage::AbstractVector;
+                    partition=nothing)
+
+The value of a two-stage (adaptive) policy in which a first-stage action is chosen on
+the prior, the cell of `partition` that holds the state is then learned, and the
+second-stage action is chosen knowing it.
+
+The actions of `problem` are the complete two-stage courses of action, and
+`first_stage` has one entry per action of the payoff table, in order, naming its
+first-stage component; actions with equal entries share a first stage. With `G` the
+set of first stages,
+
+    value = max_{g ∈ G} Σ_cells max_{a : first_stage[a] = g} Σ_{θ ∈ cell} p(θ) Q[a, θ].
+
+`partition` is as in [`evppi`](@ref); the default is the partition into single states
+(the state is learned exactly after the first stage). The result is a named tuple:
+`value`; `first_stages` and `values`, the value of committing to each first stage;
+`chosen`, every first stage that attains `value`, in order of appearance; `act_now`,
+the value `V0` of the best single course of action that ignores what is learned
+(the best fixed strategy when every fixed strategy is among the actions); and `gain`,
+`value − act_now`. Infeasible actions are left out.
+
+Always `act_now ≤ value ≤ act_now + EVPPI(partition)`: learning after the first stage
+cannot beat learning before it. The share `gain / evppi(problem, partition)` is the
+part of the value of information that the adaptive policy recovers. This is derived
+from the definitions at the top of `src/voi.jl` (it is the largest, over first stages,
+of the informed value of the problem restricted to that first stage). Needs a single
+prior.
+
+```jldoctest
+julia> Q = [-4 -9; -5 -6; -8 -3; -8 -7];   # courses: (a,a), (a,b), (b,b), (b,a)
+
+julia> p = DecisionProblem(PayoffTable([:aa, :ab, :bb, :ba], [:s1, :s2], Q), [1 // 2, 1 // 2]);
+
+julia> r = two_stage_value(p, [:a, :a, :b, :b]);
+
+julia> r.value, r.chosen, r.act_now, r.gain
+(-5//1, [:a], -11//2, 1//2)
+```
+"""
+function two_stage_value(problem::DecisionProblem, first_stage::AbstractVector;
+                         partition::Union{Nothing,AbstractVector}=nothing)
+    m, n = size(problem.payoff)
+    length(first_stage) == m ||
+        throw(ArgumentError("first_stage has $(length(first_stage)) entries for the " *
+                            "$m actions of the payoff table"))
+    cells = partition === nothing ? collect(1:n) : partition
+    length(cells) == n ||
+        throw(ArgumentError("the partition has $(length(cells)) entries for the " *
+                            "$n states of the payoff table"))
+    p = _prior(problem, :two_stage_value)
+    Q = problem.payoff.Q
+    stages = unique(first_stage[problem.feasible])
+    columns = [findall(isequal(c), cells) for c in unique(cells)]
+    values = map(stages) do g
+        rows = findall(i -> problem.feasible[i] && isequal(first_stage[i], g), 1:m)
+        return sum(maximum(view(Q, rows, cols) * view(p, cols)) for cols in columns)
+    end
+    value = maximum(values)
+    act_now = maximum(_feasible_Q(problem) * p)
+    return (; value, first_stages=stages, values, chosen=stages[values .== value], act_now,
+            gain=value - act_now)
 end
 
 """
@@ -435,7 +543,7 @@ information on a payoff table:
 variables the utility depends on. The diagram is evaluated by enumerating its joint
 distribution once per action, so this is for small diagrams, and the numbers are
 floating point, as in InfluenceDiagrams.jl. Utilities are whatever the diagram's
-utility nodes hold; this package itself counts utility in individuals.
+utility nodes hold; this package takes the payoff's unit as given.
 """
 function normal_form(model; kw...)
     throw(MissingExtensionError(:normal_form, :InfluenceDiagrams))
