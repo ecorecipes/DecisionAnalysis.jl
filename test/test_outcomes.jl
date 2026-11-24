@@ -275,12 +275,84 @@ end
         @test old.values[1, :, :, :] == t.values[1, :, :, :]
         @test new.values[1, :, :, :] == t.values[2, :, :, :]
         @test new.values[1, :, :, 3] == old.values[1, :, :, 3]
+        # The stored runs relabelled as the driver labels them, joined with the new
+        # action: the table of one call with both actions.
+        relabelled = OutcomeTable([(; row..., replicate="r$(row.replicate)")
+                                   for row in stored];
+                                  outcomes=[:uninfected, :infected, :first_draw],
+                                  parameters=draws, key=:id)
+        fresh = outcomes(pond, [:fence],
+                         SampleBelief(draws; labels=draws.id); replicates=4,
+                         run_seed=convention)
+        joined = combine_actions(relabelled, fresh)
+        @test action_labels(joined) == [:none, :fence]
+        @test joined.values == t.values && all(==("ok"), joined.status)
+        @test state_labels(joined) == [Symbol(11), Symbol(12), Symbol(13)]
+        @test crn_correlation(joined, IndividualsUtility(:first_draw)) ≈ 1
         # One of `seed` and `run_seed`; integer seeds; no two runs alike.
         @test_throws ArgumentError outcomes(pond, [:none], draws; seed=1,
                                             run_seed=convention)
         @test_throws ArgumentError outcomes(pond, [:none], draws; run_seed=(θ, r) -> 0.5)
         @test_throws ArgumentError outcomes(pond, [:none], draws; replicates=2,
                                             run_seed=(θ, r) -> θ.id)
+    end
+
+    @testset "combining the actions of several tables" begin
+        row(d, a, r; n=10d + r, m=d, status="ok") = (; draw=d, action=a, replicate=r, n,
+                                                     m, status)
+        pars = [(; draw=d, x=d / 2, w=d) for d in 1:3]
+        build(rows; kw...) = OutcomeTable(rows; outcomes=[:n, :m], status=:status,
+                                          parameters=pars, weights=:w, kw...)
+        a = build([row(d, :a, r) for d in 1:3 for r in 1:2])
+        # The second table lists its draws and replicates in another order, records
+        # its outcomes in another order, and has a failed run.
+        brows = [row(d, act, r; n=100d + r, status=(d == 2 && r == 1) ? "crashed" : "ok")
+                 for r in (2, 1) for d in (3, 1, 2) for act in (:b, :c)]
+        b = OutcomeTable(brows; outcomes=[:m, :n], status=:status,
+                         parameters=[(; draw=d, x=d / 2, w=d) for d in (3, 1, 2)],
+                         weights=:w)
+        t = combine_actions(a, b)
+        @test action_labels(t) == [:a, :b, :c] && outcome_names(t) == [:n, :m]
+        @test state_labels(t) == state_labels(a) && draw_weights(t) == draw_weights(a)
+        @test parameter_draws(t) == parameter_draws(a)
+        @test run_counts(t) == (; runs=18, ok=16, failed=2, absent=0)
+        # Against the table built from all the rows at once.
+        whole = build(vcat([row(d, :a, r) for d in 1:3 for r in 1:2],
+                           sort(brows; by=x -> (x.draw, x.replicate))); actions=[:a, :b, :c])
+        @test t.status == whole.status
+        ok = t.status .== "ok"
+        @test all(t.values[:, :, :, k][ok] == whole.values[:, :, :, k][ok] for k in 1:2)
+        @test payoff_table(t, IndividualsUtility(:n)).Q ==
+              payoff_table(whole, IndividualsUtility(:n)).Q
+        @test combine_actions(a).values == a.values
+        # Only the outcomes every table records are kept.
+        c = OutcomeTable([row(d, :c, r) for d in 1:3 for r in 1:2]; outcomes=[:m],
+                         parameters=pars, weights=:w)
+        @test outcome_names(combine_actions(a, c)) == [:m]
+        # What must agree.
+        @test_throws ArgumentError combine_actions(a, a)
+        other(rows; kw...) = OutcomeTable(rows; outcomes=[:n, :m], kw...)
+        @test_throws ArgumentError combine_actions(a, other([row(d, :b, r) for d in 1:2
+                                                             for r in 1:2];
+                                                            parameters=pars[1:2]))
+        @test_throws ArgumentError combine_actions(a, build([row(d, :b, r) for d in 1:3
+                                                             for r in 1:3]))
+        @test_throws ArgumentError combine_actions(a, other([row(d, :b, r) for d in 1:3
+                                                             for r in 1:2];
+                                                            parameters=pars))
+        @test_throws ArgumentError combine_actions(a,
+                                                   other([row(d, :b, r) for d in 1:3
+                                                          for r in 1:2];
+                                                         parameters=[(; draw=d, x=1.0 * d,
+                                                                      w=d) for d in 1:3],
+                                                         weights=:w))
+        @test_throws ArgumentError combine_actions(a,
+                                                   OutcomeTable([(; draw=d, action=:b,
+                                                                  replicate=r, z=1)
+                                                                 for d in 1:3 for r in 1:2];
+                                                                outcomes=[:z],
+                                                                parameters=pars,
+                                                                weights=:w))
     end
 
     @testset "single_replicate of an outcome table" begin

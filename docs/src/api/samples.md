@@ -12,6 +12,7 @@ outcome_names
 replicate_counts
 run_counts
 failed_runs
+combine_actions
 crn_correlation
 ```
 

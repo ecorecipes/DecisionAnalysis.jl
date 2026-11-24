@@ -305,6 +305,74 @@ function failed_runs(t::OutcomeTable)
             if t.status[a, d, r] != _OK && t.status[a, d, r] != _ABSENT]
 end
 
+"""
+    combine_actions(tables::OutcomeTable...) -> OutcomeTable
+
+One outcome table with the actions of several, for runs of the **same draws and
+replicates** made at different times: a stored table and the runs of new actions.
+The tables must have the same draws (labels and weights) and the same replicates
+(labels), in any order, and no action in common; the parameters they both carry
+must agree. The result has the draws, replicates, parameters and weights of the
+first table, the actions of all of them in order, and the outcomes that every table
+records, in the order of the first. Failed and absent runs keep their status.
+
+Nothing here can check that replicate `r` of a draw used the same random numbers in
+every table. It did when the runs were seeded by one rule: the same `seed`, or the
+same `run_seed`, in every call of [`outcomes`](@ref), or a `run_seed` that is the
+rule by which the stored runs were made. Only then is the difference between two
+actions of the combined table free of the noise that common random numbers remove,
+and [`crn_correlation`](@ref) reports what was achieved.
+
+```jldoctest
+julia> runs(a, shift) = [(; draw=d, action=a, replicate=r, frogs=10d + r + shift)
+                         for d in 1:2 for r in 1:3];
+
+julia> stored = OutcomeTable(runs("none", 0); outcomes=[:frogs]);
+
+julia> t = combine_actions(stored, OutcomeTable(runs("fence", 2); outcomes=[:frogs]));
+
+julia> action_labels(t), run_counts(t).ok
+([:none, :fence], 12)
+```
+"""
+function combine_actions(first::OutcomeTable, rest::OutcomeTable...)
+    values, status, actions = first.values, first.status, copy(first.actions)
+    names = copy(first.outcomes)
+    for t in rest
+        names = [o for o in names if o in t.outcomes]
+    end
+    isempty(names) && throw(ArgumentError("the tables record no outcome in common"))
+    pick(t) = t.values[:, :, :, [findfirst(==(o), t.outcomes) for o in names]]
+    values = pick(first)
+    for (k, t) in enumerate(rest)
+        which = "table $(k + 1)"
+        sort(t.draws) == sort(first.draws) ||
+            throw(ArgumentError("$which does not have the draws of the first: " *
+                                "$(symdiff(t.draws, first.draws)) are in one only"))
+        sort(t.replicates) == sort(first.replicates) ||
+            throw(ArgumentError("$which does not have the replicates of the first " *
+                                "($(first.replicates)): it has $(t.replicates)"))
+        shared = intersect(actions, t.actions)
+        isempty(shared) ||
+            throw(ArgumentError("$which repeats the actions $shared; drop them from " *
+                                "one table, since a run cannot be in the table twice"))
+        d = [findfirst(==(l), t.draws) for l in first.draws]
+        r = [findfirst(==(l), t.replicates) for l in first.replicates]
+        t.weights[d] == first.weights ||
+            throw(ArgumentError("$which gives the draws other weights than the first"))
+        for name in intersect(keys(first.parameters), keys(t.parameters))
+            isequal(t.parameters[name][d], first.parameters[name]) ||
+                throw(ArgumentError("$which has other values of the parameter $name " *
+                                    "than the first, so its draws are not the same"))
+        end
+        values = cat(values, pick(t)[:, d, r, :]; dims=1)
+        status = cat(status, t.status[:, d, r]; dims=1)
+        append!(actions, t.actions)
+    end
+    return OutcomeTable(copy(first.draws), actions, names, copy(first.replicates), values,
+                        status, first.parameters, copy(first.weights))
+end
+
 function Base.show(io::IO, t::OutcomeTable)
     c = run_counts(t)
     return print(io, "OutcomeTable(", length(t.draws), " draws × ", length(t.actions),
@@ -386,8 +454,9 @@ type of `prob`: each run is
   `Xoshiro`. It is called once per draw and replicate, so the random numbers are
   still common to the actions. Use it when runs of the same model made elsewhere (a
   stored table, an earlier call) seeded their generators by a rule of their own, so
-  that new runs share random numbers with them and the two can be put in one table:
-  an action then differs from a stored one by the action alone. The function must
+  that new runs share random numbers with them and the two can be put in one table
+  ([`combine_actions`](@ref)): an action then differs from a stored one by the
+  action alone. The function must
   be deterministic and should give different seeds to different runs; two runs with
   the same seed throw an `ArgumentError`, because their outcomes would be copies and
   not replicates. Give `seed` or `run_seed`, not both.

@@ -81,6 +81,7 @@ export AbstractBelief, PointBelief, FiniteBelief, SampleBelief, CredalSet, Scena
        effective_sample_size
 # Outcome tables, adapter verbs and utilities
 export OutcomeTable, outcomes, outcome_names, replicate_counts, run_counts, failed_runs,
+       combine_actions,
        with_parameters, apply_action, simulate, outcome, parameter_draws, draw_weights,
        AbstractUtility, IndividualsUtility, InfectionUtility, FunctionUtility,
        payoff_table, single_replicate, crn_correlation, LinearUtility,

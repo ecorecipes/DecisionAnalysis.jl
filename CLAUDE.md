@@ -129,7 +129,8 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   (`run_counts`, `failed_runs`) and left out of means. `outcomes` seeds the run of `(draw, replicate)`
   identically for every action (common random numbers); every random number is a seeded `Xoshiro`. With
   `run_seed = (θ, r) -> integer` the seed of a run comes from the model's own convention instead of
-  `seed`, so that new runs share random numbers with runs stored elsewhere.
+  `seed`, so that new runs share random numbers with runs stored elsewhere; `combine_actions` joins the
+  tables of the same draws and replicates (it cannot check the seeds, and its docstring says so).
 
 ## Layout
 
