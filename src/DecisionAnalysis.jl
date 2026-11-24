@@ -125,7 +125,9 @@ export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Groupi
        TwoArmBinomialStudy, NormalStudy, simulate_study, study_loglikelihood,
        study_posterior, variance_reduction_table, equivalent_binomial_sample_size,
        population_value, enbs_curve, optimal_sample_size, regression_check,
-       compare_regressions,
+       compare_regressions, ScenarioAxis, decision_axis, uncertainty_axis, ScenarioDesign,
+       design_class, scenarios, design_actions, design_draws, design_belief,
+       fractional_design, factor_effects, scenario_forecast, decision_robustness,
        expected_utility_estimates, expected_gain_estimates, conditional_problem
 # Sensitivity
 export policy_regions, one_way_thresholds, weight_sweep, rank_reversals
@@ -167,6 +169,7 @@ include("solve.jl")
 include("fidelity.jl")
 include("design.jl")
 include("estimation.jl")
+include("scenarios.jl")
 include("report.jl")
 include("certificates.jl")
 include("show.jl")

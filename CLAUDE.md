@@ -202,6 +202,11 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   (`expected_variance_reduction` with a study, `variance_reduction_table`,
   `equivalent_binomial_sample_size`), `population_value`, `enbs_curve`, `optimal_sample_size`, and the
   checks `regression_check` and `compare_regressions` (cross-validation by zero weights).
+- `src/scenarios.jl`: scenario designs after Runge et al. (2024): `ScenarioAxis` (a decision or an
+  uncertainty, stated, never guessed), `ScenarioDesign` with its class and checked purpose, `scenarios`,
+  `design_actions`, `design_draws`, `design_belief` (a `ScenarioSet` unless every uncertainty axis has
+  probabilities), `DecisionProblem(design, table, utility)`, `fractional_design`, `factor_effects`,
+  `scenario_forecast` and `decision_robustness`.
 - `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `weight_sweep`, `rank_reversals`.
 - `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
