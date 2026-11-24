@@ -15,6 +15,7 @@ else in the package: utilities are counted in individuals.
 | Quantity | Reference | Script | Fixture |
 |:--|:--|:--|:--|
 | EVPI; EVPPI by Strong and Oakley, Sadatsafavi, generalised additive model, Gaussian process; EVSI by regression and importance sampling | R `voi` 1.0.3 (with `mgcv` 1.9.4) | `voi_reference.R` | `test/fixtures/voi/voi_reference.json`, on the draws of `test/fixtures/voi/normal_sample.csv` (written by `make_sample.jl`) |
+| EVPPI by multivariate adaptive regression splines (`earth`); EVSI by moment matching; the variance-based measures `evppivar` and `evsivar`; `pop_voi`, `enbs` and `enbs_opt` | R `voi` 1.0.3 (with `earth` 5.3.6) | `voi_extra_reference.R` | `test/fixtures/voi/voi_extra_reference.json`, on the same draws; read by `test/test_voi_methods.jl` |
 | CVaR and quantile | R `cvar` 0.6.1 | `cvar_reference.R` | `test/fixtures/validation/cvar_reference.json` |
 | Maximin, maximax, Hurwicz, Laplace, minimax regret, expected utility and regret, EVPI, EVSI, quantile (exact) | textbook definitions written independently in Python with `fractions.Fraction` | `finite_reference.py` | `test/fixtures/validation/finite_reference.json` |
 | CVaR (Rockafellar-Uryasev programme), lower and upper expectations, E-admissibility, maximality, interval dominance, the garbling test, Le Cam's deficiency, the upper EVPI envelope | `scipy.optimize.linprog` (HiGHS), from formulations written independently of `src/programs.jl` | `finite_reference.py` | the same file |
@@ -25,7 +26,7 @@ The finite checks run on the three worked examples of
 
 ## Versions used
 
-- R 4.6.0 (2026-04-24), `voi` 1.0.3, `mgcv` 1.9.4, `cvar` 0.6.1, `jsonlite` 2.0.0.
+- R 4.6.0 (2026-04-24), `voi` 1.0.3, `mgcv` 1.9.4, `earth` 5.3.6, `cvar` 0.6.1, `jsonlite` 2.0.0.
 - Python 3.9.6, `numpy` 2.0.2, `scipy` 1.13.1 (`requirements.txt`).
 - Python 2.7.15 (conda-forge, `osx-64`, under Rosetta on Apple silicon), `improb` 0.1.1,
   `pycddlib` 1.0.4 (its bundled cddlib, built against conda-forge `gmp` 6.3.0 with
@@ -41,6 +42,7 @@ From the package root:
 Rscript -e 'install.packages(c("voi", "cvar", "jsonlite"), repos = "https://cloud.r-project.org")'
 julia validation/make_sample.jl          # only to regenerate the shared draws
 Rscript validation/voi_reference.R       # about half a minute
+Rscript validation/voi_extra_reference.R # a few seconds
 Rscript validation/cvar_reference.R
 
 # Python: a local virtual environment (ignored by git)
@@ -301,8 +303,29 @@ What the comparisons found:
 4. **EVSI** estimates differ by Monte Carlo error only: each side simulates its own
    data. All are within about one standard error of each other and of the closed forms.
    `voi` has no Gaussian approximation in the sense of Jalal and Alarid-Escudero; ours
-   is compared with `voi`'s regression value and the closed form. `voi`'s moment
-   matching (`mm`) is not implemented here and was not compared.
+   is compared with `voi`'s regression value and the closed form. Moment matching
+   (`mm`) uses its own nested sample on each side, so the two differ by Monte Carlo
+   error: on the shared draws, for 10 and 100 observations of `p1` (closed forms 0.0723
+   and 0.0821), ours gave 0.0696 (standard error 0.0062) and 0.0758 (0.0056), and `voi`
+   0.0929 and 0.0658 with the same number of nested data sets (30).
+7. **Multivariate adaptive regression splines.** Ours places knots on a grid of
+   weighted quantiles and `earth` at any draw, and the two were written independently,
+   yet on the shared draws they agree to the third decimal: EVPPI of `p1` 0.06427
+   against 0.06448, of `p2` 0.35674 against 0.35677, of both 0.44106 against 0.44106.
+8. **Estimation.** The variance-based measures agree with `voi`'s: expected reduction
+   in the variance of `p1 − p2` from learning `p1`, 0.997 against 0.989 (closed form
+   1), from learning `p2`, 3.958 against 3.958 (closed form 4), and from 10 and 100
+   observations of `p1`, 0.873 and 0.975 against 0.895 and 0.984 (closed forms 0.909
+   and 0.990; each side simulates its own data).
+9. **Net benefit of sampling.** `enbs_curve` reproduces `voi::enbs` to rounding (ENBS,
+   its standard deviation from the costs, the probability that the study is worth its
+   cost) and `optimal_sample_size` its optimum and near-optimal range. `voi` reads a
+   95% interval for a cost as four standard deviations wide, and so do we. One
+   difference is deliberate: at a zero discount rate `pop_voi` returns value ×
+   population, and `population_value` returns value × population × horizon, the limit
+   of the discounted formula as the rate goes to zero. The smoothed optimum uses a
+   regression spline here and `mgcv` there, and agrees to within the flat top of the
+   curve.
 5. **A weakness of our Gaussian process, found while writing a vignette and fixed.** On
    a five-parameter example the search for the hyperparameters settled on length scales
    shorter than the spacing of the points. Such a process is independent noise at the
@@ -338,7 +361,9 @@ What the comparisons found:
   `robust_evsi`), the risk-attitude and multi-attribute utilities, `voi_profile` and
   `optimal_design` have no counterpart in the packages above; they are tested against
   explicit oracles in the test suite only.
-- `voi`'s chemotherapy EVSI examples and its `earth`, `bart` and `inla` regressions.
+- `voi`'s chemotherapy EVSI examples and its `bart` and `inla` regressions, which are
+  not implemented here (INLA is an R package; the built-in Gaussian process serves the
+  same case).
 
 ### Published analyses not replicated
 

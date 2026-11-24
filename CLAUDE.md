@@ -9,7 +9,7 @@ simulator runs. The Catlab-free core of the decision layer of the ecorecipes eco
 Model packages produce outcomes; this package analyses the payoff table they give. It depends on
 FiniteKernels (finite spaces, kernels and states) through a `[sources]` URL
 (the Lean project in `proofs/` still path-requires the sibling clone `../FiniteKernels.jl`), on `JuMP` (to state linear programmes; never on a solver), and on `LinearAlgebra`,
-`Random`, `Statistics` and `Tables`. FiniteKernels brings
+`Logging`, `Random`, `Statistics` and `Tables`. FiniteKernels brings
 ResilienceCore and StructuredPopulationCore; Pkg does not follow the `[sources]` of a URL dependency, so
 both are listed in `[deps]` and `[sources]` here although the code never loads them (Aqua is told so).
 Keep every `[sources]` entry a URL, in this file and in the docs, vignette and test environments. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
@@ -90,6 +90,18 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   EVPI of the same sample by more than twice the standard error) logs a warning and adds a note to the
   report. Cell-mean methods never raise it. `Grouping()` without `bins` throws on a floating-point
   parameter that makes most draws cells of their own.
+- **The R package `voi` is GPL-3 and this package is MIT: nothing is translated from its source.** The
+  methods that follow it (`docs/src/api/methods.md` has the table of correspondences) are written from the
+  published papers and its documented behaviour, and compared with it numerically through
+  `validation/voi_extra_reference.R` and `test/fixtures/voi/voi_extra_reference.json`. Not available:
+  the INLA/SPDE Gaussian process (INLA is an R package) and BART. Two deliberate differences:
+  `population_value` at a zero discount rate is value × population × horizon (the limit of the formula;
+  `pop_voi` returns value × population), and `MARSRegression` takes knots from a grid of quantiles.
+- **A model-based estimator needs the function the table was made from.** `MomentMatching` and
+  `evppi_nested` take `payoffs(θ)`; for `MomentMatching` it must return the payoffs of the feasible actions
+  in the problem's order and reproduce the payoff table, and the non-focal parameters are drawn from the
+  draws independently of the focal ones. Its standard error covers the draws and the nested data sets
+  (jackknife), not the approximation.
 - **A non-linear utility is applied to each run before anything is averaged** (`_run_utilities`), and
   its expected utility is not a count of individuals; `certainty_equivalent` returns to individuals. A
   test holds `InfectionUtility` equal to the `AdditiveUtility` with unscaled counts.
@@ -176,7 +188,20 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - `src/gaussian_process.jl`: `GaussianProcessRegression`, a small internal Gaussian process (linear mean,
   squared-exponential kernel, nugget, hyperparameters by marginal likelihood with a deterministic
   Nelder-Mead search, seeded subsamples), for five or more focal parameters.
+- `src/mars.jl`: `MARSRegression`, multivariate adaptive regression splines written from Friedman (1991):
+  greedy pairs of hinges at a grid of weighted quantiles, pruned by generalised cross-validation, one basis
+  for all actions.
+- `src/studies.jl`: the built-in study designs `BinomialStudy`, `TwoArmBinomialStudy`, `NormalStudy` with
+  `simulate_study`, `study_loglikelihood`, `study_posterior` (conjugate), and the constructors of
+  `SummaryStatistics` and `ImportanceSampling` from a design. Small internal samplers (binomial, gamma,
+  beta), so that no distributions package is needed.
+- `src/voi_model.jl`: the estimators that run the model: `evppi_nested` (two-level Monte Carlo) and
+  `MomentMatching` with its `evsi` method.
 - `src/design.jl`: `voi_profile`, `expected_variance_reduction`, `optimal_design`.
+- `src/estimation.jl`: value of information for estimation from a `SampleBelief` alone
+  (`expected_variance_reduction` with a study, `variance_reduction_table`,
+  `equivalent_binomial_sample_size`), `population_value`, `enbs_curve`, `optimal_sample_size`, and the
+  checks `regression_check` and `compare_regressions` (cross-validation by zero weights).
 - `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `weight_sweep`, `rank_reversals`.
 - `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
@@ -201,7 +226,8 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   attitude and multi-attribute utilities), `test_gaussian_process.jl`, `test_standard_errors.jl`
   (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`,
   `test_additions.jl` (separating problem, upper-EVPI prior, the maximality shortcut, sharper
-  constants), `test_validation.jl` and `test_validation_improb.jl` (the cross-language fixtures),
+  constants), `test_voi_methods.jl` (the methods that follow `voi`: closed forms of its normal model,
+  explicit loops, and the fixture `voi_extra_reference.json`), `test_validation.jl` and `test_validation_improb.jl` (the cross-language fixtures),
   `test_replications.jl` (published analyses, from `test/fixtures/replications/`) and `test_bridge.jl` (the
   influence-diagram extension; its real tests are `test/influence_diagrams/runtests.jl`).
 - `validation/`: the scripts that write the cross-language fixtures (`voi_reference.R`,
@@ -237,6 +263,7 @@ DECISIONANALYSIS_LEAN=1 julia --project -e 'using Pkg; Pkg.test()'   # also run 
 DECISIONANALYSIS_R=1 julia --project -e 'using Pkg; Pkg.test()'      # also compare with voi's chemotherapy example (needs Rscript and the R package voi)
 DECISIONANALYSIS_ID=1 julia --project -e 'using Pkg; Pkg.test()'     # also run the influence-diagram bridge tests in their own environment
 Rscript validation/voi_reference.R && Rscript validation/cvar_reference.R   # rewrite the R fixtures
+Rscript validation/voi_extra_reference.R                                    # the fixture of the later methods (needs earth)
 validation/.venv/bin/python validation/finite_reference.py           # rewrite the Python fixture (see validation/README.md)
 validation/.venv27/bin/python validation/improb_reference.py         # rewrite the improb fixture (Python 2.7; after finite_reference.py)
 julia scripts/render_vignettes.jl [NN ...] [--no-execute]         # vignettes: code runs once (quarto to gfm), then pandoc makes HTML and PDF from the .md

@@ -31,6 +31,7 @@ pages = Any["Home" => "index.md", "Certificates" => "certificates.md",
                                 "Aggregators, regret and rules" => "api/rules.md",
                                 "Experiments and exact value of information" => "api/information.md",
                                 "Sample-based analysis" => "api/samples.md",
+                                "Model-based methods, study designs and estimation" => "api/methods.md",
                                 "Risk attitude and multi-attribute utilities" => "api/utilities.md",
                                 "Linear programmes, reports, certificates and exceptions" => "api/programmes.md"]]
 tutorials = tutorial_pages()

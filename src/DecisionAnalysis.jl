@@ -64,9 +64,10 @@ module DecisionAnalysis
 using JuMP: JuMP
 using FiniteKernels: FiniteKernels, FiniteKernel, FiniteSpace, axis_names, factors,
                      joint_states, kernel_matrix
-using LinearAlgebra: ColumnNorm, Symmetric, cholesky, dot, eigen, issuccess, logdet, qr
+using LinearAlgebra: ColumnNorm, Symmetric, cholesky, dot, eigen, issuccess, logdet, qr, tr
 using Random: AbstractRNG, Xoshiro, randn!, shuffle!
 using Statistics: mean
+using Logging: NullLogger, with_logger
 using Tables: Tables
 
 # Exceptions (ADR 0013)
@@ -117,9 +118,14 @@ export act_now_value, value_with_information, evpi, evppi, hypothesis_partition,
 # Sample-based value of information
 export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Grouping,
        StrongOakley, Sadatsafavi, SplineRegression, GAMRegression,
-       GaussianProcessRegression,
+       GaussianProcessRegression, MARSRegression,
        fitted_conditional_means, SummaryStatistics, ImportanceSampling,
        importance_loglikelihoods, GaussianApproximation, variance_components,
+       evppi_nested, MomentMatching, AbstractStudyDesign, BinomialStudy,
+       TwoArmBinomialStudy, NormalStudy, simulate_study, study_loglikelihood,
+       study_posterior, variance_reduction_table, equivalent_binomial_sample_size,
+       population_value, enbs_curve, optimal_sample_size, regression_check,
+       compare_regressions,
        expected_utility_estimates, expected_gain_estimates, conditional_problem
 # Sensitivity
 export policy_regions, one_way_thresholds, weight_sweep, rank_reversals
@@ -152,11 +158,15 @@ include("experiments.jl")
 include("voi.jl")
 include("voi_sample.jl")
 include("gaussian_process.jl")
+include("mars.jl")
+include("studies.jl")
+include("voi_model.jl")
 include("sensitivity.jl")
 include("programs.jl")
 include("solve.jl")
 include("fidelity.jl")
 include("design.jl")
+include("estimation.jl")
 include("report.jl")
 include("certificates.jl")
 include("show.jl")
