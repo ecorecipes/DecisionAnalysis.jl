@@ -24,6 +24,8 @@ Simon Frost
   EVSI](#the-value-of-a-survey-before-the-decision-evsi)
   - [Sensitivity to the assay scales and the
     design](#sensitivity-to-the-assay-scales-and-the-design)
+- [An action the cached table does not
+  hold](#an-action-the-cached-table-does-not-hold)
 - [The report](#the-report)
 - [What to take away](#what-to-take-away)
 
@@ -61,49 +63,32 @@ the decision.
 
 ``` julia
 using DecisionAnalysis
-using Chytridiomycosis: Chytridiomycosis, DrawertIBMProblem, DrawertParameters, SurveyObservation,
-                        SurveyPond, drawert_run_seed, load_drawert_decisions, simulate_survey,
+using Chytridiomycosis: Chytridiomycosis, DrawertIBMProblem, DrawertIntervention, DrawertParameters,
+                        SurveyObservation, SurveyPond, drawert_outcome_table, drawert_run_seed,
+                        load_drawert_decision_draws, load_drawert_decisions, simulate_survey,
                         survey_loglikelihood
 using Random: Xoshiro
 include(joinpath("..", "_common.jl"))
 
+table = drawert_outcome_table()
+```
+
+    OutcomeTable(100 draws × 10 actions × 30 replicates; outcomes survivors, uninfected, infected, uninfected_d120, infected_d120, uninfected_d365, infected_d365, initial_frogs, handled, treatment_deaths; 30000 runs ok, 0 failed, 0 absent)
+
+`Chytridiomycosis.jl` knows nothing of this package unless both are
+loaded; then a small extension inside it (its adapter) gives the stored
+runs as an `OutcomeTable`, with the parameters of the draws and their
+sampling weights. Runs with a failing status would be kept and counted;
+this table has none. Two sections below also read the rows themselves,
+one named tuple per run and per draw:
+
+``` julia
 runs = load_drawert_decisions()
-(rows=length(runs), columns=keys(first(runs)))
+draws = load_drawert_decision_draws()
+(rows=length(runs), columns=keys(first(runs)), draw=first(draws))
 ```
 
-    (rows = 30000, columns = (:draw_id, :group, :variant, :action, :kind, :day, :fraction, :replicate, :seed, :surviving_fraction, :survivors, :outcome, :first_loss, :frogs_at_intervention, :applied, :handled, :treatment_deaths, :initial_frogs, :uninfected, :infected, :uninfected_d120, :infected_d120, :uninfected_d365, :infected_d365, :status, :seconds))
-
-One row per run. The parameters of the draws, with their sampling
-weights, are in a second file, read here with a few lines because it is
-a plain CSV:
-
-``` julia
-function read_draws(path)
-    lines = readlines(path)
-    names = Tuple(Symbol.(split(lines[1], ',')))
-    return map(lines[2:end]) do line
-        v = split(line, ',')
-        return NamedTuple{names}((parse(Int, v[1]), String(v[2]), parse.(Float64, v[3:end])...))
-    end
-end
-draws = read_draws(joinpath(pkgdir(Chytridiomycosis), "data", "drawert2017", "decision_draws.csv"))
-first(draws)
-```
-
-    (draw_id = 37, group = "A", N = 62.0, γ = 5.73927902388375e-5, η = 17.8777834423818, ν0 = 0.0862707584165037, f = 0.530253593111411, σ0 = 0.478287360817194, μ = 1.03837436286965, load_growth_rate = 0.341402, weight = 32.23255813953488)
-
-The run table goes into an `OutcomeTable` by naming its columns. Runs
-with a failing status would be kept and counted; this table has none.
-
-``` julia
-table = OutcomeTable(runs; draw=:draw_id, action=:action, replicate=:replicate,
-                     outcomes=[:survivors, :uninfected, :infected, :uninfected_d120,
-                               :infected_d120, :uninfected_d365, :infected_d365,
-                               :initial_frogs, :handled],
-                     status=:status, parameters=draws, key=:draw_id, weights=:weight)
-```
-
-    OutcomeTable(100 draws × 10 actions × 30 replicates; outcomes survivors, uninfected, infected, uninfected_d120, infected_d120, uninfected_d365, infected_d365, initial_frogs, handled; 30000 runs ok, 0 failed, 0 absent)
+    (rows = 30000, columns = (:draw_id, :group, :variant, :action, :kind, :day, :fraction, :replicate, :seed, :surviving_fraction, :survivors, :outcome, :first_loss, :frogs_at_intervention, :applied, :handled, :treatment_deaths, :initial_frogs, :uninfected, :infected, :uninfected_d120, :infected_d120, :uninfected_d365, :infected_d365, :status, :seconds), draw = (draw_id = 37, group = "A", N = 62, γ = 5.73927902388375e-5, η = 17.8777834423818, ν0 = 0.0862707584165037, f = 0.530253593111411, σ0 = 0.478287360817194, μ = 1.03837436286965, load_growth_rate = 0.341402, weight = 32.23255813953488))
 
 ``` julia
 run_counts(table)
@@ -296,7 +281,7 @@ plt = Plots.bar(String.(actions[order]), [Float64(gain[i].value) for i in order]
 png_figure(plt)
 ```
 
-![](14_bd_epizootic_response_files/figure-commonmark/cell-11-output-1.png)
+![](14_bd_epizootic_response_files/figure-commonmark/cell-10-output-1.png)
 
 ## By group
 
@@ -621,7 +606,7 @@ end
 png_figure(plt)
 ```
 
-![](14_bd_epizootic_response_files/figure-commonmark/cell-25-output-1.png)
+![](14_bd_epizootic_response_files/figure-commonmark/cell-24-output-1.png)
 
 ## The value of perfect information, in frogs
 
@@ -643,6 +628,9 @@ regression = evpi(DecisionProblem(problem.payoff,
                   linear)
 (noise_correlation_between_actions=rho,)
 ```
+
+    ┌ Warning: The evpi estimate by SplineRegression, 3.50015, is above the EVPI of the same sample, 1.64364, by more than twice its standard error. No information is worth more than perfect information, so the fitted values are not conditional means here (too few draws for the fit, or a misspecified regression) and the estimate should not be used. The standard error does not show this. Use fewer knots or parameters, StrongOakley() or Grouping(; bins), or more draws.
+    └ @ DecisionAnalysis ~/Projects/decisiontheory/DecisionAnalysis.jl/src/voi_sample.jl:623
 
     (noise_correlation_between_actions = 0.3046910749975807,)
 
@@ -927,6 +915,100 @@ few of them, and assay scales measured for the system at hand.
 `enbs` is not used here: a survey’s cost would have to be stated in
 frogs, additively, and swabbing does not kill frogs in this model.
 
+## An action the cached table does not hold
+
+Every analysis above is confined to the ten actions that were run in
+advance. Early cleaning is the best of them, and its gain shrinks with
+delay, which raises a question the table cannot answer: is a second
+cleaning worth making? The adapter answers it without rerunning anything
+that is stored. `drawert_outcome_table(; actions)` runs the new action
+at the same 100 draws, 30 times each, **with the seeds of the stored
+runs** (`run_seed` of `outcomes`), and joins the result to the stored
+table (`combine_actions`). A new run is then the stored run of the same
+draw and replicate up to the first day on which the two actions differ,
+so the comparison with a stored action has common random numbers, as the
+comparisons among stored actions have.
+
+The new action cleans 75% of the frogs on day 14 and again on day 28.
+This is 3,000 runs of a year of the model, about half an hour on one
+core. *The runs below are ours and new; they are not in the cached
+table.*
+
+``` julia
+two_cleans = [DrawertIntervention(:clean_frogs, 14, 0.75),
+              DrawertIntervention(:clean_frogs, 28, 0.75)]
+extended = drawert_outcome_table(; actions=["clean_frogs_d14_d28_f75" => two_cleans])
+```
+
+    OutcomeTable(100 draws × 11 actions × 30 replicates; outcomes survivors, uninfected, infected, uninfected_d120, infected_d120, uninfected_d365, infected_d365, initial_frogs, handled, treatment_deaths; 33000 runs ok, 0 failed, 0 absent)
+
+``` julia
+shown = [:none, :clean_frogs_d14_f75, :clean_frogs_d28_f75, :clean_frogs_d14_d28_f75]
+estimates(utility, baseline) =
+    filter(e -> e.action in shown,
+           expected_utility_estimates(DecisionProblem(payoff_table(extended, utility; baseline),
+                                                      belief)))
+over_none = estimates(survivors, :none)
+over_one = estimates(survivors, :clean_frogs_d14_f75)
+handled = estimates(IndividualsUtility(:handled), nothing)
+md_table(["action", "gain over no intervention", "error: simulation only",
+          "error: draws as a sample", "gain over one clean on day 14",
+          "error: draws as a sample ", "frogs handled"],
+         [[a.action, Float64(a.value), a.simulation_error, a.standard_error, Float64(b.value),
+           b.standard_error, Float64(h.value)]
+          for (a, b, h) in zip(over_none, over_one, handled)])
+```
+
+| action | gain over no intervention | error: simulation only | error: draws as a sample | gain over one clean on day 14 | error: draws as a sample | frogs handled |
+|:---|---:|---:|---:|---:|---:|---:|
+| `none` | 0 | 0 | 0 | -4.94 | 1.46 | 0 |
+| `clean_frogs_d14_f75` | 4.94 | 0.34 | 1.46 | 0 | 0 | 69.17 |
+| `clean_frogs_d28_f75` | 3.57 | 0.31 | 0.97 | -1.37 | 0.92 | 64.88 |
+| `clean_frogs_d14_d28_f75` | 9.96 | 0.44 | 2.38 | 5.02 | 1.33 | 125.5 |
+
+The rows of the stored actions are the numbers of the tables above:
+nothing stored was run again. Under the design weights the second
+cleaning adds about five survivors per pond to the five of the first,
+and the difference between two cleanings and one is about four of its
+standard errors, a comparison made run by run against stored runs with
+the same seeds. The price is in the last column: nearly twice as many
+frogs caught and treated. No cost per frog handled is assumed here, so
+the two columns are shown side by side and not combined.
+
+By group, the second cleaning does most where the first already did
+most:
+
+``` julia
+extended_problem = DecisionProblem(extended, survivors; baseline=:none)
+by_group_extended = gain_over_baseline(conditional_problem(extended_problem, :group))
+keep = [findfirst(==(a), action_labels(by_group_extended)) for a in shown]
+labelled_table("gain over no intervention", shown, state_labels(by_group_extended),
+               by_group_extended.Q[keep, :]; digits=2)
+```
+
+| gain over no intervention |  `A` |   `B` |   `C` |  `D` |  `E` |
+|:--------------------------|-----:|------:|------:|-----:|-----:|
+| `none`                    |    0 |     0 |     0 |    0 |    0 |
+| `clean_frogs_d14_f75`     | 3.58 | 23.47 | 12.06 | 0.88 |  0.3 |
+| `clean_frogs_d28_f75`     | 1.82 | 17.26 | 13.76 | 0.41 |  0.3 |
+| `clean_frogs_d14_d28_f75` | 7.45 |  52.2 | 21.86 | 0.94 | 0.84 |
+
+Adding an action changes the value of information as well as the choice.
+With the eleventh action the plain EVPI falls, because one action is now
+best at more of the draws and there is less to gain from knowing which
+draw the pond is:
+
+``` julia
+(evpi_ten_actions=evpi(problem), evpi_eleven_actions=evpi(extended_problem),
+ chosen=decide(extended_problem, MaxExpectedUtility()).chosen)
+```
+
+    (evpi_ten_actions = 1.6436409610362723, evpi_eleven_actions = 0.8775775004094442, chosen = [:clean_frogs_d14_d28_f75])
+
+The sections above are left on the ten stored actions: they are the
+analysis of the cached table, and this section shows how to go beyond
+it.
+
 ## The report
 
 ``` julia
@@ -1095,6 +1177,9 @@ About the problem, under the stated assumptions (all illustrative):
 - Under the design weights, **treating the frogs early (day 14) is the
   best single action**: about five more survivors per pond than no
   intervention, from an expected seventeen. The gain shrinks with delay.
+- **A second treatment on day 14 and again on day 28**, an action that
+  is not in the cached table and was run for this vignette, gains about
+  ten, for nearly twice as many frogs handled.
 - **Culling loses frogs** on every utility that counts survivors. It
   shows a gain only when infected frogs are counted against (w = 1)
   part-way through the epidemic, and that gain is flattered by pulses
@@ -1114,8 +1199,10 @@ About the problem, under the stated assumptions (all illustrative):
 
 About the package:
 
-- A table of runs from another package becomes an `OutcomeTable` by
-  naming its columns; the model package knows nothing of this one.
+- The model package gives its stored runs as an `OutcomeTable` through
+  an adapter of its own, loaded only when this package is; a new action
+  is run with the stored seeds and joined to them (`combine_actions`),
+  so it shares random numbers with the stored ones.
 - Standard errors are reported beside every value, in two kinds, and are
   never folded in.
 - `conditional_problem` gives the payoff by group; a `ScenarioSet` over

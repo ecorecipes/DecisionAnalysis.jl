@@ -157,16 +157,17 @@ version = "1.18.8+1"
 
 [[deps.Chytridiomycosis]]
 deps = ["CommonSolve", "Dates", "Distributions", "DynamicalResilience", "LinearAlgebra", "LogDensityProblems", "OrdinaryDiffEqTsit5", "Random", "ResilienceCore", "SciMLBase", "StructuredPopulationCore", "TOML"]
-git-tree-sha1 = "08bebdc76726cd97670799bbde2469101afc3442"
-repo-rev = "main"
+git-tree-sha1 = "89151b95f9cbdfc9c94230cd230e73bb93b3e85c"
 repo-url = "https://github.com/ecorecipes/Chytridiomycosis.jl"
 uuid = "225de920-55da-40a7-8ddb-3f32ee84be8d"
 version = "0.2.0"
 
     [deps.Chytridiomycosis.extensions]
+    ChytridiomycosisDecisionAnalysisExt = "DecisionAnalysis"
     ChytridiomycosisTuringExt = "Turing"
 
     [deps.Chytridiomycosis.weakdeps]
+    DecisionAnalysis = "6a9d793e-d09c-4461-8cb4-55c12d181024"
     Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [[deps.CodecBzip2]]
@@ -308,10 +309,10 @@ uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
 version = "1.16.2+0"
 
 [[deps.DecisionAnalysis]]
-deps = ["FiniteKernels", "JuMP", "LinearAlgebra", "Random", "ResilienceCore", "Statistics", "StructuredPopulationCore", "Tables"]
+deps = ["FiniteKernels", "JuMP", "LinearAlgebra", "Logging", "Random", "ResilienceCore", "Statistics", "StructuredPopulationCore", "Tables"]
 path = ".."
 uuid = "6a9d793e-d09c-4461-8cb4-55c12d181024"
-version = "0.1.0"
+version = "0.1.1"
 
     [deps.DecisionAnalysis.extensions]
     DecisionAnalysisGAMExt = "GAM"
@@ -601,7 +602,6 @@ version = "3.4.1"
 [[deps.FiniteKernels]]
 deps = ["LinearAlgebra", "Random", "ResilienceCore", "StructuredPopulationCore"]
 git-tree-sha1 = "84d801e5eaa3bed9510ef0777081570a5a56782a"
-repo-rev = "main"
 repo-url = "https://github.com/ecorecipes/FiniteKernels.jl"
 uuid = "2ee73795-50db-4096-9573-22982ed4949b"
 version = "0.1.0"
