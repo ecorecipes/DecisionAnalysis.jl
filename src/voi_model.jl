@@ -9,6 +9,21 @@ function _payoff_vector(y)
                         "one per action; got $(typeof(y))"))
 end
 
+# E max(m + Z) − max(m) for Z ~ N(0, C), by simulation: by how much noise of covariance
+# `C` in the means `m` inflates their maximum.
+function _maximum_inflation(m::AbstractVector, C::AbstractMatrix, rng::AbstractRNG;
+                            draws::Integer=64)
+    length(m) == 1 && return 0.0
+    root = _sqrt_psd(C)
+    z = zeros(length(m))
+    total = 0.0
+    for _ in 1:draws
+        randn!(rng, z)
+        total += maximum(m .+ root * z)
+    end
+    return total / draws - maximum(m)
+end
+
 """
     evppi_nested(payoffs, sample_focal, sample_rest; outer, inner, seed) -> VOIEstimate
 
@@ -35,8 +50,9 @@ The result is a [`VOIEstimate`](@ref). `standard_error` is that of the mean over
 outer values, with the inner means as they are. The estimate is **biased upwards for
 any finite `inner`**: the maximum over actions of noisy inner means overstates the
 maximum of the conditional expectations. `bias.cells` estimates that inflation from
-the standard errors of the inner means, and is reported, not removed; increase `inner`
-until it is small beside the estimate.
+the covariance of the inner means (the actions share their inner sample, so their
+noise is correlated and inflates the maximum less than independent noise would), and
+is reported, not removed; increase `inner` until it is small beside the estimate.
 """
 function evppi_nested(payoffs, sample_focal, sample_rest; outer::Integer, inner::Integer,
                       seed::Union{Nothing,Integer}=nothing)
@@ -45,41 +61,40 @@ function evppi_nested(payoffs, sample_focal, sample_rest; outer::Integer, inner:
     inner >= 2 || throw(ArgumentError("inner must be at least 2, got $inner"))
     rng = Xoshiro(seed)
     means = nothing
-    errors = nothing
+    inflation = 0.0
     for r in 1:outer
         φ = sample_focal(rng)
         φ isa NamedTuple ||
             throw(ArgumentError("`sample_focal(rng)` must return a named tuple, got " *
                                 "$(typeof(φ))"))
         total = nothing
-        squares = nothing
+        products = nothing
         for _ in 1:inner
             rest = sample_rest(rng, φ)
             rest isa NamedTuple ||
                 throw(ArgumentError("`sample_rest(rng, φ)` must return a named tuple, " *
                                     "got $(typeof(rest))"))
             y = _payoff_vector(payoffs(merge(rest, φ)))
-            if means === nothing
-                means = zeros(length(y), outer)
-                errors = zeros(length(y), outer)
-            end
+            means === nothing && (means = zeros(length(y), outer))
             length(y) == size(means, 1) ||
                 throw(ArgumentError("`payoffs` returned $(length(y)) payoffs in one " *
                                     "call and $(size(means, 1)) in another"))
-            total === nothing && ((total, squares) = (zero(y), zero(y)))
+            total === nothing && ((total, products) = (zero(y), zeros(length(y), length(y))))
             total .+= y
-            squares .+= y .^ 2
+            products .+= y .* y'
         end
         m = total ./ inner
         means[:, r] .= m
-        errors[:, r] .= sqrt.(max.(squares ./ inner .- m .^ 2, 0.0) ./ (inner - 1))
+        # The inner means of the actions share their inner sample, so their noise is
+        # correlated: the inflation of the maximum is simulated with their covariance.
+        covariance = (products ./ inner .- m .* m') ./ (inner - 1)
+        inflation += _maximum_inflation(m, covariance, rng)
     end
     w = fill(1 / outer, outer)
     v0, a = _act_now(means, w)
     gains = [maximum(view(means, :, r)) - means[a, r] for r in 1:outer]
     value = sum(gains) / outer
-    bias = (; act_now=_act_now_bias(means, w, rng),
-            cells=_cell_noise_bias(means, errors, w, rng))
+    bias = (; act_now=_act_now_bias(means, w, rng), cells=max(inflation / outer, 0.0))
     details = (; act_now_value=v0, act_now_index=a, outer=Int(outer), inner=Int(inner),
                model_evaluations=Int(outer) * Int(inner))
     return VOIEstimate(:evppi, :NestedMonteCarlo, value, _weighted_mean_se(gains, w), bias,
@@ -100,8 +115,10 @@ mark-recapture analysis, a hierarchical model).
 The idea: the expected payoffs given the study's data are, to a good approximation,
 the expected payoffs given the focal parameters (the fitted conditional means of
 [`evppi`](@ref)) shrunk towards their mean, by as much as makes their variance equal to
-the variance that the study removes, `Var(payoff) − E Var(payoff | data)`. The second
-term is estimated by running the analysis at `nested` data sets only.
+the variance that the study removes, `Var(payoff) − E Var(payoff | data)`, estimated
+by running the analysis at `nested` data sets only. Both variances are taken over
+the same draws of the other parameters, so that their difference is not swamped by
+the variance that the study cannot touch.
 
 - `focal`: the parameters the study informs (columns of the draws).
 - `payoffs(θ)`: the payoffs of the **feasible actions of the problem, in its order**, at
@@ -113,20 +130,29 @@ term is estimated by running the analysis at `nested` data sets only.
   few hundred or more). The other parameters keep their prior: they are drawn from
   the draws at random, so they are taken to be independent of the focal ones.
 - `nested`: the number of data sets analysed. Thirty to fifty are usually enough; the
-  cost is `nested ×` (one analysis + the model at every posterior draw).
+  cost is `nested ×` (one analysis + the model twice at every posterior draw).
 - `regression`: the method for the conditional means given the focal parameters, as
   for [`evppi`](@ref) (default: chosen by the focal parameters).
 
 With a built-in design ([`BinomialStudy`](@ref), ...) the data, the analysis and the
 focal parameters come from the design and its conjugate `prior`.
 
-The nested data sets are simulated at draws spread evenly over the fitted advantage
-of the most variable action, so that they cover the range that matters. For several
+The nested data sets are simulated at draws stratified by the fitted advantage of
+the most variable action (one draw at random in each of `nested` strata of equal
+weight), so that they cover the range that matters and its tails. For several
 actions the shrinkage is a matrix, which matches the covariance of the payoffs'
-differences from the act-now action and not only their variances. The standard error
+differences from the act-now action and not only their variances; of the matrices
+that do, it is the one that moves the fitted values least (it is the identity when
+the study removes all that the focal parameters explain). The standard error
 combines the sampling of the draws with a jackknife over the nested data sets; the
 approximation itself (payoffs given the data being a shrunk copy of payoffs given the
-parameters) is a bias that no standard error covers. If the estimated variance removed
+parameters) is a bias that no standard error covers. The method lives on variances:
+when the payoffs are strongly skewed, or the focal parameters explain only a small
+share of their variance, the variance removed is a small difference of two large and
+noisy ones and needs many posterior draws and data sets (`details.variance_ratio`,
+the share of the EVPPI variance removed, should lie between 0 and 1 and settle as
+they grow); the regression on a summary statistic, where one exists, is then the
+better estimator. If the estimated variance removed
 exceeds what learning the focal parameters exactly would remove, it is capped there
 (`details.capped`), since a study is worth no more than the EVPPI of what it informs.
 """
@@ -179,7 +205,10 @@ end
 # act-now action), rescaled to the covariance `target`.
 function _matched_value(Gc::AbstractMatrix, w::AbstractVector, target::AbstractMatrix,
                         fitted::AbstractMatrix)
-    T = _sqrt_psd(target) * _sqrt_psd(fitted; inverse=true)
+    # The map between two covariances that moves the fitted values least: symmetric,
+    # the identity when the two agree, and a plain scaling for one contrast.
+    root, inverse_root = _sqrt_psd(fitted), _sqrt_psd(fitted; inverse=true)
+    T = inverse_root * _sqrt_psd(root * target * root) * inverse_root
     centre = Gc * w
     matched = centre .+ T * (Gc .- centre)
     best = [maximum(view(matched, :, i)) for i in axes(matched, 2)]
@@ -212,12 +241,30 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     spread = [fitted[k, k] for k in axes(fitted, 1)]
     order = sortperm(view(Gc, argmax(spread), :))
     cumulative = cumsum(wf[order])
-    picks = [order[min(searchsortedfirst(cumulative, (q - 0.5) / study.nested *
+    # One draw at random within each stratum of equal weight (a midpoint would never
+    # reach the tails, where the variance left by a study can be largest).
+    picks = [order[min(searchsortedfirst(cumulative, (q - rand(rng)) / study.nested *
                                                      cumulative[end]), length(order))]
              for q in 1:(study.nested)]
     rows = Tables.rowtable(belief.draws)
     all_cumulative = cumsum(wf)
-    posterior_covariances = Matrix{Float64}[]
+    # For each nested data set, the covariance of the payoffs' differences over a set
+    # of draws of the other parameters, before the study (focal values from the prior,
+    # that is from other draws picked at random) minus after it (focal values from the
+    # posterior). Both sides recombine the same draws of the other parameters with
+    # focal values in the same way, so that their difference, the variance the study
+    # removes, is neither swamped by the variance that no study of the focal
+    # parameters touches nor biased by the accidents of how the draws were paired.
+    pick() = min(searchsortedfirst(all_cumulative, rand(rng) * all_cumulative[end]),
+                 length(rows))
+    function contrasts(θ)
+        y = _payoff_vector(study.payoffs(θ))
+        length(y) == size(Q, 1) ||
+            throw(ArgumentError("`payoffs` returned $(length(y)) payoffs for the " *
+                                "$(size(Q, 1)) feasible actions of the problem"))
+        return y .- y[a]
+    end
+    removed_covariances = Matrix{Float64}[]
     evaluations = 0
     for i in picks
         data = study.simulate_data(rng, rows[i])
@@ -230,40 +277,41 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
         S = length(first(post))
         S >= 2 || throw(ArgumentError("`posterior` returned $S draws; it needs many"))
         D = zeros(size(Q, 1), S)
+        before = zeros(size(Q, 1), S)
+        names = Tuple(study.focal)
         for s in 1:S
-            j = min(searchsortedfirst(all_cumulative, rand(rng) * all_cumulative[end]),
-                    length(rows))
-            θ = merge(rows[j], NamedTuple{Tuple(study.focal)}(Tuple(post[name][s]
-                                                                    for name in study.focal)))
-            y = _payoff_vector(study.payoffs(θ))
-            length(y) == size(Q, 1) ||
-                throw(ArgumentError("`payoffs` returned $(length(y)) payoffs for the " *
-                                    "$(size(Q, 1)) feasible actions of the problem"))
-            D[:, s] .= y .- y[a]
+            other = rows[pick()]
+            prior_focal = NamedTuple{names}(Tuple(getproperty(rows[pick()], name)
+                                                  for name in names))
+            posterior_focal = NamedTuple{names}(Tuple(post[name][s] for name in names))
+            before[:, s] .= contrasts(merge(other, prior_focal))
+            D[:, s] .= contrasts(merge(other, posterior_focal))
         end
-        evaluations += S
-        push!(posterior_covariances, _weighted_covariance(D, fill(1 / S, S)) .* (S / (S - 1)))
+        evaluations += 2 * S
+        equal = fill(1 / S, S)
+        push!(removed_covariances,
+              (_weighted_covariance(before, equal) .- _weighted_covariance(D, equal)) .*
+              (S / (S - 1)))
     end
-    K = length(posterior_covariances)
-    remaining = sum(posterior_covariances) ./ K
-    function value_for(remaining)
-        target = prior .- remaining
+    K = length(removed_covariances)
+    removed_mean = sum(removed_covariances) ./ K
+    function value_for(target)
         F = eigen(Symmetric((target .+ target') ./ 2))
         target = F.vectors * (max.(F.values, 0.0) .* F.vectors')
         ratio = tr(target) / tr(fitted)
         capped = ratio > 1
         capped && (target = target ./ ratio)
         value, best = _matched_value(Gc, wf, target, fitted)
-        return value, best, tr(target), capped
+        return value, best, tr(target), capped, ratio
     end
-    value, best, removed, capped = value_for(remaining)
-    leave_one_out = [first(value_for((remaining .* K .- C) ./ (K - 1)))
-                     for C in posterior_covariances]
+    value, best, removed, capped, ratio = value_for(removed_mean)
+    leave_one_out = [first(value_for((removed_mean .* K .- C) ./ (K - 1)))
+                     for C in removed_covariances]
     centre = sum(leave_one_out) / K
     nested_se = sqrt((K - 1) / K * sum(v -> (v - centre)^2, leave_one_out))
     draws_se = _weighted_mean_se(best, wf)
     details = merge(base, (; variance_removed=removed, evppi_variance=tr(fitted), capped,
-                           variance_ratio=removed / tr(fitted),
+                           variance_ratio=ratio,
                            model_evaluations=evaluations,
                            draws_standard_error=draws_se,
                            nested_standard_error=nested_se), info)

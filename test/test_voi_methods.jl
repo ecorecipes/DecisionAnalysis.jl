@@ -234,10 +234,12 @@
             @test within(e, evsi_truth(size))
             # The share of the EVPPI variance that the study removes: n / (n + 1).
             @test e.details.variance_ratio ≈ size / (size + 1) atol = 0.08
-            @test e.details.model_evaluations == 30 * 1000
+            # The model is run twice per posterior draw: prior and posterior focal values.
+            @test e.details.model_evaluations == 2 * 30 * 1000
             @test e.standard_error ≈
                   hypot(e.details.draws_standard_error, e.details.nested_standard_error)
-            @test e.details.variance_ratio <= 1 && e.details.focal == [:p1]
+            @test e.details.capped == (e.details.variance_ratio > 1) &&
+                  e.details.focal == [:p1]
             @test e.value <= evppi(problem, :p1).value + 1e-12
             # `voi` on the shared draws, with its own nested sample: recorded with
             # the truth beside it, since the two differ by Monte Carlo error.
