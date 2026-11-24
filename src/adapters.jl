@@ -10,8 +10,9 @@ Adapter verb, **to be given methods for a model's problem type**: the problem `p
 with its uncertain parameters set to the draw `θ`, a named tuple holding one row of
 the parameter draws. It must not mutate `prob`. The package defines no method.
 
-The four verbs are used by [`outcomes`](@ref) in this order:
-`outcome(simulate(apply_action(with_parameters(prob, θ), a); rng))`.
+The four verbs are used by [`outcomes`](@ref) in this order: with
+`p = apply_action(with_parameters(prob, θ), a)`, a run is `outcome(p, simulate(p; rng))`,
+and `outcome(p, solution)` is `outcome(solution)` unless a method says otherwise.
 """
 function with_parameters end
 
@@ -42,14 +43,25 @@ function simulate end
 
 """
     outcome(solution) -> NamedTuple
+    outcome(prob, solution) -> NamedTuple
 
 Adapter verb, to be given methods for a model's solution type: the named outcomes of
 one run, a named tuple of finite real numbers (for example
 `(; uninfected=41, infected=3)`). Outcomes are counts or other quantities of the
 model, not utilities: the utility is applied afterwards by [`payoff_table`](@ref).
-The package defines no method.
+The package defines no method of the first form.
+
+[`outcomes`](@ref) calls the second form, with the problem that was simulated (after
+[`with_parameters`](@ref) and [`apply_action`](@ref)); its fallback is
+`outcome(solution)`. Give the second form a method **for the problem type** when the
+outcomes to read off depend on the problem (a focal species, a horizon, a threshold),
+or when the solution is of a type the model package does not own (a named tuple, a
+trajectory or solution type of another package): dispatch is then on the problem, and
+no method is added for a foreign type.
 """
 function outcome end
+
+outcome(prob, solution) = outcome(solution)
 
 """
     parameter_draws(source)

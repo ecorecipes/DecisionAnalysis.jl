@@ -334,16 +334,17 @@ function _outcome_tuple(o)
 end
 
 """
-    outcomes(prob, actions, draws; replicates=1, seed) -> OutcomeTable
+    outcomes(prob, actions, draws; replicates=1, seed, on_error=:record) -> OutcomeTable
 
 Run a model over draws × actions × replicates and collect the named outcomes. The
 model is reached through the adapter verbs only, which must have methods for the
 type of `prob`: each run is
 
-    outcome(simulate(apply_action(with_parameters(prob, θ), a); rng))
+    p = apply_action(with_parameters(prob, θ), a)
+    outcome(p, simulate(p; rng))
 
 ([`with_parameters`](@ref), [`apply_action`](@ref), [`simulate`](@ref),
-[`outcome`](@ref)).
+[`outcome`](@ref); `outcome(p, solution)` falls back on `outcome(solution)`).
 
 - `actions`: the actions, as `label => action` pairs, a named tuple, a dictionary, or
   a list of values that are their own labels. Include no intervention.
@@ -361,12 +362,17 @@ type of `prob`: each run is
 
 A run that throws is kept as a failed run with the status `error:<exception type>`
 (see [`failed_runs`](@ref)); an `InterruptException` is rethrown. If every run fails,
-[`InvalidOutcomeError`](@ref) is thrown with the first error's message.
+[`InvalidOutcomeError`](@ref) is thrown with the first error's message. With
+`on_error=:throw` the first exception of any run is rethrown instead, with its own
+message and stack trace: use it while writing an adapter or a menu of actions, when a
+failed run is a mistake to find and not an outcome of the model to count.
 """
 function outcomes(prob, actions, draws; replicates::Integer=1,
-                  seed::Union{Nothing,Integer}=nothing)
+                  seed::Union{Nothing,Integer}=nothing, on_error::Symbol=:record)
     seed === nothing &&
         throw(ArgumentError("give `seed`: runs are reproducible only with a stated seed"))
+    on_error in (:record, :throw) ||
+        throw(ArgumentError("on_error must be :record or :throw, got :$on_error"))
     replicates >= 1 || throw(ArgumentError("replicates must be at least 1"))
     belief = draws isa SampleBelief ? draws : SampleBelief(draws)
     named = _named_actions(actions)
@@ -384,16 +390,16 @@ function outcomes(prob, actions, draws; replicates::Integer=1,
         for (a, (_, act)) in enumerate(named)
             try
                 rng = Xoshiro(run_seed)
-                o = _outcome_tuple(outcome(simulate(apply_action(with_parameters(prob,
-                                                                                 rows[d]),
-                                                                 act); rng)))
+                acted = apply_action(with_parameters(prob, rows[d]), act)
+                o = _outcome_tuple(outcome(acted, simulate(acted; rng)))
                 names === nothing && (names = keys(o))
                 keys(o) == names ||
                     throw(InvalidOutcomeError("`outcome` returned the names $(keys(o)) " *
                                               "in one run and $names in another"))
                 results[a, d, r] = o
             catch err
-                (err isa InterruptException || err isa InvalidOutcomeError) && rethrow()
+                (err isa InterruptException || err isa InvalidOutcomeError ||
+                 on_error === :throw) && rethrow()
                 first_error === nothing && (first_error = err)
                 state[a, d, r] = "error:" * string(nameof(typeof(err)))
             end

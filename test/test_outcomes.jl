@@ -30,6 +30,23 @@ function DecisionAnalysis.outcome(sol::NamedTuple)
     return (; uninfected=sol.alive - sol.infected, infected=sol.infected, first_draw=sol.u)
 end
 
+# A second toy, deterministic, whose solution is a plain vector (a type it does not own)
+# and whose outcomes depend on the problem (its horizon): it gives `outcome` a method of
+# the two-argument form, on the problem, and none for the vector.
+struct ToyGrowth
+    rate::Float64
+    harvest::Float64
+    horizon::Int
+end
+DecisionAnalysis.with_parameters(p::ToyGrowth, θ) = ToyGrowth(θ.rate, p.harvest, p.horizon)
+DecisionAnalysis.apply_action(p::ToyGrowth, a::Real) = ToyGrowth(p.rate, a, p.horizon)
+function DecisionAnalysis.simulate(p::ToyGrowth; rng)
+    return accumulate((n, _) -> n * p.rate * (1 - p.harvest), 1:10; init=10.0)
+end
+function DecisionAnalysis.outcome(p::ToyGrowth, path::Vector{Float64})
+    return (; final=path[p.horizon], total=sum(path[1:(p.horizon)]))
+end
+
 @testset "outcome tables" begin
     @testset "from a table of runs" begin
         runs = NamedTuple[]
@@ -224,5 +241,40 @@ end
         @test_throws MethodError outcome(1.0)
         @test_throws MethodError parameter_draws(1.0)
         @test_throws MethodError draw_weights(1.0)
+
+        # `on_error=:throw` rethrows the first exception of a run instead of recording it.
+        @test_throws DomainError outcomes(ToyPond(0, 0.0, 0.0, false), [:none, :broken],
+                                          draws; seed=7, on_error=:throw)
+        @test outcomes(ToyPond(0, 0.0, 0.0, false), actions, draws; replicates=5, seed=7,
+                       on_error=:throw).values == t.values
+        @test_throws ArgumentError outcomes(ToyPond(0, 0.0, 0.0, false), actions, draws;
+                                            seed=7, on_error=:ignore)
+    end
+
+    @testset "outcomes read with the problem; a deterministic model" begin
+        # `outcome(prob, solution)` is called by the driver; its fallback is
+        # `outcome(solution)`, which the first toy relies on.
+        @test outcome(ToyPond(0, 0.0, 0.0, false), (; u=0.5, alive=7, infected=2)) ==
+              (; uninfected=5, infected=2, first_draw=0.5)
+        @test_throws MethodError outcome(ToyGrowth(1.0, 0.0, 3), 1.0)
+        @test_throws MethodError outcome([1.0, 2.0])       # no method for the foreign type
+        rates = (; rate=[1.1, 0.9, 1.3])
+        harvests = [0.0, 0.1, 0.3]
+        t = outcomes(ToyGrowth(1.0, 0.0, 4), harvests, rates; replicates=3, seed=1)
+        @test outcome_names(t) == [:final, :total]
+        for (a, h) in enumerate(harvests), (d, r) in enumerate(rates.rate)
+            path = [10.0 * (r * (1 - h))^k for k in 1:4]      # the model, by hand
+            @test all(isapprox.(t.values[a, d, :, 1], path[4]; rtol=1e-12))
+            @test all(isapprox.(t.values[a, d, :, 2], sum(path); rtol=1e-12))
+        end
+        # The horizon is the problem's: another problem reads other outcomes of the same runs.
+        t6 = outcomes(ToyGrowth(1.0, 0.0, 6), harvests, rates; seed=1)
+        @test t6.values[1, 1, 1, 1] ≈ 10.0 * 1.1^6
+        # Equal replicates have a standard error of exactly zero, also for paired gains.
+        for baseline in (nothing, Symbol("0.0"))
+            payoff = payoff_table(t, o -> o.total; baseline)
+            @test payoff.standard_errors !== nothing
+            @test all(==(0.0), payoff.standard_errors)
+        end
     end
 end

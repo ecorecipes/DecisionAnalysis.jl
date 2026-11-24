@@ -137,7 +137,9 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - `src/payoff.jl`: `PayoffTable` (with optional standard errors and replicate counts), arithmetic on tables
   with matching labels, `combine_payoffs`, `individuals_payoff`, `infection_payoff`.
 - `src/adapters.jl`: the method-less adapter verbs `with_parameters`, `apply_action`, `simulate`, `outcome`,
-  and `parameter_draws`, `draw_weights`.
+  and `parameter_draws`, `draw_weights`. The driver calls `outcome(prob, solution)`, whose only method here is
+  the fallback to `outcome(solution)`; a model package gives the two-argument form a method on its problem type
+  when its solution is of a type it does not own.
 - `src/outcomes.jl`: `OutcomeTable` (from any Tables.jl table of runs) and the driver `outcomes`.
 - `src/utilities.jl`: `IndividualsUtility`, `InfectionUtility`, `FunctionUtility`, `payoff_table`,
   `crn_correlation`; the count utilities are the implementation behind the matrix helpers of `payoff.jl`.

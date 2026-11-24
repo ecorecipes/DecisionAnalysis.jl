@@ -251,6 +251,7 @@ payoff_table(t::OutcomeTable, f; kw...) = payoff_table(t, FunctionUtility(f); kw
 
 function _standard_error(x::AbstractVector)
     n = length(x)
+    allequal(x) && return 0.0    # equal runs (a deterministic model): exactly zero, no rounding
     m = sum(Float64, x) / n
     return sqrt(sum(v -> (Float64(v) - m)^2, x) / (n - 1) / n)
 end
