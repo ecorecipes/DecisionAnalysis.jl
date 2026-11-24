@@ -13,8 +13,9 @@ FiniteKernels (finite spaces, kernels and states) through a `[sources]` path to 
 ResilienceCore and StructuredPopulationCore by URL; Pkg follows the sources of a path dependency, so they
 are not listed here. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
 generics, forwards to this package and re-exports its names (ADR 0009). No model package depends on this
-one: a model package writes a table of runs (or the user gives methods to the adapter verbs), and any
-package-specific adapter is a weak-dependency extension on this side. `GAM` (ecorecipes/GAM.jl, by URL
+one: a model package writes a table of runs (or the user gives methods to the adapter verbs). An adapter
+for one model package is a weak-dependency extension inside that model package, triggered by this one;
+generic bridges (GAM, InfluenceDiagrams) are extensions on this side. `GAM` (ecorecipes/GAM.jl, by URL
 source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl`) and a test dependency;
 `Chytridiomycosis` appears only in the vignette environment, by path. `InfluenceDiagrams`
 (ecorecipes/InfluenceDiagrams.jl) is a weak dependency for `normal_form`
