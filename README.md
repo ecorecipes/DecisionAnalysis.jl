@@ -1,5 +1,6 @@
 # DecisionAnalysis.jl
 
+[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://ecorecipes.github.io/DecisionAnalysis.jl/dev/)
 [![Build Status](https://github.com/ecorecipes/DecisionAnalysis.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ecorecipes/DecisionAnalysis.jl/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
