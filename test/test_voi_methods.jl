@@ -170,7 +170,8 @@
         @test sum(bars) / 4000 ≈ 1.5 atol = 0.03
         @test sum(abs2, bars .- 1.5) / 4000 ≈ 4 / 16 rtol = 0.08
         @test study_loglikelihood(m, (; xbar=1.0), (; mu=1.5)) ≈ -16 * 0.25 / 8
-        normal = study_posterior(rng, m, (; xbar=1.0), (; mean=0.0, sd=1.0); draws=20_000).mu
+        normal = study_posterior(rng, m, (; xbar=1.0), (; mean=0.0, sd=1.0);
+                                 draws=20_000).mu
         @test sum(normal) / 20_000 ≈ (16 / 4) / (1 + 16 / 4) atol = 0.01
         @test sum(abs2, normal .- 0.8) / 20_000 ≈ 1 / 5 rtol = 0.05
 
@@ -250,7 +251,8 @@
         # The same through the functions of a study of one's own.
         own = MomentMatching(:p1; payoffs, nested=20,
                              simulate_data=(rng, θ) -> θ.p1 + randn(rng) / sqrt(10),
-                             posterior=(rng, x) -> (; p1=(1 + 10x) / 11 .+
+                             posterior=(rng, x) -> (;
+                                                    p1=(1 + 10x) / 11 .+
                                                        randn(rng, 500) ./ sqrt(11)))
         e = evsi(problem, own; seed=3)
         @test within(e, evsi_truth(10)) && e.details.nested == 20
@@ -290,7 +292,8 @@
         @test_throws ArgumentError evsi(problem,
                                         MomentMatching(:p1; payoffs,
                                                        simulate_data=(rng, θ) -> 0.0,
-                                                       posterior=(rng, x) -> (; q=[1.0, 2.0])))
+                                                       posterior=(rng, x) -> (;
+                                                                              q=[1.0, 2.0])))
         @test_throws BeliefFormError evsi(DecisionProblem(PayoffTable([0 1; 1 0]),
                                                           [1 // 2, 1 // 2]),
                                           MomentMatching(NormalStudy(:p1; n=5); payoffs,
@@ -342,9 +345,11 @@
             @test weighted.prior_variance ≈ r1.prior_variance
         end
         curve = expected_variance_reduction(belief,
-                                            GaussianApproximation(:p1; n0=1, n=[1, 10, 100]);
+                                            GaussianApproximation(:p1; n0=1,
+                                                                  n=[1, 10, 100]);
                                             quantity=y)
-        @test issorted([c.reduction for c in curve]) && curve[1].reduction ≈ r1.reduction / 2
+        @test issorted([c.reduction for c in curve]) &&
+              curve[1].reduction ≈ r1.reduction / 2
 
         # Importance sampling against explicit enumeration on a tiny sample.
         tiny = SampleBelief((; x=[0.0, 1.0, 3.0]); weights=[1, 2, 1])
@@ -446,7 +451,8 @@
         @test recovered.lower <= truth.n <= recovered.upper
         @test recovered.lower < recovered.n < recovered.upper
         # Certain costs: no probability; a three-number cost; estimates carry errors.
-        @test exact[1].probability_positive === nothing && iszero(exact[1].standard_deviation)
+        @test exact[1].probability_positive === nothing &&
+              iszero(exact[1].standard_deviation)
         three = enbs_curve([0.1]; n=[10], setup_cost=(12, 5, 15))
         @test three[1].cost == 12 && three[1].standard_deviation == 2.5
         @test three[1].probability_positive < 1e-5
@@ -499,7 +505,8 @@
         @test check.bins[1].residual_mean ≈ sum(residual[quarter]) / length(quarter)
         @test check.bins[1].fitted ≈ sum(fitted[quarter]) / length(quarter)
         @test_throws ArgumentError regression_check(problem, :p1, SampleAverage())
-        @test_throws ArgumentError regression_check(problem, :p1, SplineRegression(); bins=1)
+        @test_throws ArgumentError regression_check(problem, :p1, SplineRegression();
+                                                    bins=1)
 
         # Cross-validation prefers the method that predicts held-out draws best: the
         # straight line loses on the bent problem, and wins nothing on the normal one.

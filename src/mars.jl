@@ -93,8 +93,9 @@ function _mars_knots(x::Vector{Float64}, w::AbstractVector, k::Int)
     return filter(<(values[end]), grid)
 end
 
-_mars_column(parent::AbstractVector, x::AbstractVector, t::Real, sign::Int) =
-    parent .* max.(sign .* (x .- t), 0.0)
+function _mars_column(parent::AbstractVector, x::AbstractVector, t::Real, sign::Int)
+    return parent .* max.(sign .* (x .- t), 0.0)
+end
 
 # Orthogonalise `c` against the orthonormal columns of `basis`; `nothing` when what is
 # left is negligible beside the column itself.
@@ -158,8 +159,9 @@ function _mars(method::MARSRegression, columns::NamedTuple, Q::AbstractMatrix,
             column = _mars_column(raw[b], predictors[v], t, sign)
             u = _mars_orthogonal(root .* column, ortho)
             u === nothing && continue
-            push!(terms, _MARSTerm(vcat(terms[b].variables, v), vcat(terms[b].knots, t),
-                                   vcat(terms[b].signs, sign)))
+            push!(terms,
+                  _MARSTerm(vcat(terms[b].variables, v), vcat(terms[b].knots, t),
+                            vcat(terms[b].signs, sign)))
             push!(raw, column)
             push!(ortho, u)
             R .-= u .* (permutedims(u) * R)
@@ -192,10 +194,12 @@ function _mars(method::MARSRegression, columns::NamedTuple, Q::AbstractMatrix,
         s <= lowest && ((chosen, lowest) = (copy(kept), s))
     end
     coefficients = qr(Bw[:, chosen], ColumnNorm()) \ (root .* Y)
-    describe(term) = isempty(term.variables) ? "1" :
-                     join(("h($(s > 0 ? "" : "−")($(names[v]) − $(round(t; sigdigits=4))))"
-                           for (v, t, s) in zip(term.variables, term.knots, term.signs)),
-                          " · ")
+    function describe(term)
+        return isempty(term.variables) ? "1" :
+               join(("h($(s > 0 ? "" : "−")($(names[v]) − $(round(t; sigdigits=4))))"
+                     for (v, t, s) in zip(term.variables, term.knots, term.signs)),
+                    " · ")
+    end
     return permutedims(B[:, chosen] * coefficients),
            info([describe(terms[j]) for j in chosen], lowest)
 end

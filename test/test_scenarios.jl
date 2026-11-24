@@ -50,7 +50,8 @@ end
         @test_throws ArgumentError ScenarioAxis(:x, [:a, :b]; kind=:factor)
         @test_throws ArgumentError ScenarioAxis(:x, Symbol[]; kind=:decision)
         @test_throws ArgumentError ScenarioAxis(:x, [:a, :a]; kind=:decision)
-        @test_throws ArgumentError ScenarioAxis(:x, [:a, :b]; kind=:decision, weights=[1, 1])
+        @test_throws ArgumentError ScenarioAxis(:x, [:a, :b]; kind=:decision,
+                                                weights=[1, 1])
         @test_throws ArgumentError uncertainty_axis(:x, [:a, :b]; weights=[1])
         @test_throws ArgumentError ScenarioDesign(boosters, boosters)
         @test_throws ArgumentError ScenarioDesign()
@@ -153,8 +154,9 @@ end
         kept = scenarios(half)
         @test length(kept) == 4 && half.purpose === :sensitivity_analysis
         sign(s, axis, high) = getproperty(s, axis) === high ? 1 : -1
-        @test all(sign(s, :severity, :severe) == sign(s, :r0, :high) *
-                                                 sign(s, :serial, :long) for s in kept)
+        @test all(sign(s, :severity, :severe) ==
+                  sign(s, :r0, :high) *
+                  sign(s, :serial, :long) for s in kept)
         additive(s) = 5.0 * sign(s, :r0, :high) + 2.0 * sign(s, :serial, :long) +
                       1.0 * sign(s, :severity, :severe)
         fraction = factor_effects(half, additive.(kept))
@@ -167,7 +169,8 @@ end
         @test_throws ArgumentError fractional_design(full, :severity => (:severity, :r0))
         @test_throws ArgumentError fractional_design(full, :nothing => (:r0,))
         @test_throws ArgumentError fractional_design(ScenarioDesign(decision_axis(:b,
-                                                                                  [:x, :y, :z])),
+                                                                                  [:x, :y,
+                                                                                   :z])),
                                                      :b => (:b,))
         @test_throws ArgumentError DecisionProblem(fractional_design(ScenarioDesign(decision_axis(:boosters,
                                                                                                   [:none,
@@ -180,7 +183,9 @@ end
                                                    outcomes(ScenarioToy(),
                                                             [:none => (; boosters=:none),
                                                              :all => (; boosters=:all)],
-                                                            SampleBelief((; variant=[1.0, 1.4]);
+                                                            SampleBelief((;
+                                                                          variant=[1.0,
+                                                                                   1.4]);
                                                                          labels=[:none,
                                                                                  :escape]);
                                                             seed=1),

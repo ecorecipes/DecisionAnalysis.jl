@@ -68,8 +68,8 @@ decision_axis(name, levels) = ScenarioAxis(name, levels; kind=:decision)
 A [`ScenarioAxis`](@ref) of a factor outside anyone's control, with optional
 probabilities of its levels.
 """
-uncertainty_axis(name, levels; weights=nothing) =
-    ScenarioAxis(name, levels; kind=:uncertainty, weights)
+uncertainty_axis(name, levels; weights=nothing) = ScenarioAxis(name, levels;
+                                                               kind=:uncertainty, weights)
 
 """
     ScenarioDesign(axes...; purpose=nothing, audience="")
@@ -121,7 +121,8 @@ function ScenarioDesign(axes::ScenarioAxis...; purpose::Union{Nothing,Symbol}=no
                         audience::AbstractString="")
     list = collect(ScenarioAxis, axes)
     isempty(list) && throw(ArgumentError("a design needs at least one axis"))
-    cells = vec([collect(c) for c in Iterators.product((eachindex(a.levels) for a in list)...)])
+    cells = vec([collect(c)
+                 for c in Iterators.product((eachindex(a.levels) for a in list)...)])
     return ScenarioDesign(list, purpose, audience, cells)
 end
 
@@ -145,9 +146,10 @@ function _check_purpose(design::ScenarioDesign, purpose::Symbol)
     class = design_class(design)
     wanted = purpose === :decision_making ? :decision :
              purpose === :value_of_information ? :value_of_information : :uncertainty
-    reason = wanted === :decision ? "compares interventions, so every axis must be a " *
-                                    "decision; with an uncertainty axis the design is " *
-                                    "one for the value of information" :
+    reason = wanted === :decision ?
+             "compares interventions, so every axis must be a " *
+             "decision; with an uncertainty axis the design is " *
+             "one for the value of information" :
              wanted === :value_of_information ?
              "asks whether the better intervention depends on an uncertainty, so it " *
              "needs at least one decision axis and one uncertainty axis" :
@@ -201,8 +203,9 @@ function design_actions(design::ScenarioDesign)
     axes, cells = _axis_cells(design, :decision)
     isempty(axes) && return [:projection => (;)]
     names = Tuple(a.name for a in axes)
-    return [_cell_label(axes, cell) =>
-            NamedTuple{names}(Tuple(a.values[i] for (a, i) in zip(axes, cell)))
+    return [_cell_label(axes, cell) => NamedTuple{names}(Tuple(a.values[i]
+                                                               for (a, i) in
+                                                                   zip(axes, cell)))
             for cell in cells]
 end
 
@@ -266,7 +269,8 @@ function DecisionProblem(design::ScenarioDesign, table::OutcomeTable, utility;
                          baseline=nothing)
     actions = first.(design_actions(design))
     states = state_labels(design_draws(design))
-    (sort(action_labels(table)) == sort(actions) && sort(state_labels(table)) == sort(states)) ||
+    (sort(action_labels(table)) == sort(actions) &&
+     sort(state_labels(table)) == sort(states)) ||
         throw(ArgumentError("the table has the actions $(action_labels(table)) and the " *
                             "draws $(state_labels(table)); the design has $actions and " *
                             "$states"))
@@ -316,9 +320,11 @@ end
 function _scenario_values(design::ScenarioDesign, values)
     labels = [_cell_label(design.axes, cell) for cell in design.cells]
     if values isa AbstractDict || values isa NamedTuple
-        get_value(l) = values isa NamedTuple ?
-                       (haskey(values, l) ? values[l] : nothing) :
-                       get(values, l, get(values, String(l), nothing))
+        function get_value(l)
+            return values isa NamedTuple ?
+                   (haskey(values, l) ? values[l] : nothing) :
+                   get(values, l, get(values, String(l), nothing))
+        end
         out = [get_value(l) for l in labels]
         any(isnothing, out) &&
             throw(ArgumentError("no value was given for the scenarios " *
@@ -361,11 +367,15 @@ function factor_effects(design::ScenarioDesign, values)
     n = length(y)
     grand = sum(y) / n
     total = sum(abs2, y .- grand)
-    level_means(k) = [(members = findall(c -> c[k] == l, design.cells);
-                       isempty(members) ? NaN : sum(y[members]) / length(members))
-                      for l in eachindex(design.axes[k].levels)]
-    explained(k) = sum(count(c -> c[k] == l, design.cells) * (m - grand)^2
-                       for (l, m) in enumerate(level_means(k)) if !isnan(m))
+    function level_means(k)
+        return [(members = findall(c -> c[k] == l, design.cells);
+                 isempty(members) ? NaN : sum(y[members]) / length(members))
+                for l in eachindex(design.axes[k].levels)]
+    end
+    function explained(k)
+        return sum(count(c -> c[k] == l, design.cells) * (m - grand)^2
+                   for (l, m) in enumerate(level_means(k)) if !isnan(m))
+    end
     share(x) = iszero(total) ? 0.0 : x / total
     main = map(enumerate(design.axes)) do (k, axis)
         means = level_means(k)
@@ -383,8 +393,9 @@ function factor_effects(design::ScenarioDesign, values)
                 members = findall(c -> c[i] == a && c[j] == b, design.cells)
                 joint += length(members) * (sum(y[members]) / length(members) - grand)^2
             end
-            push!(interactions, (; axes=(design.axes[i].name, design.axes[j].name),
-                                 share=share(max(joint - explained(i) - explained(j), 0.0))))
+            push!(interactions,
+                  (; axes=(design.axes[i].name, design.axes[j].name),
+                   share=share(max(joint - explained(i) - explained(j), 0.0))))
         end
     end
     return (; grand_mean=grand, total, main, interactions)
@@ -428,7 +439,8 @@ function scenario_forecast(design::ScenarioDesign, projections;
         throw(ArgumentError("give every scenario a number, or every scenario a vector " *
                             "of replicates"))
     means = replicated ? [sum(v) / length(v) for v in raw] : Float64.(raw)
-    within_each = replicated ? [sum(abs2, v .- m) / length(v) for (v, m) in zip(raw, means)] :
+    within_each = replicated ?
+                  [sum(abs2, v .- m) / length(v) for (v, m) in zip(raw, means)] :
                   zeros(length(means))
     centre = dot(w, means)
     between = dot(w, (means .- centre) .^ 2)
@@ -438,7 +450,8 @@ function scenario_forecast(design::ScenarioDesign, projections;
         all(p -> 0 <= p <= 1, probabilities) ||
             throw(ArgumentError("probabilities must lie in [0, 1]"))
         pooled = reduce(vcat, [Float64.(v) for v in raw])
-        mass = reduce(vcat, [fill(w[k] / length(v), length(v)) for (k, v) in enumerate(raw)])
+        mass = reduce(vcat,
+                      [fill(w[k] / length(v), length(v)) for (k, v) in enumerate(raw)])
         quantiles = _weighted_quantiles(pooled, mass, probabilities)
     end
     return (; mean=centre, variance=between + within, between, within,
@@ -472,7 +485,9 @@ function decision_robustness(problem::DecisionProblem)
     states = problem.payoff.states
     tops = [maximum(view(Q, :, j)) for j in axes(Q, 2)]
     best = [states[j] => actions[findall(==(tops[j]), view(Q, :, j))] for j in axes(Q, 2)]
-    robust = [a for (k, a) in enumerate(actions) if all(Q[k, j] == tops[j] for j in axes(Q, 2))]
+    robust = [a
+              for (k, a) in enumerate(actions)
+              if all(Q[k, j] == tops[j] for j in axes(Q, 2))]
     losses = [a => maximum(tops[j] - Q[k, j] for j in axes(Q, 2))
               for (k, a) in enumerate(actions)]
     return (; best, robust, reversal=isempty(robust), losses)

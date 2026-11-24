@@ -117,11 +117,14 @@ draws), as its sufficient statistics: `(; x1)` for a [`BinomialStudy`](@ref),
 [`NormalStudy`](@ref). These are also the summary statistics that the regression
 method regresses on.
 """
-simulate_study(rng::AbstractRNG, s::BinomialStudy, θ) =
-    (; x1=_binomial(rng, s.n, _probability(θ, s.parameter)))
-simulate_study(rng::AbstractRNG, s::TwoArmBinomialStudy, θ) =
-    (; x1=_binomial(rng, s.n, _probability(θ, s.parameters[1])),
-     x2=_binomial(rng, s.n, _probability(θ, s.parameters[2])))
+simulate_study(rng::AbstractRNG, s::BinomialStudy, θ) = (;
+                                                         x1=_binomial(rng, s.n,
+                                                                      _probability(θ,
+                                                                                   s.parameter)))
+function simulate_study(rng::AbstractRNG, s::TwoArmBinomialStudy, θ)
+    return (; x1=_binomial(rng, s.n, _probability(θ, s.parameters[1])),
+            x2=_binomial(rng, s.n, _probability(θ, s.parameters[2])))
+end
 function simulate_study(rng::AbstractRNG, s::NormalStudy, θ)
     haskey(θ, s.parameter) ||
         throw(ArgumentError("the draw has no parameter $(s.parameter)"))
@@ -137,13 +140,16 @@ _binomial_loglikelihood(x::Real, n::Int, p::Float64) = _xlogy(x, p) + _xlogy(n -
 The log-likelihood of a data set of [`simulate_study`](@ref) under the parameters `θ`,
 up to a constant that does not depend on `θ` (the binomial coefficient is left out).
 """
-study_loglikelihood(s::BinomialStudy, data, θ) =
-    _binomial_loglikelihood(data.x1, s.n, _probability(θ, s.parameter))
-study_loglikelihood(s::TwoArmBinomialStudy, data, θ) =
-    _binomial_loglikelihood(data.x1, s.n, _probability(θ, s.parameters[1])) +
-    _binomial_loglikelihood(data.x2, s.n, _probability(θ, s.parameters[2]))
-study_loglikelihood(s::NormalStudy, data, θ) =
-    -s.n * (data.xbar - Float64(getproperty(θ, s.parameter)))^2 / (2 * s.sd^2)
+study_loglikelihood(s::BinomialStudy, data, θ) = _binomial_loglikelihood(data.x1, s.n,
+                                                                         _probability(θ,
+                                                                                      s.parameter))
+function study_loglikelihood(s::TwoArmBinomialStudy, data, θ)
+    return _binomial_loglikelihood(data.x1, s.n, _probability(θ, s.parameters[1])) +
+           _binomial_loglikelihood(data.x2, s.n, _probability(θ, s.parameters[2]))
+end
+function study_loglikelihood(s::NormalStudy, data, θ)
+    return -s.n * (data.xbar - Float64(getproperty(θ, s.parameter)))^2 / (2 * s.sd^2)
+end
 
 function _prior_fields(prior, names, design)
     (prior isa NamedTuple && all(k -> haskey(prior, k), names)) ||
@@ -163,7 +169,8 @@ data set, by its conjugate analysis: a named tuple of vectors, one per parameter
 came from, or [`evsi`](@ref) by moment matching values a study against one belief and
 analyses it with another.
 """
-function study_posterior(rng::AbstractRNG, s::BinomialStudy, data, prior; draws::Integer=1000)
+function study_posterior(rng::AbstractRNG, s::BinomialStudy, data, prior;
+                         draws::Integer=1000)
     p = _prior_fields(prior, (:a, :b), s)
     return NamedTuple{(s.parameter,)}(([_beta(rng, p.a + data.x1, p.b + s.n - data.x1)
                                         for _ in 1:draws],))

@@ -265,10 +265,13 @@ end
         # So runs made elsewhere by the same convention are reproduced exactly, and a
         # new action shares random numbers with them: the two go in one table.
         stored = [(; draw=draws.id[d], action=:none, replicate=r,
-                   DecisionAnalysis.outcome(DecisionAnalysis.simulate(
-                       DecisionAnalysis.with_parameters(pond, (; frogs=draws.frogs[d],
-                                                                survival=draws.survival[d]));
-                       rng=Xoshiro(convention((; id=draws.id[d]), r))))...)
+                   DecisionAnalysis.outcome(DecisionAnalysis.simulate(DecisionAnalysis.with_parameters(pond,
+                                                                                                       (;
+                                                                                                        frogs=draws.frogs[d],
+                                                                                                        survival=draws.survival[d]));
+                                                                      rng=Xoshiro(convention((;
+                                                                                              id=draws.id[d]),
+                                                                                             r))))...)
                   for d in 1:3 for r in 1:4]
         old = OutcomeTable(stored; outcomes=[:uninfected, :infected, :first_draw])
         new = outcomes(pond, [:fence], draws; replicates=4, run_seed=convention)
@@ -318,7 +321,8 @@ end
         @test run_counts(t) == (; runs=18, ok=16, failed=2, absent=0)
         # Against the table built from all the rows at once.
         whole = build(vcat([row(d, :a, r) for d in 1:3 for r in 1:2],
-                           sort(brows; by=x -> (x.draw, x.replicate))); actions=[:a, :b, :c])
+                           sort(brows; by=x -> (x.draw, x.replicate)));
+                      actions=[:a, :b, :c])
         @test t.status == whole.status
         ok = t.status .== "ok"
         @test all(t.values[:, :, :, k][ok] == whole.values[:, :, :, k][ok] for k in 1:2)
@@ -332,14 +336,17 @@ end
         # What must agree.
         @test_throws ArgumentError combine_actions(a, a)
         other(rows; kw...) = OutcomeTable(rows; outcomes=[:n, :m], kw...)
-        @test_throws ArgumentError combine_actions(a, other([row(d, :b, r) for d in 1:2
-                                                             for r in 1:2];
-                                                            parameters=pars[1:2]))
-        @test_throws ArgumentError combine_actions(a, build([row(d, :b, r) for d in 1:3
-                                                             for r in 1:3]))
-        @test_throws ArgumentError combine_actions(a, other([row(d, :b, r) for d in 1:3
-                                                             for r in 1:2];
-                                                            parameters=pars))
+        @test_throws ArgumentError combine_actions(a,
+                                                   other([row(d, :b, r) for d in 1:2
+                                                          for r in 1:2];
+                                                         parameters=pars[1:2]))
+        @test_throws ArgumentError combine_actions(a,
+                                                   build([row(d, :b, r) for d in 1:3
+                                                          for r in 1:3]))
+        @test_throws ArgumentError combine_actions(a,
+                                                   other([row(d, :b, r) for d in 1:3
+                                                          for r in 1:2];
+                                                         parameters=pars))
         @test_throws ArgumentError combine_actions(a,
                                                    other([row(d, :b, r) for d in 1:3
                                                           for r in 1:2];
@@ -366,7 +373,8 @@ end
                   single_replicate(payoff_table(t, IndividualsUtility(:uninfected)))
         end
         # A cell left with one usable run by a failure is flagged too.
-        runs = [(; draw=1, action=a, replicate=r, n=r, status=(a == :b && r == 2) ? "x" : "ok")
+        runs = [(; draw=1, action=a, replicate=r, n=r,
+                 status=(a == :b && r == 2) ? "x" : "ok")
                 for a in (:a, :b) for r in 1:2]
         @test single_replicate(OutcomeTable(runs; outcomes=[:n], status=:status))
     end

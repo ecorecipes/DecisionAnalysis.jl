@@ -144,8 +144,9 @@ function variance_reduction_table(source::Union{SampleBelief,DecisionProblem}, i
                                   outputs; method::Union{Nothing,AbstractVOIMethod}=nothing)
     belief = _estimation_belief(source)
     focal_sets = [f isa Union{Symbol,AbstractString} ? Symbol(f) : Tuple(_focal_names(f))
-                  for f in (inputs isa Union{Symbol,AbstractString,Tuple{Vararg{Symbol}}} ?
-                            [inputs] : inputs)]
+                  for f in
+                      (inputs isa Union{Symbol,AbstractString,Tuple{Vararg{Symbol}}} ?
+                       [inputs] : inputs)]
     isempty(focal_sets) && throw(ArgumentError("no input was given"))
     named = outputs isa NamedTuple ? [k => v for (k, v) in pairs(outputs)] :
             [o isa Pair ? Symbol(first(o)) => last(o) : Symbol(o) => Symbol(o)
@@ -225,7 +226,8 @@ end
 function population_value(estimate::VOIEstimate; population::Real, horizon=nothing,
                           discount::Real=0)
     factor = _population_factor(population, horizon, discount)
-    return (; value=estimate.value * factor, standard_error=estimate.standard_error * factor)
+    return (; value=estimate.value * factor,
+            standard_error=estimate.standard_error * factor)
 end
 
 # A cost: a number, a (lower, upper) 95% interval, or (mean, lower, upper).
@@ -244,8 +246,10 @@ function _normal_cdf(x::Real)
     # Abramowitz and Stegun 26.2.17, absolute error below 7.5e-8.
     t = 1 / (1 + 0.2316419 * abs(x))
     tail = exp(-x^2 / 2) / sqrt(2π) *
-           t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 +
-                                                      t * (-1.821255978 + t * 1.330274429))))
+           t *
+           (0.319381530 +
+            t * (-0.356563782 + t * (1.781477937 +
+                                     t * (-1.821255978 + t * 1.330274429))))
     return x >= 0 ? 1 - tail : tail
 end
 
@@ -308,8 +312,10 @@ function _smooth_curve(x::Vector{Float64}, y::Vector{Float64}, xnew::Vector{Floa
     scale(v) = (v .- lo) ./ (hi - lo)
     interior = df - 4
     knots = [k / (interior + 1) for k in 1:interior]
-    basis(z) = hcat(ones(length(z)), z, z .^ 2, z .^ 3,
+    function basis(z)
+        return hcat(ones(length(z)), z, z .^ 2, z .^ 3,
                     (max.(z .- κ, 0.0) .^ 3 for κ in knots)...)
+    end
     coefficients = qr(basis(scale(x)), ColumnNorm()) \ y
     return basis(scale(xnew)) * coefficients
 end
@@ -433,9 +439,10 @@ function _regression_check(problem, columns, method, bins)
             share = wf[members] ./ mass
             m = dot(share, residual[members])
             se = sqrt(sum(share .^ 2 .* (residual[members] .- m) .^ 2))
-            push!(rows, (; action=labels[b], bin=c, fitted=dot(share, fitted[members]),
-                         residual_mean=m, standard_error=se,
-                         z=iszero(se) ? (iszero(m) ? 0.0 : Inf * sign(m)) : m / se))
+            push!(rows,
+                  (; action=labels[b], bin=c, fitted=dot(share, fitted[members]),
+                   residual_mean=m, standard_error=se,
+                   z=iszero(se) ? (iszero(m) ? 0.0 : Inf * sign(m)) : m / se))
         end
     end
     return (; method=_method_name(method),

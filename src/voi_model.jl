@@ -79,7 +79,8 @@ function evppi_nested(payoffs, sample_focal, sample_rest; outer::Integer, inner:
             length(y) == size(means, 1) ||
                 throw(ArgumentError("`payoffs` returned $(length(y)) payoffs in one " *
                                     "call and $(size(means, 1)) in another"))
-            total === nothing && ((total, products) = (zero(y), zeros(length(y), length(y))))
+            total === nothing &&
+                ((total, products) = (zero(y), zeros(length(y), length(y))))
             total .+= y
             products .+= y .* y'
         end
@@ -234,8 +235,9 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     if tr(fitted) <= 1e-12 * max(tr(prior), floatmin())
         # Learning the focal parameters exactly would change nothing.
         return VOIEstimate(:evsi, :MomentMatching, 0.0, 0.0, bias,
-                           merge(base, (; variance_removed=0.0, evppi_variance=0.0,
-                                        capped=false, model_evaluations=0)))
+                           merge(base,
+                                 (; variance_removed=0.0, evppi_variance=0.0,
+                                  capped=false, model_evaluations=0)))
     end
     # Nested data sets at draws spread over the most variable fitted contrast.
     spread = [fitted[k, k] for k in axes(fitted, 1)]
@@ -243,8 +245,9 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     cumulative = cumsum(wf[order])
     # One draw at random within each stratum of equal weight (a midpoint would never
     # reach the tails, where the variance left by a study can be largest).
-    picks = [order[min(searchsortedfirst(cumulative, (q - rand(rng)) / study.nested *
-                                                     cumulative[end]), length(order))]
+    picks = [order[min(searchsortedfirst(cumulative,
+                                         (q - rand(rng)) / study.nested *
+                                         cumulative[end]), length(order))]
              for q in 1:(study.nested)]
     rows = Tables.rowtable(belief.draws)
     all_cumulative = cumsum(wf)
@@ -255,8 +258,10 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     # focal values in the same way, so that their difference, the variance the study
     # removes, is neither swamped by the variance that no study of the focal
     # parameters touches nor biased by the accidents of how the draws were paired.
-    pick() = min(searchsortedfirst(all_cumulative, rand(rng) * all_cumulative[end]),
-                 length(rows))
+    function pick()
+        return min(searchsortedfirst(all_cumulative, rand(rng) * all_cumulative[end]),
+                   length(rows))
+    end
     function contrasts(θ)
         y = _payoff_vector(study.payoffs(θ))
         length(y) == size(Q, 1) ||
@@ -310,11 +315,12 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     centre = sum(leave_one_out) / K
     nested_se = sqrt((K - 1) / K * sum(v -> (v - centre)^2, leave_one_out))
     draws_se = _weighted_mean_se(best, wf)
-    details = merge(base, (; variance_removed=removed, evppi_variance=tr(fitted), capped,
-                           variance_ratio=ratio,
-                           model_evaluations=evaluations,
-                           draws_standard_error=draws_se,
-                           nested_standard_error=nested_se), info)
+    details = merge(base,
+                    (; variance_removed=removed, evppi_variance=tr(fitted), capped,
+                     variance_ratio=ratio,
+                     model_evaluations=evaluations,
+                     draws_standard_error=draws_se,
+                     nested_standard_error=nested_se), info)
     return VOIEstimate(:evsi, :MomentMatching, value, hypot(draws_se, nested_se), bias,
                        details)
 end
