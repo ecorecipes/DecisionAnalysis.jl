@@ -840,15 +840,26 @@ voi_table(["EVSI of the day-7 survey (10 swabs, 2 eDNA samples)" => survey,
 
 | estimate | value | standard error | act-now bias | cell-noise bias |
 |:---|---:|---:|---:|---:|
-| EVSI of the day-7 survey (10 swabs, 2 eDNA samples) | 0.42 | 0.05 | 0 | \- |
+| EVSI of the day-7 survey (10 swabs, 2 eDNA samples) | 0.42 | 0.33 | 0 | \- |
 | EVPI, plain (the ceiling) | 1.64 | 0.59 | 0 | 0.19 |
 
+The effective sample sizes are part of the estimate, and its standard
+error has two parts, from the simulated data sets and from the 100
+draws:
+
 ``` julia
-(median_effective_sample_size=survey.details.median_ess,
- smallest=survey.details.minimum_ess, draws=survey.details.draws)
+survey
 ```
 
-    (median_effective_sample_size = 9.936266256902119, smallest = 1.005886923035976, draws = 100)
+    VOIEstimate(evsi by ImportanceSampling: 0.422605 ± 0.333572 (standard error); act-now bias 0.0; posterior effective sample size: median 9.93627, smallest 1.00589 of 100 draws)
+
+``` julia
+(standard_error=survey.standard_error,
+ from_data_sets=survey.details.datasets_standard_error,
+ from_draws=survey.details.draws_standard_error)
+```
+
+    (standard_error = 0.3335717774214111, from_data_sets = 0.04617170710850643, from_draws = 0.3303608695877369)
 
 **How to read this.** The effective sample sizes are small: after a
 typical simulated survey about ten of the 100 draws carry the posterior
@@ -857,9 +868,13 @@ drifts upwards towards the plain EVPI. The honest reading is an order of
 magnitude: under these assumptions a day-7 survey is worth **a few
 tenths of a frog per pond**, perhaps a quarter of what perfect knowledge
 would be worth, and small beside the five frogs gained by simply
-treating early. The standard error shown covers the simulated data sets
-only, not the fact that there are 100 draws, so it understates the
-uncertainty.
+treating early. The standard error covers both the simulated data sets
+and the fact that there are only 100 draws, and the second part is by
+far the larger: it is nearly as large as the estimate, so with 100 draws
+the value of the survey is not distinguished from zero. It is a
+first-order calculation, too: with effective sample sizes this small it
+still understates the uncertainty, and it does not measure the upward
+drift.
 
 Two further limits. The survey also tells the manager about *this
 pond’s* epidemic trajectory, not only its parameters; the payoffs here
@@ -885,14 +900,14 @@ md_table(["assumption or design", "EVSI (frogs)", "standard error", "median effe
 
 | assumption or design | EVSI (frogs) | standard error | median effective sample size |
 |:---|---:|---:|---:|
-| reference: ρ = 1, κ = 1, σe = 1 | 0.42 | 0.05 | 9.94 |
-| swab yield ρ = 0.1 | 0.33 | 0.03 | 10.26 |
-| swab yield ρ = 10 | 0.38 | 0.05 | 9.49 |
-| eDNA yield κ = 0.01 | 0.42 | 0.05 | 16.06 |
-| eDNA noise σe = 2 | 0.29 | 0.03 | 15.12 |
-| swabs only | 0.05 | 0.02 | 50.99 |
-| eDNA only | 0.23 | 0.02 | 25.43 |
-| 30 swabs, 2 eDNA | 0.76 | 0.13 | 8.12 |
+| reference: ρ = 1, κ = 1, σe = 1 | 0.42 | 0.33 | 9.94 |
+| swab yield ρ = 0.1 | 0.33 | 0.31 | 10.26 |
+| swab yield ρ = 10 | 0.38 | 0.26 | 9.49 |
+| eDNA yield κ = 0.01 | 0.42 | 0.33 | 16.06 |
+| eDNA noise σe = 2 | 0.29 | 0.32 | 15.12 |
+| swabs only | 0.05 | 0.05 | 50.99 |
+| eDNA only | 0.23 | 0.28 | 25.43 |
+| 30 swabs, 2 eDNA | 0.76 | 0.48 | 8.12 |
 
 Across a hundredfold range of the swab yield, a hundredfold lower eDNA
 yield and a doubling of the eDNA noise, the estimate stays between about
@@ -901,12 +916,13 @@ day 7 few frogs carry Bd, so ten swabs alone say little, and under the
 reference scales most of the value comes from the water samples; thirty
 swabs with the water samples do better than ten.
 
-These comparisons are suggestive only. The standard errors leave out the
-error from having 100 draws, the rows with the most informative data
-have the smallest effective sample sizes and so the most upward drift,
-and the assay scales are placeholders. A sharper answer needs more draws
-(the full 2,132 points), so that the importance weights are not carried
-by a few of them, and assay scales measured for the system at hand.
+These comparisons are suggestive only. The standard errors, which
+include the error from having 100 draws, are as large as the differences
+between most rows; the rows with the most informative data have the
+smallest effective sample sizes and so the most upward drift, and the
+assay scales are placeholders. A sharper answer needs more draws (the
+full 2,132 points), so that the importance weights are not carried by a
+few of them, and assay scales measured for the system at hand.
 
 `enbs` is not used here: a survey’s cost would have to be stated in
 frogs, additively, and swabbing does not kill frogs in this model.

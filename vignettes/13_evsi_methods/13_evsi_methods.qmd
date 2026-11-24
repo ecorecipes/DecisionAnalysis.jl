@@ -92,9 +92,17 @@ function importance_evsi(n)
     return evsi(problem, study)
 end
 by_importance = [n => importance_evsi(n) for n in (2, 5, 10, 20, 50)]
-md_table(["trials", "EVSI", "standard error", "median effective sample size", "smallest"],
-         [[n, Float64(e.value), e.standard_error, e.details.median_ess, e.details.minimum_ess]
+md_table(["trials", "EVSI", "standard error", "from the data sets", "from the draws",
+          "median effective sample size", "smallest"],
+         [[n, Float64(e.value), e.standard_error, e.details.datasets_standard_error,
+           e.details.draws_standard_error, e.details.median_ess, e.details.minimum_ess]
           for (n, e) in by_importance]; digits=3)
+```
+
+The effective sample sizes are part of the estimate and are printed with it:
+
+```{julia}
+last(by_importance[3])
 ```
 
 The effective sample size is the diagnostic to watch. The more informative the data,
@@ -103,9 +111,15 @@ mean" is the payoff at one or two draws, noise and all, and the estimate drifts 
 towards the plain EVPI. Here the median is comfortable throughout, while the smallest,
 for data sets far in the tail, falls to one or two draws for the larger studies.
 
-The standard error of this method is over the simulated data sets only. It does not
-include the error from the finite number of draws, so it is smaller than the others'
-and not comparable with them.
+The estimate has two sources of Monte Carlo error, and its standard error combines
+them. One is the finite number of simulated data sets. The other is the finite number of
+draws: each posterior mean is a weighted average over the draws, and its error is
+carried through to the estimate by the delta method. The two parts are in the table.
+Here there is one data set per draw and the two parts are of similar size, so leaving
+either out would understate the error by about a quarter. The combined standard error
+is comparable with those of the other two methods. It is a
+first-order calculation, so when the effective sample size is small it understates the
+error and says nothing about the upward drift.
 
 ## The Gaussian approximation
 
@@ -188,6 +202,20 @@ best = argmax([b.value for b in net])
 A small study pays for itself and a large one does not: the EVSI curve flattens while
 the cost keeps rising. With a single pond no study is worth its newts.
 
+`optimal_design` makes the same comparison in one call, over a list of candidate
+studies or, as here, the sample sizes of one study, with the cost a function of the
+size:
+
+```{julia}
+design = optimal_design(problem, GaussianApproximation(:log_contact; n0, n=sizes);
+                        costs=n -> newts_per_trial * n, population=ponds)
+(best=design.best, criterion=design.criterion)
+```
+
+The best size is picked from estimates, so its net benefit is on average a little
+flattering, and sizes whose net benefits differ by less than their standard errors are
+not distinguished.
+
 ```{julia}
 [round(enbs(e; cost=newts_per_trial * n, population=1).value; digits=2)
  for (n, e) in zip(sizes, curve)]
@@ -230,8 +258,11 @@ voi_table(rows; digits=4, truth=[0.0723251, 0.0723251, 0.0723251, 0.0821176, 0.0
   fixes the method: `SummaryStatistics`, `ImportanceSampling` or
   `GaussianApproximation`.
 - Regression on summaries is EVPPI with the summary in place of the parameter.
-- Importance sampling needs only a log-likelihood. Its effective sample size must be
-  reported: when it is small the estimate drifts towards the EVPI.
+- Importance sampling needs only a log-likelihood. Its effective sample size is
+  reported with the estimate: when it is small the estimate drifts towards the EVPI.
+  Its standard error covers both the simulated data sets and the draws.
+- `optimal_design` compares candidate studies or sample sizes by EVSI, or by net benefit
+  in animals where payoffs are additive.
 - The Gaussian approximation gives a curve over sample size from one fit and the prior
   effective sample size.
 - No study of a parameter is worth more than its EVPPI.

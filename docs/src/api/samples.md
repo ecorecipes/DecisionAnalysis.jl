@@ -36,6 +36,8 @@ FunctionUtility
 payoff_table
 ```
 
+Utilities with a risk attitude and over several attributes are on [their own page](utilities.md).
+
 ## Estimates and their errors
 
 ```@docs
@@ -57,6 +59,7 @@ StrongOakley
 Sadatsafavi
 SplineRegression
 GAMRegression
+GaussianProcessRegression
 fitted_conditional_means
 ```
 

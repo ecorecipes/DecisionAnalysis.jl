@@ -32,9 +32,27 @@ robust_evsi
 RobustVOI
 ```
 
+## Outcomes, estimation and design
+
+```@docs
+voi_profile
+expected_variance_reduction
+optimal_design
+```
+
+## Influence diagrams
+
+```@docs
+normal_form
+```
+
 ## Fidelity
 
 ```@docs
 total_variation
 decision_loss_bound
+payoff_range
+largest_action_range
+largest_regret
+deficiency_value_bound
 ```

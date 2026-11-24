@@ -8,6 +8,8 @@ Simon Frost
 - [A discrete parameter](#a-discrete-parameter)
 - [All three, and groups of
   parameters](#all-three-and-groups-of-parameters)
+- [Five or more parameters: a Gaussian
+  process](#five-or-more-parameters-a-gaussian-process)
 - [A check against closed forms](#a-check-against-closed-forms)
 - [What to take away](#what-to-take-away)
 - [Next](#next)
@@ -35,6 +37,12 @@ and differ only in how they get the conditional means `g`:
 | `Sadatsafavi()` | one numeric parameter | the best one or two cut points along the parameter |
 | `SplineRegression()` | up to about four parameters | an additive regression spline, built in |
 | `GAMRegression()` | up to about four parameters | penalised smooths from GAM.jl, an optional extension |
+| `GaussianProcessRegression()` | five or more parameters | a Gaussian process with a linear mean, built in |
+
+Without a method, `evppi` chooses one by the focal parameters, as the R
+package `voi` does: grouping for a discrete parameter, a regression with
+smooths for up to four numeric parameters, a Gaussian process from five
+on.
 
 Each returns a `VOIEstimate`: the value, its standard error and the
 selection biases, in separate fields.
@@ -93,7 +101,7 @@ voi_table(contact)
 | additive spline (built in) | 1.654 |          0.087 |            0 |              \- |
 | Strong and Oakley, blocks  |  1.63 |          0.087 |            0 |              \- |
 | Sadatsafavi, one cut       | 1.663 |          0.089 |            0 |              \- |
-| Sadatsafavi, two cuts      | 1.656 |          0.092 |            0 |              \- |
+| Sadatsafavi, two cuts      | 1.663 |          0.089 |            0 |              \- |
 | ten bins of equal weight   | 1.638 |          0.088 |            0 |              \- |
 | GAM.jl smooth              | 1.503 |          0.086 |            0 |              \- |
 
@@ -231,6 +239,9 @@ groups = ["contact and habitat, spline" => evppi(problem, (:contact, :habitat), 
           "contact and habitat, spline with interaction" =>
               evppi(problem, (:contact, :habitat), SplineRegression(; interactions=true)),
           "contact and habitat, GAM.jl" => evppi(problem, (:contact, :habitat), GAMRegression()),
+          "contact and newts, spline" => evppi(problem, (:contact, :newts), SplineRegression()),
+          "contact and newts, Gaussian process" =>
+              evppi(problem, (:contact, :newts), GaussianProcessRegression()),
           "all three: the regression EVPI" => evpi(problem, SplineRegression()),
           "EVPI, plain sample average" =>
               evpi(problem, SampleAverage(); noise_correlation=crn_correlation(table, alive))]
@@ -242,14 +253,20 @@ voi_table(groups)
 | contact and habitat, spline | 1.709 | 0.085 | 0 | \- |
 | contact and habitat, spline with interaction | 1.81 | 0.085 | 0 | \- |
 | contact and habitat, GAM.jl | 1.612 | 0.084 | 0 | \- |
+| contact and newts, spline | 1.662 | 0.086 | 0 | \- |
+| contact and newts, Gaussian process | 1.678 | 0.089 | 0 | \- |
 | all three: the regression EVPI | 1.717 | 0.085 | 0 | \- |
 | EVPI, plain sample average | 1.914 | 0.082 | 0 | 0.269 |
 
 Transmission and habitat together account for most of the value of
-perfect information about the parameters. The plain sample average also
-counts the simulator’s own randomness as something to be learned, which
-no study of the parameters can deliver; its cell-noise bias column says
-how much its perfect-information term is inflated by that.
+perfect information about the parameters. The Gaussian process is shown
+on the two numeric parameters beside the spline, as a cross-check: it is
+a different regression of the same payoffs on the same columns, and the
+two agree within their standard errors. It is not needed for two
+parameters; its use is for many. The plain sample average also counts
+the simulator’s own randomness as something to be learned, which no
+study of the parameters can deliver; its cell-noise bias column says how
+much its perfect-information term is inflated by that.
 
 ``` julia
 labels = ["newts", "habitat", "contact", "contact + habitat", "all parameters"]
@@ -263,6 +280,61 @@ png_figure(plt)
 ```
 
 ![](12_evppi_methods_files/figure-commonmark/cell-12-output-1.png)
+
+## Five or more parameters: a Gaussian process
+
+An additive spline misses interactions between parameters, and a spline
+surface with every interaction has too many coefficients once there are
+more than a few. From five focal parameters on, `evppi` therefore uses
+`GaussianProcessRegression()`: a linear trend plus a smooth random
+function of all the parameters at once, with one length scale per
+parameter and a **nugget** for everything the focal parameters do not
+explain. The length scales and the nugget are chosen for each action by
+maximising the marginal likelihood on a seeded subsample of the draws,
+the process is conditioned on at most `max_points` draws (1500 by
+default), and it then predicts the conditional mean at **every** draw,
+so the whole sample enters the estimate.
+
+The pond has only three uncertain parameters, so the illustration adds
+four that a manager might also be unsure of. Each draw now carries a
+multiplier of the handling mortality, of the capture rate and of the two
+test errors, and the payoff of each intervention is adjusted by a
+made-up smooth function of them. **This adjustment is invented for the
+illustration** and is not part of the toy model.
+
+``` julia
+rng = Xoshiro(21)
+n = length(belief)
+extra = (; handling=randn(rng, n), capture=randn(rng, n), sensitivity=randn(rng, n),
+         specificity=randn(rng, n))
+base = payoff_table(table, alive).Q
+adjusted = Float64.(base)
+adjusted[2, :] .+= 1.5 .* extra.capture .- 2.0 .* extra.handling .+ 0.8 .* extra.capture .* extra.handling
+adjusted[3, :] .+= 1.5 .* extra.capture .+ 1.2 .* extra.sensitivity .- 1.0 .* extra.specificity
+wide_draws = merge((; contact=belief.draws.contact, newts=Float64.(belief.draws.newts)), extra)
+wide = DecisionProblem(PayoffTable(adjusted; actions=TOY_ACTIONS), SampleBelief(wide_draws);
+                       baseline=:none)
+five = (:contact, :handling, :capture, :sensitivity, :specificity)
+many = ["five parameters (default: Gaussian process)" => evppi(wide, five),
+        "the same five, additive spline" => evppi(wide, five, SplineRegression()),
+        "all six" => evppi(wide, (five..., :newts)),
+        "the four added ones only (spline, by default)" =>
+            evppi(wide, (:handling, :capture, :sensitivity, :specificity))]
+md_table(["focal parameters", "method chosen", "EVPPI (newts)", "standard error"],
+         [[name, String(e.method), Float64(e.value), e.standard_error] for (name, e) in many];
+         digits=3)
+```
+
+| focal parameters | method chosen | EVPPI (newts) | standard error |
+|:---|---:|---:|---:|
+| five parameters (default: Gaussian process) | GaussianProcessRegression | 1.928 | 0.112 |
+| the same five, additive spline | SplineRegression | 1.823 | 0.111 |
+| all six | GaussianProcessRegression | 2.067 | 0.113 |
+| the four added ones only (spline, by default) | SplineRegression | 0.525 | 0.128 |
+
+The method column shows the rule at work: four parameters go to the
+spline and five or six to the Gaussian process. An explicit method
+always overrides it.
 
 ## A check against closed forms
 
@@ -309,11 +381,47 @@ Every estimate is within about two standard errors of its closed form.
 The estimates share one sample, so their errors are correlated: they
 miss on the same side.
 
+The same model with four more parameters checks the Gaussian process,
+since the closed form extends: with payoffs 0 and p₁ − p₂ + (x₃ + x₄ +
+x₅ + x₆) / 2 and x₃ to x₆ standard normal, learning a set of parameters
+leaves a normal conditional mean whose variance is the sum of their
+contributions.
+
+``` julia
+x = [randn(rng, 4000) for _ in 1:4]
+q1, q2 = p1[1:4000], p2[1:4000]
+six = DecisionProblem(PayoffTable(permutedims(hcat(zeros(4000), q1 .- q2 .+ 0.5 .* sum(x)));
+                                  actions=[:reference, :new]),
+                      SampleBelief((; p1=q1, p2=q2, x3=x[1], x4=x[2], x5=x[3], x6=x[4]));
+                      baseline=:reference)
+# E max(0, X) − 1 for X ~ N(1, σ²) is Φ(1/σ) + σ φ(1/σ) − 1; Φ by the midpoint rule.
+φ(z) = exp(-z^2 / 2) / sqrt(2π)
+Φ(z) = 0.5 + sum(φ((k - 0.5) * z / 20_000) for k in 1:20_000) * z / 20_000
+closed(variance) = (σ = sqrt(variance); Φ(1 / σ) + σ * φ(1 / σ) - 1)
+gp_checks = ["EVPPI(p1, x3..x6), Gaussian process" => evppi(six, (:p1, :x3, :x4, :x5, :x6)),
+             "EVPPI(p2, x3..x6), Gaussian process" => evppi(six, (:p2, :x3, :x4, :x5, :x6))]
+voi_table(gp_checks; digits=4, truth=[closed(1 + 1), closed(4 + 1)])
+```
+
+| estimate | value | standard error | act-now bias | cell-noise bias | reference |
+|:---|---:|---:|---:|---:|---:|
+| EVPPI(p1, x3..x6), Gaussian process | 0.2245 | 0.0176 | 0 | \- | 0.1996 |
+| EVPPI(p2, x3..x6), Gaussian process | 0.4957 | 0.0177 | 0 | \- | 0.4798 |
+
+These estimators are also compared with the R package `voi` on the same
+draws: its `so` and `sal` methods agree with `StrongOakley` and
+`Sadatsafavi` to rounding, and its generalised additive model and
+Gaussian process agree with `GAMRegression` and
+`GaussianProcessRegression` to within a small fraction of a standard
+error. The scripts and the numbers are in the `validation/` directory of
+the package.
+
 ## What to take away
 
 - `evppi(problem, focal, method)` estimates the value of learning the
   named parameters of the draws. Without a method, a non-numeric
-  parameter uses `Grouping()` and numeric ones `SplineRegression()`.
+  parameter uses `Grouping()`, one to four numeric ones
+  `SplineRegression()` and five or more `GaussianProcessRegression()`.
 - `Grouping`, `StrongOakley` and `Sadatsafavi` need no regression, and
   are cross-checks on it. `GAMRegression` needs `using GAM`; GAM.jl is
   not a dependency of the package.

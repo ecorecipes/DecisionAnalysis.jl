@@ -1666,7 +1666,7 @@ draw is the average over that draw’s 30 runs.</p>
 <td style="text-align: left;">EVSI of the day-7 survey (10 swabs, 2 eDNA
 samples)</td>
 <td style="text-align: right;">0.42</td>
-<td style="text-align: right;">0.05</td>
+<td style="text-align: right;">0.33</td>
 <td style="text-align: right;">0</td>
 <td style="text-align: right;">-</td>
 </tr>
@@ -1679,9 +1679,15 @@ samples)</td>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb46"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>(median_effective_sample_size<span class="op">=</span>survey.details.median_ess,</span>
-<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a> smallest<span class="op">=</span>survey.details.minimum_ess, draws<span class="op">=</span>survey.details.draws)</span></code></pre></div>
-<pre><code>(median_effective_sample_size = 9.936266256902119, smallest = 1.005886923035976, draws = 100)</code></pre>
+<p>The effective sample sizes are part of the estimate, and its standard
+error has two parts, from the simulated data sets and from the 100
+draws:</p>
+<div class="sourceCode" id="cb46"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>survey</span></code></pre></div>
+<pre><code>VOIEstimate(evsi by ImportanceSampling: 0.422605 ± 0.333572 (standard error); act-now bias 0.0; posterior effective sample size: median 9.93627, smallest 1.00589 of 100 draws)</code></pre>
+<div class="sourceCode" id="cb48"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>(standard_error<span class="op">=</span>survey.standard_error,</span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a> from_data_sets<span class="op">=</span>survey.details.datasets_standard_error,</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a> from_draws<span class="op">=</span>survey.details.draws_standard_error)</span></code></pre></div>
+<pre><code>(standard_error = 0.3335717774214111, from_data_sets = 0.04617170710850643, from_draws = 0.3303608695877369)</code></pre>
 <p><strong>How to read this.</strong> The effective sample sizes are
 small: after a typical simulated survey about ten of the 100 draws carry
 the posterior weight, and after some a single one does. In that regime
@@ -1689,9 +1695,13 @@ the estimate drifts upwards towards the plain EVPI. The honest reading
 is an order of magnitude: under these assumptions a day-7 survey is
 worth <strong>a few tenths of a frog per pond</strong>, perhaps a
 quarter of what perfect knowledge would be worth, and small beside the
-five frogs gained by simply treating early. The standard error shown
-covers the simulated data sets only, not the fact that there are 100
-draws, so it understates the uncertainty.</p>
+five frogs gained by simply treating early. The standard error covers
+both the simulated data sets and the fact that there are only 100 draws,
+and the second part is by far the larger: it is nearly as large as the
+estimate, so with 100 draws the value of the survey is not distinguished
+from zero. It is a first-order calculation, too: with effective sample
+sizes this small it still understates the uncertainty, and it does not
+measure the upward drift.</p>
 <p>Two further limits. The survey also tells the manager about <em>this
 pond’s</em> epidemic trajectory, not only its parameters; the payoffs
 here are averages over replicates, so that part of the survey’s value is
@@ -1699,17 +1709,17 @@ not counted. And the number of swabs taken reveals <code>N</code> for
 small ponds, which the likelihood does not use.</p>
 <h2 id="sensitivity-to-the-assay-scales-and-the-design">Sensitivity to
 the assay scales and the design</h2>
-<div class="sourceCode" id="cb48"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>variants <span class="op">=</span> [<span class="st">&quot;reference: ρ = 1, κ = 1, σe = 1&quot;</span> <span class="op">=&gt;</span> (reference, (;)),</span>
-<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;swab yield ρ = 0.1&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">0.1</span>, κ<span class="op">=</span><span class="fl">1.0</span>, σe<span class="op">=</span><span class="fl">1.0</span>), (;)),</span>
-<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;swab yield ρ = 10&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">10.0</span>, κ<span class="op">=</span><span class="fl">1.0</span>, σe<span class="op">=</span><span class="fl">1.0</span>), (;)),</span>
-<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;eDNA yield κ = 0.01&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">1.0</span>, κ<span class="op">=</span><span class="fl">0.01</span>, σe<span class="op">=</span><span class="fl">1.0</span>), (;)),</span>
-<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;eDNA noise σe = 2&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">1.0</span>, κ<span class="op">=</span><span class="fl">1.0</span>, σe<span class="op">=</span><span class="fl">2.0</span>), (;)),</span>
-<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;swabs only&quot;</span> <span class="op">=&gt;</span> (reference, (; edna<span class="op">=</span><span class="fl">0</span>)),</span>
-<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;eDNA only&quot;</span> <span class="op">=&gt;</span> (reference, (; swabs<span class="op">=</span><span class="fl">0</span>)),</span>
-<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;30 swabs, 2 eDNA&quot;</span> <span class="op">=&gt;</span> (reference, (; swabs<span class="op">=</span><span class="fl">30</span>))]</span>
-<span id="cb48-9"><a href="#cb48-9" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> [name <span class="op">=&gt;</span> <span class="fu">evsi</span>(problem, <span class="fu">survey_study</span>(obs; design<span class="op">...</span>)) for (name, (obs, design)) <span class="kw">in</span> variants]</span>
-<span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;assumption or design&quot;</span>, <span class="st">&quot;EVSI (frogs)&quot;</span>, <span class="st">&quot;standard error&quot;</span>, <span class="st">&quot;median effective sample size&quot;</span>],</span>
-<span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a>         [[name, <span class="fu">Float64</span>(<span class="cn">e</span>.value), <span class="cn">e</span>.standard_error, <span class="cn">e</span>.details.median_ess] for (name, <span class="cn">e</span>) <span class="kw">in</span> results])</span></code></pre></div>
+<div class="sourceCode" id="cb50"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>variants <span class="op">=</span> [<span class="st">&quot;reference: ρ = 1, κ = 1, σe = 1&quot;</span> <span class="op">=&gt;</span> (reference, (;)),</span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;swab yield ρ = 0.1&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">0.1</span>, κ<span class="op">=</span><span class="fl">1.0</span>, σe<span class="op">=</span><span class="fl">1.0</span>), (;)),</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;swab yield ρ = 10&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">10.0</span>, κ<span class="op">=</span><span class="fl">1.0</span>, σe<span class="op">=</span><span class="fl">1.0</span>), (;)),</span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;eDNA yield κ = 0.01&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">1.0</span>, κ<span class="op">=</span><span class="fl">0.01</span>, σe<span class="op">=</span><span class="fl">1.0</span>), (;)),</span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;eDNA noise σe = 2&quot;</span> <span class="op">=&gt;</span> (<span class="fu">SurveyObservation</span>(; ρ<span class="op">=</span><span class="fl">1.0</span>, κ<span class="op">=</span><span class="fl">1.0</span>, σe<span class="op">=</span><span class="fl">2.0</span>), (;)),</span>
+<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;swabs only&quot;</span> <span class="op">=&gt;</span> (reference, (; edna<span class="op">=</span><span class="fl">0</span>)),</span>
+<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;eDNA only&quot;</span> <span class="op">=&gt;</span> (reference, (; swabs<span class="op">=</span><span class="fl">0</span>)),</span>
+<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;30 swabs, 2 eDNA&quot;</span> <span class="op">=&gt;</span> (reference, (; swabs<span class="op">=</span><span class="fl">30</span>))]</span>
+<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> [name <span class="op">=&gt;</span> <span class="fu">evsi</span>(problem, <span class="fu">survey_study</span>(obs; design<span class="op">...</span>)) for (name, (obs, design)) <span class="kw">in</span> variants]</span>
+<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;assumption or design&quot;</span>, <span class="st">&quot;EVSI (frogs)&quot;</span>, <span class="st">&quot;standard error&quot;</span>, <span class="st">&quot;median effective sample size&quot;</span>],</span>
+<span id="cb50-11"><a href="#cb50-11" aria-hidden="true" tabindex="-1"></a>         [[name, <span class="fu">Float64</span>(<span class="cn">e</span>.value), <span class="cn">e</span>.standard_error, <span class="cn">e</span>.details.median_ess] for (name, <span class="cn">e</span>) <span class="kw">in</span> results])</span></code></pre></div>
 <table>
 <thead>
 <tr>
@@ -1723,49 +1733,49 @@ the assay scales and the design</h2>
 <tr>
 <td style="text-align: left;">reference: ρ = 1, κ = 1, σe = 1</td>
 <td style="text-align: right;">0.42</td>
-<td style="text-align: right;">0.05</td>
+<td style="text-align: right;">0.33</td>
 <td style="text-align: right;">9.94</td>
 </tr>
 <tr>
 <td style="text-align: left;">swab yield ρ = 0.1</td>
 <td style="text-align: right;">0.33</td>
-<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">0.31</td>
 <td style="text-align: right;">10.26</td>
 </tr>
 <tr>
 <td style="text-align: left;">swab yield ρ = 10</td>
 <td style="text-align: right;">0.38</td>
-<td style="text-align: right;">0.05</td>
+<td style="text-align: right;">0.26</td>
 <td style="text-align: right;">9.49</td>
 </tr>
 <tr>
 <td style="text-align: left;">eDNA yield κ = 0.01</td>
 <td style="text-align: right;">0.42</td>
-<td style="text-align: right;">0.05</td>
+<td style="text-align: right;">0.33</td>
 <td style="text-align: right;">16.06</td>
 </tr>
 <tr>
 <td style="text-align: left;">eDNA noise σe = 2</td>
 <td style="text-align: right;">0.29</td>
-<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">0.32</td>
 <td style="text-align: right;">15.12</td>
 </tr>
 <tr>
 <td style="text-align: left;">swabs only</td>
 <td style="text-align: right;">0.05</td>
-<td style="text-align: right;">0.02</td>
+<td style="text-align: right;">0.05</td>
 <td style="text-align: right;">50.99</td>
 </tr>
 <tr>
 <td style="text-align: left;">eDNA only</td>
 <td style="text-align: right;">0.23</td>
-<td style="text-align: right;">0.02</td>
+<td style="text-align: right;">0.28</td>
 <td style="text-align: right;">25.43</td>
 </tr>
 <tr>
 <td style="text-align: left;">30 swabs, 2 eDNA</td>
 <td style="text-align: right;">0.76</td>
-<td style="text-align: right;">0.13</td>
+<td style="text-align: right;">0.48</td>
 <td style="text-align: right;">8.12</td>
 </tr>
 </tbody>
@@ -1776,23 +1786,24 @@ about 0.3 and 0.4 frogs per pond. The design matters more than the
 scales. On day 7 few frogs carry Bd, so ten swabs alone say little, and
 under the reference scales most of the value comes from the water
 samples; thirty swabs with the water samples do better than ten.</p>
-<p>These comparisons are suggestive only. The standard errors leave out
-the error from having 100 draws, the rows with the most informative data
-have the smallest effective sample sizes and so the most upward drift,
-and the assay scales are placeholders. A sharper answer needs more draws
-(the full 2,132 points), so that the importance weights are not carried
-by a few of them, and assay scales measured for the system at hand.</p>
+<p>These comparisons are suggestive only. The standard errors, which
+include the error from having 100 draws, are as large as the differences
+between most rows; the rows with the most informative data have the
+smallest effective sample sizes and so the most upward drift, and the
+assay scales are placeholders. A sharper answer needs more draws (the
+full 2,132 points), so that the importance weights are not carried by a
+few of them, and assay scales measured for the system at hand.</p>
 <p><code>enbs</code> is not used here: a survey’s cost would have to be
 stated in frogs, additively, and swabbing does not kill frogs in this
 model.</p>
 <h1 id="the-report">The report</h1>
-<div class="sourceCode" id="cb49"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DecisionReport</span>(problem; parameters<span class="op">=</span>[<span class="op">:</span>group], regression<span class="op">=</span><span class="cn">nothing</span>, noise_correlation<span class="op">=</span>rho,</span>
-<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>               assumptions<span class="op">=</span>[<span class="st">&quot;The draws are a stratified sample of a space-filling design, weighted to &quot;</span> <span class="op">*</span></span>
-<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;stand for its 2,132 points; treating that as a belief is an assumption.&quot;</span>,</span>
-<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;Runs are ours, of the Drawert et al. (2017) model; nothing here is a &quot;</span> <span class="op">*</span></span>
-<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;published result.&quot;</span>,</span>
-<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;A pulse is skipped once the frogs or Bd have gone, which makes late &quot;</span> <span class="op">*</span></span>
-<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;culls look less harmful than they would be.&quot;</span>])</span></code></pre></div>
+<div class="sourceCode" id="cb51"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DecisionReport</span>(problem; parameters<span class="op">=</span>[<span class="op">:</span>group], regression<span class="op">=</span><span class="cn">nothing</span>, noise_correlation<span class="op">=</span>rho,</span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>               assumptions<span class="op">=</span>[<span class="st">&quot;The draws are a stratified sample of a space-filling design, weighted to &quot;</span> <span class="op">*</span></span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;stand for its 2,132 points; treating that as a belief is an assumption.&quot;</span>,</span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;Runs are ours, of the Drawert et al. (2017) model; nothing here is a &quot;</span> <span class="op">*</span></span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;published result.&quot;</span>,</span>
+<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;A pulse is skipped once the frogs or Bd have gone, which makes late &quot;</span> <span class="op">*</span></span>
+<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;culls look less harmful than they would be.&quot;</span>])</span></code></pre></div>
 <p><strong>DecisionReport: 10 actions × 100 states,
 SampleBelief</strong><br />
 <strong>Baseline (no intervention): none</strong></p>

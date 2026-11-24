@@ -13,9 +13,11 @@ Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
 [weakdeps]
 GAM = "f5b95e24-6450-466f-92b1-fee0c65c0d6b"
+InfluenceDiagrams = "cd3dbe2d-275d-4a8e-841a-d44f7f7abf07"
 
 [extensions]
 DecisionAnalysisGAMExt = "GAM"
+DecisionAnalysisInfluenceDiagramsExt = "InfluenceDiagrams"
 
 [sources]
 FiniteKernels = {path = "../FiniteKernels.jl"}
@@ -27,6 +29,7 @@ CDDLib = "0.10"
 FiniteKernels = "0.1"
 GAM = "0.3"
 HiGHS = "1"
+InfluenceDiagrams = "0.1"
 JSON = "0.21, 1"
 JuMP = "1.32"
 LinearAlgebra = "1"

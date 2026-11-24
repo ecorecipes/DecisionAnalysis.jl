@@ -19,3 +19,11 @@ docs/Manifest-v*.toml
 *.out
 *.toc
 !vignettes/_pandoc/header.tex
+
+# The Python environment of validation/ (see validation/README.md).
+validation/.venv/
+validation/__pycache__/
+
+# The environment of the gated influence-diagram bridge tests is resolved on demand.
+test/influence_diagrams/Manifest.toml
+test/influence_diagrams/Manifest-v*.toml

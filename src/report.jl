@@ -5,7 +5,8 @@
                    experiments=nothing, partitions=nothing, objectives=nothing,
                    pareto=nothing, hurwicz=nothing, assumptions=String[],
                    optimizer=nothing, parameters=nothing,
-                   regression=SplineRegression(), seed=1, noise_correlation=0)
+                   regression=SplineRegression(), seed=1, noise_correlation=0,
+                   profile=false, quantities=nothing)
 
 Everything the package can say about one problem, side by side, so that a decision
 that is contested between rules is seen to be contested. Which parts are filled
@@ -56,6 +57,16 @@ of the states (each a vector with one entry per state, as for [`evppi`](@ref)); 
 each the report gives the EVPPI. Both need a single prior
 ([`BeliefFormError`](@ref) otherwise).
 
+**Optional sections.** With `profile = true` the report adds, for every experiment,
+its value **outcome by outcome** ([`voi_profile`](@ref)): the probability of each
+signal, the action chosen after it and what that outcome is worth, with the standard
+deviation of the realised value and the probability that the study changes nothing.
+`quantities` is a named collection of quantities of interest, each a vector with one
+number per state; the report then adds the **value of information for estimation**,
+the expected reduction of the variance of each quantity by each experiment and each
+partition ([`expected_variance_reduction`](@ref)). Both need a finite single prior
+and experiments or partitions to report on.
+
 **Several objectives.** `objectives` is a named collection of payoff tables on the
 actions and states of the problem, one per objective, all utilities (higher is
 better). The report then has a multi-objective section: the [`ParetoFront`](@ref)
@@ -93,6 +104,10 @@ Fields:
 - `pareto`: the result of the Pareto front, when `objectives` were given.
 - `assumptions`: the stated assumptions under which the numbers hold, to which the
   strings in the `assumptions` keyword are appended.
+- `profiles`: with `profile = true`, one `(; name, profile)` per experiment;
+  `estimation`: with `quantities`, one `(; source, quantity, prior_variance,
+  expected_posterior_variance, reduction, share)` per experiment or partition and
+  quantity.
 - `monte_carlo`: for a sample-based problem, the named tuple `(; expected_utility,
   expected_gain, evpi, evpi_regression, evppi, variance, single_replicate)` of the
   estimates described above (`nothing` where one does not apply).
@@ -123,6 +138,8 @@ struct DecisionReport{P<:DecisionProblem}
     pareto::Union{Nothing,DecisionResult}
     assumptions::Vector{String}
     monte_carlo::Union{Nothing,NamedTuple}
+    profiles::Vector{NamedTuple}
+    estimation::Vector{NamedTuple}
 end
 
 function _has_prior(p::DecisionProblem)
@@ -144,7 +161,8 @@ function DecisionReport(problem::DecisionProblem;
                         assumptions::AbstractVector{<:AbstractString}=String[],
                         optimizer=nothing, parameters=nothing,
                         regression::Union{Nothing,AbstractRegression}=SplineRegression(),
-                        seed::Integer=1, noise_correlation::Real=0)
+                        seed::Integer=1, noise_correlation::Real=0, profile::Bool=false,
+                        quantities=nothing)
     belief = problem.belief
     sampled = belief isa SampleBelief
     parameters === nothing || sampled ||
@@ -209,6 +227,33 @@ function DecisionReport(problem::DecisionProblem;
     partition_rows = NamedTuple[(; name, evppi=evppi(problem, part))
                                 for (name, part) in named_partitions]
 
+    profile_rows = NamedTuple[]
+    estimation_rows = NamedTuple[]
+    if profile || quantities !== nothing
+        belief isa Union{FiniteBelief,PointBelief} ||
+            throw(BeliefFormError(:DecisionReport, nameof(typeof(belief)),
+                                  "the per-outcome profile and the estimation value " *
+                                  "are computed exactly and need a finite single prior"))
+        isempty(named_experiments) && isempty(named_partitions) &&
+            throw(ArgumentError("`profile` and `quantities` report on experiments or " *
+                                "partitions; give `experiments` or `partitions`"))
+    end
+    if profile
+        for (name, e) in named_experiments
+            push!(profile_rows, (; name, profile=voi_profile(problem, e)))
+        end
+    end
+    if quantities !== nothing
+        named_quantities = _named_items(quantities, AbstractVector, "quantities")
+        for (source, item) in vcat(named_experiments, named_partitions),
+            (quantity, g) in named_quantities
+
+            push!(estimation_rows,
+                  merge((; source, quantity),
+                        expected_variance_reduction(problem, item, g)))
+        end
+    end
+
     front = nothing
     if objectives !== nothing
         rule = pareto === nothing ? _default_pareto(belief) : pareto
@@ -250,6 +295,16 @@ function DecisionReport(problem::DecisionProblem;
         push!(notes,
               "EVPPI is the value of learning which cell of a partition of the states " *
               "holds, and nothing more, at no cost.")
+    isempty(profile_rows) ||
+        push!(notes,
+              "The value by outcome is the posterior expected utility of the best " *
+              "action after a signal minus that of the action chosen now; its " *
+              "probability-weighted mean is the EVSI.")
+    isempty(estimation_rows) ||
+        push!(notes,
+              "The variance reduction is the value of information for estimating a " *
+              "quantity, in its squared units. It measures learning, not deciding: a " *
+              "study can reduce a variance and still be unable to change the decision.")
     if robust_problem !== nothing
         k = length(robust_problem.belief.points)
         push!(notes,
@@ -293,7 +348,7 @@ function DecisionReport(problem::DecisionProblem;
                           single ? evpi(problem) : nothing,
                           isempty(experiment_rows) ? nothing : first(experiment_rows).evsi,
                           experiment_rows, partition_rows, robust_value, front, notes,
-                          monte_carlo)
+                          monte_carlo, profile_rows, estimation_rows)
 end
 
 # The Monte Carlo section of a sample-based report; appends its assumptions to `notes`.

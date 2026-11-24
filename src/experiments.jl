@@ -290,7 +290,7 @@ payoff table with range `B` (largest minus smallest payoff), the value of acting
 `e′` from `e` through the minimising `G` and act as if the result were `e′`). The
 bound also holds with the sharper constant `B` = the largest entry of the
 [`regret_table`](@ref), which is never more than the range (proved in the Lean
-development).
+development): see [`largest_regret`](@ref) and [`deficiency_value_bound`](@ref).
 
 Computed by the linear programme of [`deficiency_model`](@ref), solved by
 [`solve_program`](@ref) with the keywords `optimizer` and `rounding_tol`: by default
@@ -335,12 +335,36 @@ What [`garbling_result`](@ref) returns. Fields:
   optimiser) with a floating-point optimiser. Every answer for floating-point
   likelihoods, or with a nonzero `atol`, is numerical.
 - `route`: the route that solved the programme (see [`ProgramSolution`](@ref)).
+- `separating`: when the answer is an exact "no", a **separating decision problem**:
+  a [`DecisionProblem`](@ref) on the states of the experiments, with one action per
+  signal of the first experiment and a uniform prior, in which the first experiment
+  is worth strictly more than the second (`evsi(separating, e′) > evsi(separating,
+  e)`, checked in exact arithmetic before it is returned). By Blackwell's theorem
+  such a problem exists exactly when the first experiment is not a garbling of the
+  second, so it is the reason for the "no" in a form that can be inspected: a
+  decision-maker who would rather have the first experiment. It is the content of
+  the file written by [`export_not_garbling_witness`](@ref). `nothing` when the
+  answer is yes, when it is numerical, or when `separating = false` was passed.
 """
-struct GarblingResult{M<:Union{Nothing,Matrix}}
+struct GarblingResult{M<:Union{Nothing,Matrix},P<:Union{Nothing,DecisionProblem}}
     is_garbling::Bool
     witness::M
     exact::Bool
     route::Symbol
+    separating::P
+end
+function GarblingResult(is_garbling::Bool, witness, exact::Bool, route::Symbol)
+    return GarblingResult(is_garbling, witness, exact, route, nothing)
+end
+
+# The separating payoff table of `_separating_payoff` as a decision problem.
+function _separating_problem(found, e′::Experiment)
+    found === nothing && return nothing
+    V, prior = found
+    states = e′.states === nothing ? _default_labels("s", size(V, 2)) : e′.states
+    actions = [Symbol("act_on_", z) for z in e′.signals]
+    allunique(actions) || (actions = _default_labels("a", size(V, 1)))
+    return DecisionProblem(PayoffTable(actions, states, V), FiniteBelief(states, prior))
 end
 
 function _is_garbling_witness(G::AbstractMatrix, L::AbstractMatrix, Lt::AbstractMatrix)
@@ -349,7 +373,7 @@ end
 
 """
     garbling_result(e′::Experiment, e::Experiment; atol, optimizer=nothing,
-                    rounding_tol=(1e-8, 1e-10, 1e-12)) -> GarblingResult
+                    rounding_tol=(1e-8, 1e-10, 1e-12), separating=true) -> GarblingResult
 
 Decide whether `e′` is a garbling of `e` (whether `e′` is less informative than `e`
 in Blackwell's order) and say how sure the answer is; [`is_garbling_of`](@ref)
@@ -360,8 +384,13 @@ feasibility programme of [`garbling_model`](@ref) is solved. A witness, whatever
 found it, is returned only after it has passed the exact check; with a
 floating-point `optimizer` it is first rounded and cleaned up (negative entries to
 zero, columns renormalised), and [`ExactVerificationError`](@ref) is thrown if the
-optimiser reports a garbling and the cleaned matrix is not exactly one. A "no" from a
-floating-point optimiser is numerical and is marked so.
+optimiser reports a garbling and the cleaned matrix is not exactly one. When the
+answer is no, the programme of [`separating_payoff_model`](@ref) is solved as well
+and the result carries the separating decision problem (see
+[`GarblingResult`](@ref)); `separating = false` skips that second programme when only
+the yes or no is wanted and the first programme was solved exactly. A "no" from a
+floating-point optimiser is exact once a separating problem passes the exact check,
+and numerical, and marked so, otherwise.
 
 Otherwise (floating-point likelihoods, or `atol > 0`) the programme of
 [`deficiency_model`](@ref) is solved and the pair counts as a garbling when the
@@ -372,7 +401,8 @@ numerical.
 """
 function garbling_result(e′::Experiment, e::Experiment;
                          atol::Real=_default_atol(promote_type(eltype(e), eltype(e′))),
-                         optimizer=nothing, rounding_tol=_ROUNDING_TOLS)
+                         optimizer=nothing, rounding_tol=_ROUNDING_TOLS,
+                         separating::Bool=true)
     T = promote_type(eltype(e), eltype(e′))
     if !(_is_exact(T) && iszero(atol))
         d, G, _, route = _deficiency_solution(e, e′; optimizer, rounding_tol)
@@ -383,9 +413,11 @@ function garbling_result(e′::Experiment, e::Experiment;
     if sol.status === :infeasible
         # A "no" from a floating-point optimiser is exact once a separating payoff
         # table passes the exact check.
-        certified = sol.exact ||
-                    _separating_payoff(e′, e; optimizer, rounding_tol) !== nothing
-        return GarblingResult(false, nothing, certified, sol.route)
+        found = separating || !sol.exact ?
+                _separating_problem(_separating_payoff(e′, e; optimizer, rounding_tol),
+                                    e′) : nothing
+        return GarblingResult(false, nothing, sol.exact || found !== nothing, sol.route,
+                              found)
     end
     sol.status === :optimal || throw(LinearProgramError(:garbling, sol.status))
     G = sol.exact ? sol.values.G : _clean_columns(sol.values.G)
@@ -420,5 +452,5 @@ rational likelihoods a matrix that is returned has still been verified exactly, 
 function is_garbling_of(e′::Experiment, e::Experiment;
                         atol::Real=_default_atol(promote_type(eltype(e), eltype(e′))),
                         optimizer=nothing, rounding_tol=_ROUNDING_TOLS)
-    return garbling_result(e′, e; atol, optimizer, rounding_tol).witness
+    return garbling_result(e′, e; atol, optimizer, rounding_tol, separating=false).witness
 end

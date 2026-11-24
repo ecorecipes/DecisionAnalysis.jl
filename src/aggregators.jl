@@ -70,6 +70,12 @@ The Hurwicz criterion **over states**: `α · best + (1 − α) · worst`, where
 
 This is not [`AlphaMaxmin`](@ref), which mixes the lower and upper **expectations
 over a set of priors** and, following its own literature, puts `α` on the lower one.
+
+**Which way `α` runs differs between texts.** Here, as in Hurwicz's optimism index, it
+weights the best outcome. Several textbooks and software packages call `α` the
+coefficient of pessimism and put it on the worst outcome; a value from such a source
+is `Hurwicz(1 − α)` here. The independent Python reference of `validation/` uses the
+convention of this package and says so in its fixture.
 """
 struct Hurwicz{T<:Real} <: AbstractAggregator
     α::T
@@ -130,6 +136,14 @@ in the worst `α` share of the probability mass,
 `CVaR(1)` is the [`Expectation`](@ref) and the limit `α → 0` is the worst case over
 the support. Needs a single prior. Applied to a regret table it is the expected regret
 in the worst `α` share.
+
+**Conventions differ.** This is the tail mean of a **utility** at the tail
+probability `α`, so a larger value is better. Software for financial risk works with
+losses and reports a positive number for a bad tail: the R package `cvar` gives
+`ES(q, p_loss = α) = −CVaR(α)` and `VaR = −`[`Quantile`](@ref)`(α)`, and some texts
+index the level by the confidence `1 − α`. It equals the optimum of Rockafellar and
+Uryasev's programme `max_t t − E[(t − X)⁺] / α`. Both are checked in
+`test/test_validation.jl` against `cvar` and against scipy's `linprog`.
 """
 struct CVaR{T<:Real} <: AbstractAggregator
     α::T

@@ -12,7 +12,8 @@ each reported with its Monte Carlo standard error in a separate field.
 The package depends on [FiniteKernels.jl](https://github.com/ecorecipes/FiniteKernels.jl),
 [JuMP](https://jump.dev) (to state its linear programmes; no solver is a dependency), `LinearAlgebra`,
 `Random`, `Statistics` and `Tables`, and on no Catlab, GATlab or ACSets. [GAM.jl](https://github.com/ecorecipes/GAM.jl)
-is an optional regression backend, loaded as a weak-dependency extension.
+is an optional regression backend and [InfluenceDiagrams.jl](https://github.com/ecorecipes/InfluenceDiagrams.jl)
+an optional source of problems, each loaded as a weak-dependency extension.
 
 ## Features
 
@@ -68,17 +69,39 @@ is an optional regression backend, loaded as a weak-dependency extension.
   weight)` and `FunctionUtility`; `payoff_table(outcomes, utility)` gives the conditional expected utility
   of each cell with its standard error and replicate count in separate fields, and with `baseline` the
   paired gains over no intervention. A table built from one run per cell is flagged. No monetary costs.
+- **Risk attitude and several attributes.** `LinearUtility`, `ExponentialUtility` (constant absolute risk
+  aversion) and `PowerUtility` (constant relative risk aversion) on a named outcome, optionally scaled to
+  [0, 1] between a worst and a best level; `certainty_equivalent`, `risk_premium` and `inverse_utility`;
+  `AdditiveUtility` and the Keeney-Raiffa `MultiplicativeUtility` over named attributes with weights. A
+  non-linear utility is applied to every run before anything is averaged; its expected utility is no
+  longer a count of individuals, and the certainty equivalent returns to individuals.
+  `InfectionUtility` is the additive utility with unscaled counts.
 - **Sample-based value of information.** `evpi`, `evppi` and `evsi` called with a method return a
   `VOIEstimate`: the value, its standard error, and the two selection biases, never folded together.
   EVPI by sample average or by all-parameter regression, with `variance_components` for the split between
   parameter and simulation variance; EVPPI by `Grouping` (discrete parameters), `StrongOakley` and
-  `Sadatsafavi` (one parameter, no regression), `SplineRegression` (built-in additive regression spline)
-  and `GAMRegression` (GAM.jl extension); EVSI by `SummaryStatistics` (regression on summaries),
-  `ImportanceSampling` (from a log-likelihood) and `GaussianApproximation` (curves over sample size).
+  `Sadatsafavi` (one parameter, no regression), `SplineRegression` (built-in additive regression spline),
+  `GAMRegression` (GAM.jl extension) and `GaussianProcessRegression` (built in, for five or more focal
+  parameters); without a method `evppi` chooses by the focal parameters, as the R package `voi` does.
+  EVSI by `SummaryStatistics` (regression on summaries), `ImportanceSampling` (from a log-likelihood,
+  with the posterior effective sample sizes and a standard error that covers both the simulated data
+  sets and the draws) and `GaussianApproximation` (curves over sample size).
   Every estimator is tested against exact enumeration on finite problems and against closed forms.
+- **Outcomes, estimation and design.** `voi_profile` gives the value of an experiment outcome by outcome
+  (with its standard deviation and the probability that the study changes nothing);
+  `expected_variance_reduction` is the value of information for estimating a quantity;
+  `optimal_design` compares candidate experiments, studies or sample sizes by EVSI, or by net benefit in
+  individuals where payoffs are additive.
+- **Influence diagrams.** With InfluenceDiagrams.jl loaded, `normal_form(model)` turns a single-decision
+  influence diagram into a `DecisionProblem` and its information into an `Experiment`; the diagram's
+  structural values of information are then `evpi` and `evsi` on the table.
+- **Checked against other software.** The scripts in [`validation/`](validation/README.md) compare the
+  package with the R packages `voi` and `cvar` and with independent Python code and scipy's `linprog`;
+  the fixtures they write are read by the test suite, which needs neither R nor Python.
 - **Sensitivity.** `policy_regions` and `one_way_thresholds` (exact switch points of a weight, such as the
   weight on infected individuals), `weight_sweep`, `rank_reversals`.
-- **Fidelity.** `total_variation` and `decision_loss_bound(B, ε) = 2Bε`.
+- **Fidelity.** `total_variation` and `decision_loss_bound(B, ε) = 2Bε`, with the sharper constants
+  `largest_action_range` and `largest_regret` (`deficiency_value_bound`) beside `payoff_range`.
 - **Reports and certificates.** `DecisionReport` puts every applicable rule side by side with the regret
   profile, EVPI, the EVSI of several named experiments (and whether each can change the decision), the
   EVPPI of named partitions, the robust sets, an optional Pareto section over several objectives, the gain
@@ -163,9 +186,10 @@ is also published as the Tutorials of the documentation, copied by `julia script
 | 9 | [The decision report](vignettes/09_decision_report/09_decision_report.md) | `DecisionReport` and its Tables.jl form |
 | 10 | [Exact arithmetic and certificates](vignettes/10_exact_arithmetic_and_certificates/10_exact_arithmetic_and_certificates.md) | Rational problems, certificates and witnesses, the Lean checker |
 | 11 | [Sample beliefs and outcome tables](vignettes/11_sample_beliefs_and_outcome_tables/11_sample_beliefs_and_outcome_tables.md) | Draws, a toy simulator behind the adapter verbs, common random numbers, payoffs with standard errors |
-| 12 | [EVPPI from a sample](vignettes/12_evppi_methods/12_evppi_methods.md) | Grouping, Strong and Oakley, Sadatsafavi, regression splines, GAM.jl; a check against closed forms |
-| 13 | [EVSI from a sample](vignettes/13_evsi_methods/13_evsi_methods.md) | Regression on summaries, importance sampling, the Gaussian approximation, net benefit in animals |
+| 12 | [EVPPI from a sample](vignettes/12_evppi_methods/12_evppi_methods.md) | Grouping, Strong and Oakley, Sadatsafavi, regression splines, GAM.jl, a Gaussian process for five or more parameters; a check against closed forms |
+| 13 | [EVSI from a sample](vignettes/13_evsi_methods/13_evsi_methods.md) | Regression on summaries, importance sampling with its effective sample size, the Gaussian approximation, net benefit in animals, `optimal_design` |
 | 14 | [Bd epizootic response](vignettes/14_bd_epizootic_response/14_bd_epizootic_response.md) | The Drawert et al. (2017) model from a cached table of runs: gains, rules, groups, EVPI, EVPPI and the EVSI of a survey |
+| 15 | [Risk attitude and several attributes](vignettes/15_risk_attitude_and_attributes/15_risk_attitude_and_attributes.md) | Certainty equivalents and risk premiums in animals, exponential and power utilities on simulator runs, additive and multiplicative utilities over uninfected and infected counts |
 
 ## Conventions
 
@@ -173,7 +197,9 @@ is also published as the Tutorials of the documentation, copied by `julia script
 - `Q[a, θ]`: rows are actions, columns are states. `L[z, θ]`: rows are signals, columns are states, so
   columns sum to one. A garbling `G[z′, z]` is column-stochastic and acts as `G * L`.
 - Total variation is half the ℓ¹ distance; the `B` of `decision_loss_bound` is the range of the utility.
-- `Hurwicz(α)` puts `α` on the best state; `AlphaMaxmin(α)` puts `α` on the lower expectation.
+- `Hurwicz(α)` puts `α` on the best state (some texts put it on the worst: use `1 − α`);
+  `AlphaMaxmin(α)` puts `α` on the lower expectation. `CVaR(α)` is the mean utility in the worst `α`
+  share, the negative of the expected shortfall of loss-based software.
 - State-wise rules ignore probabilities and range over every state of the table unless the belief is a
   `ScenarioSet` or a `PointBelief`.
 
@@ -188,9 +214,8 @@ table such a model produces. It exports no `regret` or `regrets` (the latter is 
 
 ## Not in this version
 
-Risk-averse utility functions and multi-attribute utility, moment-matching EVSI, multilevel Monte Carlo,
-Gaussian-process regression for many focal parameters, and anything sequential. See the roadmap in the
-lab wiki.
+Discounting, moment-matching EVSI, multilevel Monte Carlo, influence diagrams with more than one
+decision, and anything sequential. See the roadmap in the lab wiki.
 
 ## Licence
 

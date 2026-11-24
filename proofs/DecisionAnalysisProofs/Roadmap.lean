@@ -76,22 +76,26 @@ Each line names a proved result and the Julia function or check it motivates.
 * `Certificate.RawNotGarbling.accepts_sound`, `not_isGarblingOf_iff_exists_separating` (S1):
   every `nothing` of `is_garbling_of` has a checkable witness, a decision problem with one
   action per signal of `e′` and the uniform prior. **Done in Julia**: `export_not_garbling_witness`
-  (`"not-garbling-witness/1"`), from the programme `separating_payoff_model`. Still open: a
-  `GarblingResult` could carry the separating problem, which is also the most useful thing
-  to show a user who asks why two experiments are not ordered.
+  (`"not-garbling-witness/1"`), from the programme `separating_payoff_model`, and
+  `GarblingResult.separating` carries the separating problem as a `DecisionProblem`, which
+  is also the most useful thing to show a user who asks why two experiments are not ordered.
 * `isMixedDominated_of_not_isMaximal`: an action rejected by `Maximal()` needs no programme
-  to certify that it is not E-admissible; the pure dominating action is the witness.
+  to certify that it is not E-admissible; the pure dominating action is the witness. **Done
+  in Julia**: `decide(problem, EAdmissible())` solves no programme for such an action and
+  names the dominating action in `details.dominated_by`.
 * `evpi_bias_sign_indefinite`, `sum_mul_expectedUtility_meanTable_le` (T16): **to do in
   Julia**: correct the docstring of `evpi`; if a selection-bias note is added to
   `DecisionReport`, attach it to the reported best value and the chosen action, not to EVPI or
   EVSI.
-* `IsBayes.decision_loss_le`, `IsDeficientWithin.valueWithInformation_le`: **possible in
-  Julia**: helpers returning the two sharper ranges (largest row range for
-  `decision_loss_bound`, largest regret for the deficiency bound), since the table range is
-  what users will otherwise pass.
+* `IsBayes.decision_loss_le`, `IsDeficientWithin.valueWithInformation_le`: **done in
+  Julia**: `largest_action_range` (for `decision_loss_bound`, which also takes a table or a
+  problem) and `largest_regret` (for the deficiency bound, `deficiency_value_bound`) return
+  the two sharper ranges, beside `payoff_range`, the table range that users would otherwise
+  pass.
 * `evpiEnvelope_optimum`, `evpi_max_not_at_generating_point` (T15): the upper end of the
   envelope needs the programme and the lower end does not; `robust_evpi` is right on both.
-  The optimal `λ` is the prior at which EVPI is largest; `RobustVOI` could return it.
+  The optimal `λ` is the prior at which EVPI is largest; `RobustVOI.upper_prior` returns
+  it.
 * `dilation_robust_evsi_negative` (T13) and `valueWithInformation_garble_le` (T6, single
   prior only): `robust_evsi` must not assume monotonicity or nonnegativity, and must keep
   returning negative values unclamped.

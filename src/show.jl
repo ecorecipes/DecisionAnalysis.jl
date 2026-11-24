@@ -48,7 +48,9 @@ end
 
 function Base.show(io::IO, v::RobustVOI)
     print(io, "RobustVOI(", v.quantity, " under ", _rule_name(v.rule), ": ", v.value)
-    v.lower === nothing || print(io, "; envelope [", v.lower, ", ", v.upper, "]")
+    v.lower === nothing ||
+        print(io, "; envelope [", v.lower, ", ", v.upper, "], upper end at the prior ",
+              v.upper_prior)
     return print(io, ")")
 end
 
@@ -67,7 +69,9 @@ end
 
 function Base.show(io::IO, r::GarblingResult)
     return print(io, "GarblingResult(", r.is_garbling ? "a garbling" : "not a garbling",
-                 r.exact ? ", exact" : ", numerical", ", ", r.route, ")")
+                 r.exact ? ", exact" : ", numerical", ", ", r.route,
+                 r.separating === nothing ? "" : ", with a separating decision problem",
+                 ")")
 end
 
 function Base.show(io::IO, r::DecisionReport)
@@ -509,6 +513,28 @@ function _blocks(r::DecisionReport)
               _Grid(["experiment", "EVSI", "cost", "EVSI − cost"],
                     [[String(e.name), _cell(e.evsi), _cell(e.cost), _cell(e.net)]
                      for e in r.experiments]))
+    end
+
+    for item in r.profiles
+        prof = item.profile
+        push!(blocks,
+              _Title("Value of $(item.name) by outcome (acting now: " *
+                     "$(prof.act_now_action))"),
+              _Grid(["signal", "probability", "best action", "value of this outcome"],
+                    [[String(o.signal), _cell(o.probability), join(o.best, ", "),
+                      _cell(o.value)] for o in prof.outcomes]; left=[3], code=[1, 3]),
+              _Para("EVSI " * _cell(prof.evsi) * "; standard deviation of the value " *
+                    "over outcomes " * _cell(prof.standard_deviation) *
+                    "; probability that the study changes nothing " *
+                    _cell(prof.probability_zero) * "."))
+    end
+    if !isempty(r.estimation)
+        push!(blocks, _Title("Value of information for estimation (variance reduction)"),
+              _Grid(["source", "quantity", "prior variance", "expected reduction",
+                     "share"],
+                    [[String(e.source), String(e.quantity), _cell(e.prior_variance),
+                      _cell(e.reduction), _cell(e.share)] for e in r.estimation];
+                    code=[1, 2]))
     end
 
     if r.pareto !== nothing

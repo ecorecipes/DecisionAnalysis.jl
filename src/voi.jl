@@ -235,8 +235,15 @@ apart. Fields:
   set. For `:evsi` both are `nothing`: EVSI is neither convex nor concave in the
   prior, so neither end of its envelope is found at a generating point, and
   version 0.1 does not compute it.
+- `upper_prior`: a prior in the credal set **at which the upper EVPI is attained**:
+  the probabilities of the states, in the order of the payoff table, of the mixture
+  of the generating points found by the programme of
+  [`evpi_envelope_model`](@ref), so that `evpi` under it equals `upper`. It is the
+  belief in the set under which learning the state is worth most, and it is often an
+  interior prior, not a generating point. It need not be unique. `nothing` for
+  `:evsi`.
 """
-struct RobustVOI{R<:AbstractRule,T,E}
+struct RobustVOI{R<:AbstractRule,T,E,P}
     quantity::Symbol
     rule::R
     act_now::T
@@ -245,6 +252,7 @@ struct RobustVOI{R<:AbstractRule,T,E}
     members::Vector{T}
     lower::E
     upper::E
+    upper_prior::P
 end
 
 # The parts of a rule that a rule-specific robust value can use.
@@ -273,7 +281,7 @@ function _credal_view(problem::DecisionProblem, operation::Symbol)
 end
 
 # Largest single-prior EVPI over the convex hull of the priors, by the programme of
-# `evpi_envelope_model`.
+# `evpi_envelope_model`, with the weights on the generating points that attain it.
 function _evpi_upper(E::AbstractMatrix, perfect::AbstractVector; optimizer=nothing,
                      rounding_tol=_ROUNDING_TOLS)
     T = promote_type(eltype(E), eltype(perfect))
@@ -283,7 +291,7 @@ function _evpi_upper(E::AbstractMatrix, perfect::AbstractVector; optimizer=nothi
         throw(ExactVerificationError(:evpi_envelope,
                                      "the rounded solution of the floating-point " *
                                      "optimiser is not certified optimal"))
-    return _from_big(T, sol.objective)
+    return _from_big(T, sol.objective), sol.values.λ
 end
 
 """
@@ -305,7 +313,8 @@ is the difference.
 [`evpi`](@ref) over the whole set. EVPI is concave in the prior, so the smallest is
 attained at a generating point (`lower == minimum(members)`), while the largest may
 lie at an interior prior and is found by the linear programme of
-[`evpi_envelope_model`](@ref) (`upper ≥ maximum(members)`). `optimizer` and
+[`evpi_envelope_model`](@ref) (`upper ≥ maximum(members)`); `upper_prior` is a prior
+of the set at which it is attained. `optimizer` and
 `rounding_tol` are passed to [`solve_program`](@ref); with a floating-point
 optimiser on an exact problem the optimum must be certified exactly, or
 [`ExactVerificationError`](@ref) is thrown.
@@ -325,9 +334,13 @@ function robust_evpi(problem::DecisionProblem; rule::AbstractRule=GammaMaximin()
     perfect = [dot(q, best) for q in v.priors]
     members = [perfect[k] - maximum(view(E, :, k)) for k in eachindex(perfect)]
     act_now, informed, least = promote(act_now, informed, minimum(members))
-    lower, upper = promote(least, _evpi_upper(E, perfect; optimizer, rounding_tol))
+    most, λ = _evpi_upper(E, perfect; optimizer, rounding_tol)
+    lower, upper = promote(least, most)
+    P = eltype(first(v.priors))
+    upper_prior = [_from_big(P, sum(λ[k] * v.priors[k][j] for k in eachindex(λ)))
+                   for j in axes(Q, 2)]
     return RobustVOI(:evpi, rule, act_now, informed, informed - act_now,
-                     collect(typeof(least), members), lower, upper)
+                     collect(typeof(least), members), lower, upper, upper_prior)
 end
 
 """
@@ -379,5 +392,51 @@ function robust_evsi(problem::DecisionProblem, experiment::Experiment;
                maximum(view(E, :, k)) for (k, q) in enumerate(v.priors)]
     act_now, informed, m = promote(act_now, informed, first(members))
     return RobustVOI(:evsi, rule, act_now, informed, informed - act_now,
-                     collect(typeof(m), members), nothing, nothing)
+                     collect(typeof(m), members), nothing, nothing, nothing)
+end
+
+# The bridge to influence diagrams
+# --------------------------------
+
+"""
+    normal_form(model; states=nothing, baseline=nothing, atol=1e-9) -> NamedTuple
+
+The **normal form** of a single-decision influence diagram: the payoff table and
+belief that the diagram defines, as a [`DecisionProblem`](@ref), and the decision's
+information as an [`Experiment`](@ref). `model` is an `InfluenceDiagramModel` of
+InfluenceDiagrams.jl (`github.com/ecorecipes/InfluenceDiagrams.jl`); the method lives
+in a weak-dependency extension, so load that package first
+([`MissingExtensionError`](@ref) otherwise). InfluenceDiagrams.jl is not a dependency
+of this package.
+
+- The **actions** are the states of the decision's action variable.
+- The **state** `θ` is the joint value of the chance variables named in `states`; by
+  default, every chance variable that could be observed before the decision (those
+  not downstream of it). The belief is their joint distribution, `p(θ)`.
+- The **payoff** is the conditional expected total utility,
+  `Q[a, θ] = E[U | do(a), θ]`, summing the additive utility nodes of the diagram.
+- The **experiment** describes what the decision already observes: its information
+  variables that are not part of the state, with likelihood `L[z, θ] = P(z | θ)`;
+  `nothing` when there are none.
+
+The result is `(; problem, experiment, decision, action, states, information,
+observed)`. With it, the structural quantities of the diagram are values of
+information on a payoff table:
+
+- `decide(problem, MaxExpectedUtility())` is the best action with no information;
+- `evsi(problem, experiment)` is the value of what the decision observes (the
+  diagram's `expected_value_of_information` for those variables, from none);
+- `evpi(problem)` is the value of observing the whole state (its
+  `expected_value_of_perfect_information` from no information), and
+  `evpi(problem) − evsi(problem, experiment)` what is left to learn.
+
+`states` must carry everything the information tells about the utility
+(`E[U | a, θ, z] = E[U | a, θ]`), otherwise `ArgumentError` is thrown: add the
+variables the utility depends on. The diagram is evaluated by enumerating its joint
+distribution once per action, so this is for small diagrams, and the numbers are
+floating point, as in InfluenceDiagrams.jl. Utilities are whatever the diagram's
+utility nodes hold; this package itself counts utility in individuals.
+"""
+function normal_form(model; kw...)
+    throw(MissingExtensionError(:normal_form, :InfluenceDiagrams))
 end

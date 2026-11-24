@@ -23,8 +23,8 @@ A sample-based estimate of a value of information, as returned by [`evpi`](@ref)
 - `quantity`: `:evpi`, `:evppi` or `:evsi`; `method`: the name of the method.
 - `value`: the estimate, in the units of the payoff (individuals).
 - `standard_error`: the Monte Carlo standard error of `value` from the finite number
-  of draws (or of simulated data sets, for importance sampling), **kept apart and
-  never folded into the value**. By default it is the linearised error of the
+  of draws (and, for importance sampling, of simulated data sets as well: see
+  [`ImportanceSampling`](@ref)), **kept apart and never folded into the value**. By default it is the linearised error of the
   weighted mean of the per-draw **policy gains** `Q[â_i, i] − Q[a*, i]`: what
   following the fitted policy (the action `â_i` with the largest fitted conditional
   mean at draw `i`) gains over the act-now action `a*`, evaluated on the payoffs
@@ -49,7 +49,8 @@ A sample-based estimate of a value of information, as returned by [`evpi`](@ref)
   actions in a cell to be independent unless a `noise_correlation` is given, and so
   overstates the bias under common random numbers (see [`crn_correlation`](@ref)).
 - `details`: method-specific diagnostics (act-now value and action, effective sample
-  sizes, residual variance, ...).
+  sizes, residual variance, ...). For importance sampling the posterior effective
+  sample sizes are part of the estimate and are printed with it.
 
 `Float64(e)` and `e.value` give the number; arithmetic is deliberately not defined,
 so that an error cannot be dropped by accident.
@@ -75,6 +76,10 @@ function Base.show(io::IO, e::VOIEstimate)
           _cell(e.standard_error), " (standard error); act-now bias ",
           _cell(e.bias.act_now))
     e.bias.cells === nothing || print(io, ", cell-noise bias ", _cell(e.bias.cells))
+    haskey(e.details, :median_ess) &&
+        print(io, "; posterior effective sample size: median ", _cell(e.details.median_ess),
+              ", smallest ", _cell(e.details.minimum_ess), " of ", e.details.draws,
+              " draws")
     return print(io, ")")
 end
 
@@ -84,7 +89,8 @@ end
 Supertype of the methods that estimate a value of information from a
 [`SampleBelief`](@ref): [`SampleAverage`](@ref), [`Grouping`](@ref),
 [`StrongOakley`](@ref), [`Sadatsafavi`](@ref) and the regressions
-([`AbstractRegression`](@ref): [`SplineRegression`](@ref), [`GAMRegression`](@ref)).
+([`AbstractRegression`](@ref): [`SplineRegression`](@ref), [`GAMRegression`](@ref),
+[`GaussianProcessRegression`](@ref)).
 """
 abstract type AbstractVOIMethod end
 
@@ -93,8 +99,9 @@ abstract type AbstractVOIMethod end
 
 Supertype of the regression methods, which estimate the conditional mean of every
 action's payoff given some columns (parameters or summary statistics) by regressing
-the payoffs on them: [`SplineRegression`](@ref) (built in) and
-[`GAMRegression`](@ref) (extension, needs GAM.jl). A regression smooths over the
+the payoffs on them: [`SplineRegression`](@ref) (built in),
+[`GAMRegression`](@ref) (extension, needs GAM.jl) and
+[`GaussianProcessRegression`](@ref) (built in, for five or more columns). A regression smooths over the
 simulation noise of the cells, so it is the estimator to use when cells are noisy.
 """
 abstract type AbstractRegression <: AbstractVOIMethod end
@@ -151,25 +158,32 @@ struct StrongOakley <: AbstractVOIMethod
 end
 
 """
-    Sadatsafavi(; separators=1, grid=200)
+    Sadatsafavi(; separators=1)
 
 Single-parameter EVPPI by the method of Sadatsafavi, Bansback, Zafari, Najafzadeh and
 Marra (2013, *Value in Health* 16:438): sort the draws by the focal parameter and
 find the `separators` cut points (one or two) that maximise the value of choosing
 the best action separately in each segment. It is exact, as the sample grows, when
-the best action changes at most `separators` times along the parameter. With one
-separator every position is tried; with two, the cuts are searched over at most
-`grid` equally spaced positions. Choosing the cuts to maximise the value biases the
-value-with-information term upwards in small samples.
+the best action changes at most `separators` times along the parameter. The search
+is exhaustive: every position is tried for one cut, and every pair of positions for
+two (in time proportional to draws × actions, by a running maximum), so the value
+with two separators is never below the value with one. Choosing the cuts to maximise
+the value biases the value-with-information term upwards in small samples.
+
+**Checked against the R package `voi`** (1.0.3, method `"sal"`) on the same draws:
+with one and with two separators the two agree to rounding (relative differences
+below 1e-9) on the normal model of its vignette and on its chemotherapy example,
+both of which have two actions. With more than two actions `voi` places the cuts
+pair of actions by pair of actions, which need not give the best segmentation, so
+this estimate can be larger than its value there. The fixtures and the numbers are
+in `test/fixtures/voi` and `validation/`.
 """
 struct Sadatsafavi <: AbstractVOIMethod
     separators::Int
-    grid::Int
-    function Sadatsafavi(; separators::Integer=1, grid::Integer=200)
+    function Sadatsafavi(; separators::Integer=1)
         separators in (1, 2) ||
             throw(ArgumentError("separators must be 1 or 2, got $separators"))
-        grid >= 2 || throw(ArgumentError("grid must be at least 2, got $grid"))
-        return new(separators, grid)
+        return new(separators)
     end
 end
 
@@ -188,7 +202,8 @@ are added (a tensor-product surface per pair), which needs many more draws.
 It is meant for up to about four columns. There is no penalty and no smoothing
 parameter: the flexibility is set by `knots`, and `SplineRegression(; knots=0,
 degree=1)` is the linear metamodel of Jalal, Goldhaber-Fiebert and Kuntz (2015). For
-penalised smooths use [`GAMRegression`](@ref).
+penalised smooths use [`GAMRegression`](@ref), and for five or more columns
+[`GaussianProcessRegression`](@ref).
 """
 struct SplineRegression <: AbstractRegression
     knots::Int
@@ -446,24 +461,25 @@ function _fit(method::Sadatsafavi, columns::NamedTuple, Q, w)
     segment(from, to) = maximum(from == 0 ? C[:, to] : C[:, to] .- C[:, from])
     cuts = Int[]
     best = maximum(total)
-    if method.separators == 1 || length(allowed) < 2
-        for s in allowed
-            v = segment(0, s) + maximum(total .- C[:, s])
-            v > best && ((best, cuts) = (v, [s]))
-        end
-    else
-        candidates = length(allowed) <= method.grid ? allowed :
-                     unique(allowed[round.(Int,
-                                           range(1, length(allowed); length=method.grid))])
-        head = [segment(0, s) for s in candidates]
-        tail = [maximum(total .- C[:, s]) for s in candidates]
-        for (i, s) in enumerate(candidates)
-            v = head[i] + tail[i]
-            v > best && ((best, cuts) = (v, [s]))
-            for j in (i + 1):length(candidates)
-                t = candidates[j]
-                v = head[i] + segment(s, t) + tail[j]
-                v > best && ((best, cuts) = (v, [s, t]))
+    head = [segment(0, s) for s in allowed]
+    tail = [maximum(total .- C[:, s]) for s in allowed]
+    for (i, s) in enumerate(allowed)
+        v = head[i] + tail[i]
+        v > best && ((best, cuts) = (v, [s]))
+    end
+    if method.separators == 2
+        # Two cuts s < t with action a in between are worth
+        # (head[s] − C[a, s]) + (C[a, t] + tail[t]): for each a, one pass over t with
+        # the running maximum of the first bracket over the cuts before it.
+        for a in axes(C, 1)
+            before, at = -Inf, 0
+            for (j, t) in enumerate(allowed)
+                if j > 1
+                    v = before + C[a, t] + tail[j]
+                    v > best && ((best, cuts) = (v, [at, t]))
+                end
+                lead = head[j] - C[a, t]
+                lead > before && ((before, at) = (lead, t))
             end
         end
     end
@@ -596,7 +612,8 @@ with its standard error and biases kept apart ([`VOIEstimate`](@ref)).
   default, zero, is right for independent runs and **overstates the bias under
   common random numbers**, where the noise is shared between actions; pass the
   achieved correlation, [`crn_correlation`](@ref)`(outcomes, utility)`.
-- A regression ([`SplineRegression`](@ref), [`GAMRegression`](@ref)): the
+- A regression ([`SplineRegression`](@ref), [`GAMRegression`](@ref),
+  [`GaussianProcessRegression`](@ref) when the draws carry many parameters): the
   **all-parameter regression estimate**. Each action's payoff is regressed on all the
   parameters of the draws and the fitted values replace the noisy cells, so the
   simulation noise is smoothed out instead of being maximised over. This is the
@@ -682,9 +699,12 @@ end
 # EVPPI
 # -----
 
+# The default method by the number of focal parameters, as the R package `voi` chooses:
+# a regression with smooths up to four, a Gaussian process from five on.
+const _GP_FROM = 5
 function _default_method(columns::NamedTuple)
-    return all(_is_numeric, columns) ? SplineRegression() :
-           Grouping()
+    all(_is_numeric, columns) || return Grouping()
+    return length(columns) < _GP_FROM ? SplineRegression() : GaussianProcessRegression()
 end
 
 """
@@ -704,10 +724,16 @@ error and biases ([`VOIEstimate`](@ref)). Methods:
 | [`Sadatsafavi`](@ref) | one numeric | best one or two cut points |
 | [`SplineRegression`](@ref) | up to about four | additive regression spline, built in |
 | [`GAMRegression`](@ref) | up to about four | penalised smooths, needs GAM.jl |
+| [`GaussianProcessRegression`](@ref) | five or more | Gaussian process, built in |
 
-Without a method, a non-numeric focal parameter uses `Grouping()` and numeric ones
-use `SplineRegression()`. The single-parameter methods and `Grouping` need no
-regression and are useful cross-checks on it. All of them average over the
+**Without a method, the method is chosen by the focal parameters**, by the rule of
+the R package `voi`: a regression with smooths for up to four parameters and a
+Gaussian process from five on. Here that is `Grouping()` when any focal parameter is
+not numeric, `SplineRegression()` for one to four numeric parameters (the built-in
+stand-in for the generalised additive model, which needs GAM.jl: pass
+`GAMRegression()` to use it) and `GaussianProcessRegression()` for five or more. The
+method used is recorded in the `method` field of the result. The single-parameter
+methods and `Grouping` need no regression and are useful cross-checks on it. All of them average over the
 simulation noise in the cells, provided each block, segment or cell holds many
 draws.
 
@@ -788,9 +814,39 @@ explicitly.
 For each data set the draws are reweighted by their likelihood, which gives the
 posterior expected payoff of every action without refitting anything. See
 [`importance_loglikelihoods`](@ref) to build the matrix from a data simulator and a
-log-likelihood function. The estimate degrades when the data are so informative that
-a few draws carry all the weight: the result reports the effective sample sizes, and
-a small one means the estimate is drifting towards the EVPI.
+log-likelihood function.
+
+**Effective sample size.** The estimate degrades when the data are so informative
+that a few draws carry all the weight: each posterior mean is then an average over
+few draws, the maximum over actions is taken over noisy means, and the estimate
+drifts upwards towards the EVPI. The result therefore reports the posterior
+effective sample size `1 / Σ_j π_kj²` of the data sets in `details` (`minimum_ess`,
+`median_ess`, `mean_ess`, beside `prior_ess`, that of the draws themselves) and
+prints the median and the smallest with the estimate. A median of a few tens or less
+says that more draws are needed, or a regression on summary statistics
+([`SummaryStatistics`](@ref)).
+
+**Standard error.** The estimate has two sources of Monte Carlo error and
+`standard_error` combines them, `√(datasets² + draws²)`, so that it is comparable
+with the other estimators:
+
+- `details.datasets_standard_error`: from the finite number of simulated data sets,
+  the error of the weighted mean of the per-data-set gains;
+- `details.draws_standard_error`: from the finite number of draws, by the delta
+  method. Each posterior mean is a self-normalised weighted mean over the draws; its
+  linearisation gives the first-order effect of draw `j` on the whole estimate,
+  `Σ_k v_k π_kj (D_kj − g_k)`, with `π_kj` the posterior weight of draw `j` for data
+  set `k`, `D_kj` the payoff of the action chosen for data set `k` minus that of the
+  act-now action at draw `j`, and `g_k` its posterior mean; the sum of the squares of
+  these effects over the draws is the variance.
+
+The two are treated as independent, which ignores that a data set was simulated from
+one of the draws, and the delta method is first-order: with a small effective sample
+size it understates the error and says nothing of the upward drift above. On the
+normal model of the R `voi` vignette (EVSI of 10 or 100 observations of `p1`; 400 to
+2000 draws, 100 to 1000 data sets, 150 repetitions of each of five designs) the reported standard
+error was between 0.91 and 1.13 times the standard deviation of the estimate over
+the repetitions; the error from the data sets alone was between 0.27 and 0.79 times.
 """
 struct ImportanceSampling{M<:AbstractMatrix{<:Real},W}
     loglikelihood::M
@@ -874,6 +930,17 @@ size, a curve that rises to the EVPPI of the focal parameters.
 The approximation is exact when the conditional means are linear in a normal
 parameter with normal data, and otherwise as good as the normal approximation to the
 prior and the posterior.
+
+**Standard error.** The default standard error is the linearised one of
+[`VOIEstimate`](@ref) with the residuals of the fit scaled by the shrinkage factor.
+It covers the sampling of the draws and, to first order, the fit; it does **not**
+cover the error of the approximation itself (a wrong `n0`, a prior or posterior far
+from normal), which is a bias and not a Monte Carlo error. On the normal model of the
+R `voi` vignette (EVSI of 1, 10 and 100 observations of `p1`; 1000 and 4000 draws,
+300 repetitions of each) it was between 1.02 and 1.05 times the standard deviation of
+the estimate over the repetitions with the default regression, and 1.25 times
+(conservative) with a linear fit, whose error is smaller than the linearisation
+allows for; `bootstrap = 100` gave 0.94 to 0.99 times.
 """
 struct GaussianApproximation{N,M}
     focal::Vector{Symbol}
@@ -914,7 +981,8 @@ be observed and fixes the method:
 The choice follows Kunst et al. (2020, *Value in Health* 23:734). The estimates
 are bounded by the EVPPI of what the study informs and by the EVPI only up to Monte
 Carlo error, since each comes from a different estimator. `bootstrap` (not available
-for importance sampling) and `seed` are as for [`evpi`](@ref).
+for importance sampling, whose standard error already covers both the data sets and
+the draws: see [`ImportanceSampling`](@ref)) and `seed` are as for [`evpi`](@ref).
 """
 function evsi(problem::DecisionProblem, study::SummaryStatistics; bootstrap::Integer=0,
               seed::Integer=1)
@@ -946,6 +1014,9 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
     informed = zeros(K)
     ess = zeros(K)
     posterior = zeros(n)
+    # influence[j]: the first-order effect of draw j on the estimate, summed over the
+    # data sets, from the linearisation of each self-normalised posterior mean.
+    influence = zeros(n)
     for k in 1:K
         top = maximum(view(L, k, :))
         isfinite(top) ||
@@ -953,18 +1024,25 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
         posterior .= wf .* exp.(view(L, k, :) .- top)
         posterior ./= sum(posterior)
         m = Qf * posterior
-        informed[k] = maximum(m)
-        gains[k] = informed[k] - m[a]
+        b = argmax(m)
+        informed[k] = m[b]
+        gains[k] = m[b] - m[a]
         ess[k] = 1 / sum(abs2, posterior)
+        for j in 1:n
+            influence[j] += v[k] * posterior[j] * (Qf[b, j] - Qf[a, j] - gains[k])
+        end
     end
     value = dot(v, gains)
     sorted = sort(ess)
+    datasets_se = _weighted_mean_se(gains, v)
+    draws_se = sqrt(sum(abs2, influence))
     details = (; act_now_value=v0, act_now_index=a, draws=n, datasets=K,
                direct_value=dot(v, informed) - Float64(v0), minimum_ess=sorted[1],
-               median_ess=sorted[(K + 1) ÷ 2],
-               prior_ess=Float64(effective_sample_size(w)))
+               median_ess=sorted[(K + 1) ÷ 2], mean_ess=dot(v, ess),
+               prior_ess=Float64(effective_sample_size(w)),
+               datasets_standard_error=datasets_se, draws_standard_error=draws_se)
     bias = (; act_now=_act_now_bias(Q, w, Xoshiro(seed)), cells=nothing)
-    return VOIEstimate(:evsi, :ImportanceSampling, value, _weighted_mean_se(gains, v),
+    return VOIEstimate(:evsi, :ImportanceSampling, value, hypot(datasets_se, draws_se),
                        bias, details)
 end
 

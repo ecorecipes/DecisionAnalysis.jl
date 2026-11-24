@@ -147,6 +147,21 @@ Knowing the site is worth a frog and a half here: treatment gains nine at a pond
 loses three at a stream. See the tutorials on sample beliefs, EVPPI and EVSI, and the
 [Sample-based analysis](api/samples.md) reference.
 
+## Risk attitude, several attributes, and checks against other software
+
+A count of individuals is a linear, risk-neutral utility. [`ExponentialUtility`](@ref)
+and [`PowerUtility`](@ref) give one named outcome a risk attitude, and
+[`AdditiveUtility`](@ref) and [`MultiplicativeUtility`](@ref) combine several
+attributes scaled to `[0, 1]`. A non-linear utility is applied to every run before
+anything is averaged; its expected utility is no longer a count of individuals, and
+[`certainty_equivalent`](@ref) returns to individuals. See the
+[reference](api/utilities.md) and the tutorial on risk attitude.
+
+The estimators are compared with the R packages `voi` and `cvar`, and the finite rules
+and linear programmes with independent Python code and scipy's `linprog`. The scripts,
+the versions and every number are in the `validation/` directory of the repository; the
+fixtures they write are read by the test suite, which needs neither R nor Python.
+
 ## Conventions
 
 - **Payoffs are utilities**: higher is better. Costs enter as negative payoffs. A
@@ -161,8 +176,12 @@ loses three at a stream. See the tutorials on sample beliefs, EVPPI and EVSI, an
   Laplace, Hurwicz, minimax regret) range over every state of the table, unless the
   belief is a [`ScenarioSet`](@ref) or a [`PointBelief`](@ref).
 - **Two α conventions.** [`Hurwicz`](@ref) mixes the best and worst payoff over
-  states and puts `α` on the best. [`AlphaMaxmin`](@ref) mixes the lower and upper
+  states and puts `α` on the best (texts that call `α` the coefficient of pessimism
+  put it on the worst: use `1 − α`). [`AlphaMaxmin`](@ref) mixes the lower and upper
   expectation over priors and puts `α` on the lower. Both follow their literature.
+- **Tail risk is of utilities.** [`CVaR`](@ref) is the mean payoff in the worst `α`
+  share and [`Quantile`](@ref) the lower quantile: the negatives of the expected
+  shortfall and value at risk of software that works with losses.
 - **Ties.** Every tied action is returned, in table order; [`first_choice`](@ref) is
   the first. Ties are exact for rational problems and within a relative tolerance in
   floating point.
@@ -232,6 +251,8 @@ julia> solution.status, solution.objective, solution.exact
 
 ## Scope of version 0.1
 
-Finite problems, exactly. Sample-based beliefs and Monte Carlo value of information,
-outcome tables and model adapters, utility functions, decision sensitivity and
-sequential problems are planned for later versions.
+Finite problems, exactly; sample-based beliefs, outcome tables and model adapters,
+utilities with a risk attitude and over several attributes, Monte Carlo value of
+information with its standard errors, decision sensitivity, and single-decision
+influence diagrams through an optional extension. Discounting, moment-matching EVSI,
+multilevel Monte Carlo and sequential problems are not in this version.

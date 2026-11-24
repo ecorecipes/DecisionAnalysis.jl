@@ -311,7 +311,13 @@ exact statement: always `true` by the default route and with an exact optimiser 
 an exact problem; with a floating-point optimiser a yes is exact (its witness was
 rounded and verified) and a no is numerical, to the tolerance of the optimiser,
 unless its optimum was certified by duality; on a floating-point problem every answer
-is numerical. `details.route` names the route (see [`ProgramSolution`](@ref)). If a
+is numerical. `details.route` names the route (see [`ProgramSolution`](@ref)).
+
+An action that is not [`Maximal`](@ref) is strictly beaten by another action at every
+generating point, hence under every prior of the set, so it is **not E-admissible and
+no programme is solved for it** (theorem `isMixedDominated_of_not_isMaximal` of the
+Lean development). `details.dominated_by` maps each such action to the action that
+beats it; its "no" is exact on an exact problem with zero tolerances. If a
 floating-point optimiser reports an action E-admissible and the rounded witness fails
 the exact check, [`ExactVerificationError`](@ref) is thrown.
 """
@@ -566,7 +572,18 @@ function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,
     weights = Dict{Symbol,Vector}()
     exact = Dict{Symbol,Bool}()
     route = :internal
+    # An action that is not maximal is strictly beaten at every generating point by
+    # another action, hence under every prior of the set, so it is not E-admissible
+    # (Lean `isMixedDominated_of_not_isMaximal`) and no programme is solved for it.
+    dominated_by = Dict{Symbol,Symbol}()
+    strict = _is_exact(T) && iszero(tol)
     for a in axes(E, 1)
+        b = findfirst(b -> all(k -> E[b, k] - E[a, k] > tol, axes(E, 2)), axes(E, 1))
+        if b !== nothing
+            dominated_by[actions[a]] = actions[b]
+            exact[actions[a]] = strict
+            continue
+        end
         admitted, λ, sure, route = _eadmissible_witness(E, a; tol, optimizer,
                                                         rounding_tol)
         exact[actions[a]] = sure
@@ -578,7 +595,7 @@ function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,
         weights[actions[a]] = _from_big.(T, λ)
     end
     return DecisionResult(rule, actions, nothing, actions[idx], :max,
-                          (; witnesses, weights, exact, route))
+                          (; witnesses, weights, exact, route, dominated_by))
 end
 
 # Rows of `S` not dominated by another row (all >=, one > by more than `tol`).

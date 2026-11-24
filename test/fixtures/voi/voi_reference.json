@@ -1,0 +1,53 @@
+{
+  "provenance": {
+    "R": "R version 4.6.0 (2026-04-24)",
+    "voi": "1.0.3",
+    "mgcv": "1.9.4",
+    "script": "validation/voi_reference.R",
+    "sample": "test/fixtures/voi/normal_sample.csv"
+  },
+  "normal": {
+    "evpi": 0.441064325564,
+    "p1_gam": 0.0693300480116,
+    "p2_gam": 0.359943574459,
+    "p1_gp": 0.0699389641902,
+    "p2_gp": 0.359941947691,
+    "p1_so_20": 0.0812911666696,
+    "p2_so_20": 0.351155731887,
+    "p1_so_50": 0.0812911666696,
+    "p1_sal_1": 0.0844064140267,
+    "p2_sal_1": 0.358211842898,
+    "p1_sal_2": 0.0844064140267,
+    "p2_sal_2": 0.358211842898,
+    "p1_p2_gam": 0.441064325564,
+    "p1_p2_gp": 0.44106432549,
+    "evsi_p1_n10_gam": 0.0584228616334,
+    "evsi_p1_n100_gam": 0.0671821066331,
+    "evsi_p1_n10_is": 0.0487824221676,
+    "evsi_p1_n100_is": 0.0566442021612
+  },
+  "six": {
+    "evpi": 0.510158646968,
+    "p1_x3_x4_x5_x6_default": 0.170229750231,
+    "p2_x3_x4_x5_x6_default": 0.437063572059,
+    "p1_x3_x4_x5_x6_gp": 0.170229750231,
+    "all_six_gp": 0.51015864694
+  },
+  "chemotherapy": {
+    "evpi": 368.605096227,
+    "draws": 10000,
+    "p_side_effects_t1_gam": 26.7546251125,
+    "p_side_effects_t1_so_50": 38.4974081579,
+    "p_side_effects_t1_sal_1": 32.3525565713,
+    "p_side_effects_t1_sal_2": 32.5204824134,
+    "logor_side_effects_gam": 331.867581326,
+    "logor_side_effects_so_50": 333.309377408,
+    "logor_side_effects_sal_1": 333.504039667,
+    "logor_side_effects_sal_2": 333.504039667,
+    "logor_side_effects_gp_first1500": 329.813340621,
+    "u_hospital_gam": 4.6710088976,
+    "u_hospital_sal_1": 6.95080849004,
+    "pair_gam": 333.875732676,
+    "group_of_five_gp_first1500": 339.359719585
+  }
+}

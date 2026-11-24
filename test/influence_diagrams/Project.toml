@@ -1,0 +1,23 @@
+# The environment of the influence-diagram bridge tests. It is separate from the test
+# environment of the package because InfluenceDiagrams.jl brings GATlab and ACSets,
+# which must not enter the package's own `[deps]` or `[extras]` (CLAUDE.md). Run with
+# DECISIONANALYSIS_ID=1, or directly:
+#   julia --project=test/influence_diagrams -e 'using Pkg; Pkg.instantiate()'
+#   julia --project=test/influence_diagrams test/influence_diagrams/runtests.jl
+[deps]
+BayesianNetworkFormats = "590d4596-919e-4d5f-b4a5-097a6400eab8"
+BayesianNetworkInference = "195c3fd5-7fa7-45ed-aaa0-a92a9a2fe9e5"
+BayesianNetworks = "47d2e50c-3d9a-425e-96fd-023c794d3c65"
+DecisionAnalysis = "6a9d793e-d09c-4461-8cb4-55c12d181024"
+FiniteKernels = "2ee73795-50db-4096-9573-22982ed4949b"
+InfluenceDiagrams = "cd3dbe2d-275d-4a8e-841a-d44f7f7abf07"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+BayesianNetworkFormats = {url = "https://github.com/ecorecipes/BayesianNetworkFormats.jl"}
+BayesianNetworkInference = {url = "https://github.com/ecorecipes/BayesianNetworkInference.jl"}
+BayesianNetworks = {url = "https://github.com/ecorecipes/BayesianNetworks.jl"}
+DecisionAnalysis = {path = "../.."}
+FiniteKernels = {path = "../../../FiniteKernels.jl"}
+InfluenceDiagrams = {url = "https://github.com/ecorecipes/InfluenceDiagrams.jl"}

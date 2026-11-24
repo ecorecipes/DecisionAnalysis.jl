@@ -64,8 +64,8 @@ module DecisionAnalysis
 using JuMP: JuMP
 using FiniteKernels: FiniteKernels, FiniteKernel, FiniteSpace, axis_names, factors,
                      joint_states, kernel_matrix
-using LinearAlgebra: ColumnNorm, Symmetric, dot, eigen, qr
-using Random: AbstractRNG, Xoshiro, randn!
+using LinearAlgebra: ColumnNorm, Symmetric, cholesky, dot, eigen, issuccess, logdet, qr
+using Random: AbstractRNG, Xoshiro, randn!, shuffle!
 using Statistics: mean
 using Tables: Tables
 
@@ -83,7 +83,9 @@ export AbstractBelief, PointBelief, FiniteBelief, SampleBelief, CredalSet, Scena
 export OutcomeTable, outcomes, outcome_names, replicate_counts, run_counts, failed_runs,
        with_parameters, apply_action, simulate, outcome, parameter_draws, draw_weights,
        AbstractUtility, IndividualsUtility, InfectionUtility, FunctionUtility,
-       payoff_table, single_replicate, crn_correlation
+       payoff_table, single_replicate, crn_correlation, LinearUtility,
+       ExponentialUtility, PowerUtility, AdditiveUtility, MultiplicativeUtility,
+       inverse_utility, certainty_equivalent, risk_premium
 # Payoff tables and problems
 export PayoffTable, action_labels, random_payoff_table, combine_payoffs,
        individuals_payoff, infection_payoff, DecisionProblem,
@@ -107,10 +109,12 @@ export Experiment, signal_labels, random_experiment, BayesianInversion, bayes_in
 # Value of information
 export act_now_value, value_with_information, evpi, evppi, evsi, enbs,
        information_can_change_decision, RobustVOI,
-       robust_evpi, robust_evsi
+       robust_evpi, robust_evsi, voi_profile, expected_variance_reduction,
+       optimal_design, normal_form
 # Sample-based value of information
 export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Grouping,
        StrongOakley, Sadatsafavi, SplineRegression, GAMRegression,
+       GaussianProcessRegression,
        fitted_conditional_means, SummaryStatistics, ImportanceSampling,
        importance_loglikelihoods, GaussianApproximation, variance_components,
        expected_utility_estimates, expected_gain_estimates, conditional_problem
@@ -121,7 +125,8 @@ export DecisionProgram, ProgramSolution, solve_program, eadmissibility_model,
        garbling_model, deficiency_model, evpi_envelope_model, mixed_dominance_model,
        separating_payoff_model
 # Fidelity
-export total_variation, decision_loss_bound
+export total_variation, decision_loss_bound, payoff_range, largest_action_range,
+       largest_regret, deficiency_value_bound
 # Reports and certificates
 export DecisionReport, CERTIFICATE_SCHEMA, export_decision_certificate,
        GARBLING_WITNESS_SCHEMA, export_garbling_witness, EADMISSIBLE_WITNESS_SCHEMA,
@@ -143,10 +148,12 @@ include("rules.jl")
 include("experiments.jl")
 include("voi.jl")
 include("voi_sample.jl")
+include("gaussian_process.jl")
 include("sensitivity.jl")
 include("programs.jl")
 include("solve.jl")
 include("fidelity.jl")
+include("design.jl")
 include("report.jl")
 include("certificates.jl")
 include("show.jl")

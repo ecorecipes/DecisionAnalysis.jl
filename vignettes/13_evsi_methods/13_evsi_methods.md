@@ -120,18 +120,29 @@ function importance_evsi(n)
     return evsi(problem, study)
 end
 by_importance = [n => importance_evsi(n) for n in (2, 5, 10, 20, 50)]
-md_table(["trials", "EVSI", "standard error", "median effective sample size", "smallest"],
-         [[n, Float64(e.value), e.standard_error, e.details.median_ess, e.details.minimum_ess]
+md_table(["trials", "EVSI", "standard error", "from the data sets", "from the draws",
+          "median effective sample size", "smallest"],
+         [[n, Float64(e.value), e.standard_error, e.details.datasets_standard_error,
+           e.details.draws_standard_error, e.details.median_ess, e.details.minimum_ess]
           for (n, e) in by_importance]; digits=3)
 ```
 
-| trials |  EVSI | standard error | median effective sample size | smallest |
-|:-------|------:|---------------:|-----------------------------:|---------:|
-| 2      | 0.766 |          0.048 |                      455.462 |   26.687 |
-| 5      | 1.082 |          0.057 |                      351.902 |    9.557 |
-| 10     | 1.269 |          0.061 |                      272.467 |    4.816 |
-| 20     | 1.405 |          0.062 |                      203.228 |    1.735 |
-| 50     | 1.496 |          0.063 |                      135.554 |    1.032 |
+| trials | EVSI | standard error | from the data sets | from the draws | median effective sample size | smallest |
+|:---|---:|---:|---:|---:|---:|---:|
+| 2 | 0.766 | 0.072 | 0.048 | 0.054 | 455.462 | 26.687 |
+| 5 | 1.082 | 0.079 | 0.057 | 0.054 | 351.902 | 9.557 |
+| 10 | 1.269 | 0.081 | 0.061 | 0.054 | 272.467 | 4.816 |
+| 20 | 1.405 | 0.084 | 0.062 | 0.057 | 203.228 | 1.735 |
+| 50 | 1.496 | 0.087 | 0.063 | 0.06 | 135.554 | 1.032 |
+
+The effective sample sizes are part of the estimate and are printed with
+it:
+
+``` julia
+last(by_importance[3])
+```
+
+    VOIEstimate(evsi by ImportanceSampling: 1.26897 ± 0.0814613 (standard error); act-now bias 0.0; posterior effective sample size: median 272.467, smallest 4.81618 of 600 draws)
 
 The effective sample size is the diagnostic to watch. The more
 informative the data, the fewer draws carry the posterior weight. When
@@ -141,9 +152,17 @@ EVPI. Here the median is comfortable throughout, while the smallest, for
 data sets far in the tail, falls to one or two draws for the larger
 studies.
 
-The standard error of this method is over the simulated data sets only.
-It does not include the error from the finite number of draws, so it is
-smaller than the others’ and not comparable with them.
+The estimate has two sources of Monte Carlo error, and its standard
+error combines them. One is the finite number of simulated data sets.
+The other is the finite number of draws: each posterior mean is a
+weighted average over the draws, and its error is carried through to the
+estimate by the delta method. The two parts are in the table. Here there
+is one data set per draw and the two parts are of similar size, so
+leaving either out would understate the error by about a quarter. The
+combined standard error is comparable with those of the other two
+methods. It is a first-order calculation, so when the effective sample
+size is small it understates the error and says nothing about the upward
+drift.
 
 ## The Gaussian approximation
 
@@ -198,7 +217,7 @@ Plots.hline!(plt, [Float64(ceiling.value)]; label="EVPPI of the parameter", line
 png_figure(plt)
 ```
 
-![](13_evsi_methods_files/figure-commonmark/cell-6-output-1.png)
+![](13_evsi_methods_files/figure-commonmark/cell-7-output-1.png)
 
 The three agree to within about two standard errors. They are different
 estimators, so they need not respect EVSI ≤ EVPPI to the last digit; the
@@ -256,6 +275,22 @@ A small study pays for itself and a large one does not: the EVSI curve
 flattens while the cost keeps rising. With a single pond no study is
 worth its newts.
 
+`optimal_design` makes the same comparison in one call, over a list of
+candidate studies or, as here, the sample sizes of one study, with the
+cost a function of the size:
+
+``` julia
+design = optimal_design(problem, GaussianApproximation(:log_contact; n0, n=sizes);
+                        costs=n -> newts_per_trial * n, population=ponds)
+(best=design.best, criterion=design.criterion)
+```
+
+    (best = Symbol("n = 2"), criterion = :net_benefit)
+
+The best size is picked from estimates, so its net benefit is on average
+a little flattering, and sizes whose net benefits differ by less than
+their standard errors are not distinguished.
+
 ``` julia
 [round(enbs(e; cost=newts_per_trial * n, population=1).value; digits=2)
  for (n, e) in zip(sizes, curve)]
@@ -307,10 +342,10 @@ voi_table(rows; digits=4, truth=[0.0723251, 0.0723251, 0.0723251, 0.0821176, 0.0
 |:---|---:|---:|---:|---:|---:|
 | m = 10, regression on the sample mean | 0.0801 | 0.0042 | 0 | \- | 0.0723 |
 | m = 10, Gaussian approximation | 0.0796 | 0.004 | 0 | \- | 0.0723 |
-| m = 10, importance sampling (3,000 draws) | 0.0759 | 0.009 | 0 | \- | 0.0723 |
+| m = 10, importance sampling (3,000 draws) | 0.0759 | 0.0137 | 0 | \- | 0.0723 |
 | m = 100, regression on the sample mean | 0.0892 | 0.0044 | 0 | \- | 0.0821 |
 | m = 100, Gaussian approximation | 0.0902 | 0.0043 | 0 | \- | 0.0821 |
-| m = 100, importance sampling (3,000 draws) | 0.0903 | 0.0104 | 0 | \- | 0.0821 |
+| m = 100, importance sampling (3,000 draws) | 0.0903 | 0.0169 | 0 | \- | 0.0821 |
 
 ## What to take away
 
@@ -320,8 +355,11 @@ voi_table(rows; digits=4, truth=[0.0723251, 0.0723251, 0.0723251, 0.0821176, 0.0
 - Regression on summaries is EVPPI with the summary in place of the
   parameter.
 - Importance sampling needs only a log-likelihood. Its effective sample
-  size must be reported: when it is small the estimate drifts towards
-  the EVPI.
+  size is reported with the estimate: when it is small the estimate
+  drifts towards the EVPI. Its standard error covers both the simulated
+  data sets and the draws.
+- `optimal_design` compares candidate studies or sample sizes by EVSI,
+  or by net benefit in animals where payoffs are additive.
 - The Gaussian approximation gives a curve over sample size from one fit
   and the prior effective sample size.
 - No study of a parameter is worth more than its EVPPI.

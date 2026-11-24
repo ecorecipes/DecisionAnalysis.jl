@@ -16,11 +16,18 @@ generics, forwards to this package and re-exports its names (ADR 0009). No model
 one: a model package writes a table of runs (or the user gives methods to the adapter verbs), and any
 package-specific adapter is a weak-dependency extension on this side. `GAM` (ecorecipes/GAM.jl, by URL
 source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl`) and a test dependency;
-`Chytridiomycosis` appears only in the vignette environment, by path.
+`Chytridiomycosis` appears only in the vignette environment, by path. `InfluenceDiagrams`
+(ecorecipes/InfluenceDiagrams.jl) is a weak dependency for `normal_form`
+(`ext/DecisionAnalysisInfluenceDiagramsExt.jl`) and **nothing more**: it brings GATlab and ACSets (not
+Catlab), so it is in `[weakdeps]` only, never in `[extras]` or the docs or vignette environments, and its
+tests have an environment of their own, `test/influence_diagrams/`, which lists it and its three sibling
+packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 
 ## Invariants that must not be broken
 
-- **No Catlab, GATlab or ACSets, ever**, in `[deps]`, `[extras]` or the docs environment.
+- **No Catlab, GATlab or ACSets, ever**, in `[deps]`, `[extras]` or the docs environment, directly or
+  through a dependency listed there (`test/test_bridge.jl` checks the direct case). The only place where
+  GATlab and ACSets are installed is the gated environment `test/influence_diagrams/`.
 - Never define or import `compose`, `otimes`, `id`, `mcopy`, `delete`, `braid`, `dom` or `codom`, and never
   export a bare `regret` or `regrets` (`CategoricalInfluenceDiagrams` exports `regrets` for a different
   quantity). `test/test_docstrings.jl` checks all of these.
@@ -72,6 +79,21 @@ source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl
   Every one has the form `Σ_i w_i max_a g[a, i] − max_a Σ_i w_i Q[a, i]` with `g` the fitted conditional
   means (top of `src/voi_sample.jl`), and each is tested against exact enumeration on a finite problem
   turned into a sample and against the closed forms of the R `voi` normal model (analytic EVPI 0.4798107).
+  `evppi` without a method chooses by the focal parameters as `voi` does: `Grouping` when any is not
+  numeric, `SplineRegression` for one to four, `GaussianProcessRegression` from five (`_GP_FROM`).
+- **A non-linear utility is applied to each run before anything is averaged** (`_run_utilities`), and
+  its expected utility is not a count of individuals; `certainty_equivalent` returns to individuals. A
+  test holds `InfectionUtility` equal to the `AdditiveUtility` with unscaled counts.
+- **The standard error of an estimate covers every source of its Monte Carlo error.** For
+  `ImportanceSampling` it is `√(datasets² + draws²)` (delta method for the draws), with both parts and the
+  posterior effective sample sizes in `details`; the calibration numbers quoted in the docstrings of
+  `ImportanceSampling` and `GaussianApproximation` are measured, and `test/test_standard_errors.jl` holds
+  the standard errors against the spread over independent repetitions.
+- **Cross-language fixtures are contracts too.** `test/fixtures/voi/` and `test/fixtures/validation/` are
+  written by the scripts of `validation/` (R `voi` and `cvar`; Python with scipy) and carry their
+  provenance. Never edit them by hand: re-run the script and report any number that moved. The test
+  suite reads them and needs neither R nor Python; the chemotherapy data of `voi` are not copied here
+  (money appears only as that validation target), and their comparison runs with `DECISIONANALYSIS_R=1`.
 - **Monte Carlo error is a separate field, never folded into a value**: `PayoffTable.standard_errors` and
   `.replicates`, and `VOIEstimate.standard_error` and `.bias`. A table with one run in a cell is flagged
   (`single_replicate`) and gets no invented standard error.
@@ -108,6 +130,9 @@ source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl
 - `src/outcomes.jl`: `OutcomeTable` (from any Tables.jl table of runs) and the driver `outcomes`.
 - `src/utilities.jl`: `IndividualsUtility`, `InfectionUtility`, `FunctionUtility`, `payoff_table`,
   `crn_correlation`; the count utilities are the implementation behind the matrix helpers of `payoff.jl`.
+  Then risk attitude (`LinearUtility`, `ExponentialUtility`, `PowerUtility`, `inverse_utility`,
+  `certainty_equivalent`, `risk_premium`) and the multi-attribute `AdditiveUtility` and
+  `MultiplicativeUtility`.
 - `src/problem.jl`: `DecisionProblem`, feasibility filter, baseline and gains over it,
   `restrict_scenarios`, and the internal `_View` that aggregators act on.
 - `src/aggregators.jl`: the ten aggregators and `aggregate`.
@@ -117,15 +142,21 @@ source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl
 - `src/experiments.jl`: `Experiment`, `bayes_invert`, `garble`, `is_garbling_of`, `garbling_result`,
   `deficiency`.
 - `src/voi.jl`: `evpi`, `evppi`, `evsi`, `enbs`, `value_with_information`,
-  `information_can_change_decision`, `robust_evpi`, `robust_evsi`.
+  `information_can_change_decision`, `robust_evpi`, `robust_evsi` (`RobustVOI.upper_prior`), and the
+  stub of `normal_form`, whose method is in `ext/DecisionAnalysisInfluenceDiagramsExt.jl`.
 - `src/voi_sample.jl`: `VOIEstimate`, the methods (`SampleAverage`, `Grouping`, `StrongOakley`,
   `Sadatsafavi`, `SplineRegression`, `GAMRegression`), the studies (`SummaryStatistics`,
   `ImportanceSampling`, `GaussianApproximation`), the method-taking `evpi`, `evppi`, `evsi`, `enbs`,
   `variance_components`, `expected_utility_estimates`, `expected_gain_estimates`, `conditional_problem`.
   A regression backend subtypes `AbstractRegression` and implements `fitted_conditional_means`.
+- `src/gaussian_process.jl`: `GaussianProcessRegression`, a small internal Gaussian process (linear mean,
+  squared-exponential kernel, nugget, hyperparameters by marginal likelihood with a deterministic
+  Nelder-Mead search, seeded subsamples), for five or more focal parameters.
+- `src/design.jl`: `voi_profile`, `expected_variance_reduction`, `optimal_design`.
 - `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `weight_sweep`, `rank_reversals`.
 - `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
-- `src/fidelity.jl`: `total_variation`, `decision_loss_bound`.
+- `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
+  `largest_action_range`, `largest_regret` with `deficiency_value_bound`.
 - `src/report.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives), its
   Tables.jl rows, and printing. A display is a list of blocks (titles, grids, paragraphs, lists) rendered as
   plain text within 80 columns, Markdown or HTML, for `PayoffTable`, `RegretTable`, `DecisionResult` and
@@ -142,10 +173,20 @@ source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl
   no page nears Documenter's 200 KiB limit, and `tutorials/`, the synced vignettes).
 - `test/test_sample.jl`, `test_outcomes.jl`, `test_voi_sample.jl`, `test_sensitivity.jl`: the sample-based
   layer; `test_outcomes.jl` defines the toy simulator that the driver is tested on, and
-  `test_voi_sample.jl` checks `MissingExtensionError` before it loads GAM.
-- `vignettes/NN_name/NN_name.qmd`: fourteen Quarto vignettes (Julia engine), basic to advanced (1 to 10 the
+  `test_voi_sample.jl` checks `MissingExtensionError` before it loads GAM. `test_utilities.jl` (risk
+  attitude and multi-attribute utilities), `test_gaussian_process.jl`, `test_standard_errors.jl`
+  (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`,
+  `test_additions.jl` (separating problem, upper-EVPI prior, the maximality shortcut, sharper
+  constants), `test_validation.jl` (the cross-language fixtures) and `test_bridge.jl` (the
+  influence-diagram extension; its real tests are `test/influence_diagrams/runtests.jl`).
+- `validation/`: the scripts that write the cross-language fixtures (`voi_reference.R`,
+  `cvar_reference.R`, `chemo_data.R`, `finite_reference.py`, `make_sample.jl`), `compare_voi.jl`, which
+  prints our estimates beside those of `voi`, `requirements.txt` and a README with the versions used and
+  the findings. The Python environment is `validation/.venv` (ignored).
+- `vignettes/NN_name/NN_name.qmd`: fifteen Quarto vignettes (Julia engine), basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
-  application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`), each rendered to
+  application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
+  multi-attribute utilities on the toy simulator), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for
   ad hoc summaries; package objects display themselves), `vignettes/_pandoc/`
   (HTML style, LaTeX preamble). Vignette rules: utility is counted in individuals, never money (for a disease,
@@ -161,6 +202,10 @@ source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl
 julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.test()'   # the test suite; the only run that counts
 julia --project=docs docs/make.jl --no-deploy                    # build the docs locally
 DECISIONANALYSIS_LEAN=1 julia --project -e 'using Pkg; Pkg.test()'   # also run exported files through the Lean checker (needs lake and a built proofs/)
+DECISIONANALYSIS_R=1 julia --project -e 'using Pkg; Pkg.test()'      # also compare with voi's chemotherapy example (needs Rscript and the R package voi)
+DECISIONANALYSIS_ID=1 julia --project -e 'using Pkg; Pkg.test()'     # also run the influence-diagram bridge tests in their own environment
+Rscript validation/voi_reference.R && Rscript validation/cvar_reference.R   # rewrite the R fixtures
+validation/.venv/bin/python validation/finite_reference.py           # rewrite the Python fixture (see validation/README.md)
 julia scripts/render_vignettes.jl [NN ...] [--no-execute]         # vignettes: code runs once (quarto to gfm), then pandoc makes HTML and PDF from the .md
 julia scripts/sync_vignettes.jl [--check]                         # copy the rendered Markdown into docs/src/tutorials
 ```
@@ -173,6 +218,7 @@ julia scripts/sync_vignettes.jl [--check]                         # copy the ren
 - `vignettes/*/*.md`, `*.html`, `*.pdf` and `*_files/` are rendered output; edit the `.qmd` and re-render. Never
   add `html` or `pdf` to `vignettes/_quarto.yml` or a vignette's front matter (Quarto would re-run the code per
   format).
+- `test/fixtures/voi/` and `test/fixtures/validation/` are written by the scripts of `validation/`.
 - `test/fixtures/worked_examples.json` is shared with the Lean development. Edit it only together with
   that side, and keep every number in it equal to what `lab/wiki/references/computations/worked_examples.py`
   prints.

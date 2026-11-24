@@ -195,7 +195,13 @@ Proved results that suggest or constrain functionality (the full list is in `Roa
 * `evpi_bias_sign_indefinite`: the docstring of `evpi` no longer says that noise biases EVPI
   upwards; the selection-bias note is on the reported best value and the chosen action.
 * `IsBayes.decision_loss_le`, `IsDeficientWithin.valueWithInformation_le`: both bounds hold
-  with a smaller `B` than the table range; helpers for the two sharper ranges would be cheap.
+  with a smaller `B` than the table range. Done in the package: `largest_action_range`,
+  `largest_regret` and `deficiency_value_bound`.
+* `isMixedDominated_of_not_isMaximal`: done in the package, `decide(problem, EAdmissible())`
+  solves no programme for an action that is not maximal (`details.dominated_by`).
+* `not_isGarblingOf_iff_exists_separating`, `evpiEnvelope_optimum`: done in the package,
+  `GarblingResult.separating` carries the separating decision problem and
+  `RobustVOI.upper_prior` the prior at which the upper EVPI is attained.
 
 ## Design notes
 
