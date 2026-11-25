@@ -175,7 +175,7 @@ end
 @testset "replications of published analyses" begin
     @testset "every fixture states its provenance" begin
         files = filter(endswith(".json"), readdir(REPLICATIONS))
-        @test length(files) == 11
+        @test length(files) == 12
         for f in files
             fix = JSON.parse(read(joinpath(REPLICATIONS, f), String))
             for key in ("citation", "doi", "licence", "retrieved", "decision", "unit",
@@ -1146,6 +1146,61 @@ end
             end
             @test findfirst(==(:vaccinate), firsts) - 1 == fewest[scenario]
         end
+    end
+
+    @testset "de Vries et al. 2021, closing mink farms" begin
+        fix = replication("devries2021_mink")
+        box = fix["box2"]
+        actions, states = symbols(fix["actions"]), symbols(fix["states"])
+        close, open_infected = exact_number(box["cost_of_closing"]),
+                               exact_number(box["cost_of_infected_open_farm"])
+        farms = box["farms"]
+        # One farm, in millions of euros. An open farm that is not infected costs
+        # nothing; closing costs the same in both states (the fixture's "implied").
+        farm(p; closing=close, infected=open_infected) = DecisionProblem(PayoffTable(actions,
+                                                                                     states,
+                                                                                     [-infected 0;
+                                                                                      -closing -closing]),
+                                                                         FiniteBelief(states,
+                                                                                      [p,
+                                                                                       1 -
+                                                                                       p]);
+                                                                         baseline=:keep_open)
+        prior = parse_rational(box["probability_infected"])
+        problem = farm(prior)
+        values = aggregate(Expectation(), problem)
+        @test values[1] == target(fix, "expected_value_keep_open_per_farm")["value"]
+        @test values[2] == target(fix, "expected_value_close_per_farm")["value"]
+        @test first_choice(decide(problem, MaxExpectedUtility())) == :keep_open
+        @test -farms * act_now_value(problem) ==
+              target(fix, "expected_loss_without_information")["value"]
+        @test -farms * (act_now_value(problem) + evpi(problem)) ==
+              target(fix, "expected_loss_with_perfect_information")["value"]
+        @test farms * evpi(problem) == target(fix, "evpi")["value"]
+        # Closed form: what is saved on the farms that would be decided wrongly.
+        closed_form(p) = min(p * (open_infected - close), (1 - p) * close)
+        for p in (0:20) .// 20
+            @test evpi(farm(p)) == closed_form(p)
+        end
+        # Largest where the two actions tie, at p = closing cost / infected cost.
+        @test argmax(p -> evpi(farm(p)), (0:100) .// 100) == close // open_infected ==
+              2 // 5
+        @test evpi(farm(2 // 5)) == 12 // 5 == 4 * evpi(problem)
+        # A test of a farm with sensitivity se and specificity sp, as an experiment.
+        function testing(se, sp)
+            return Experiment([se 1-sp; 1-se sp]; signals=[:positive, :negative], states)
+        end
+        @test evsi(problem, testing(1, 1)) == evpi(problem) == 3 // 5
+        @test evsi(problem, testing(1 // 2, 1 // 2)) == 0
+        # Positive farms are closed: the gain is p se (10 − 4) − (1 − p)(1 − sp) 4.
+        for se in (6:10) .// 10, sp in (6:10) .// 10
+            gain = prior * se * (open_infected - close) - (1 - prior) * (1 - sp) * close
+            @test evsi(problem, testing(se, sp)) == max(gain, 0)
+            @test information_can_change_decision(problem, testing(se, sp)) == (gain > 0)
+        end
+        # A test that misses nothing is still worthless below a specificity of 5/6.
+        @test evsi(problem, testing(1, 5 // 6)) == 0
+        @test evsi(problem, testing(1, 9 // 10)) == 6 // 25
     end
 
     @testset "the functions added for the replications" begin

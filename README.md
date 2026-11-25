@@ -187,11 +187,11 @@ information_can_change_decision(problem, gauge)                       # true: EV
 
 ## Vignettes
 
-Thirty-one vignettes in [`vignettes/`](vignettes/). Twenty are tutorials (1 to 15, 21 and 25 to 28): the
+Thirty-two vignettes in [`vignettes/`](vignettes/). Twenty are tutorials (1 to 15, 21 and 25 to 28): the
 first fifteen go from a first decision table to
 Lean-checked certificates, sample-based analysis and an application to chytridiomycosis,
 on ecological examples whose outcomes are counted in individuals and always compared with no intervention
-(all numbers illustrative). The other eleven are case studies, grouped by field after the
+(all numbers illustrative). The other twelve are case studies, grouped by field after the
 table. Each is rendered to Markdown, HTML and PDF beside its `.qmd`, with the code run
 once: `julia scripts/render_vignettes.jl` (see [`vignettes/README.md`](vignettes/README.md)). The Markdown
 is also published in the documentation (Tutorials, and Case studies by field), copied by `julia scripts/sync_vignettes.jl`.
@@ -221,7 +221,7 @@ is also published in the documentation (Tutorials, and Case studies by field), c
 
 ### Case studies
 
-Each of the eleven case studies replicates a published value-of-information analysis, in ecology (including
+Each of the twelve case studies replicates a published value-of-information analysis, in ecology (including
 diseases of animals) or in human epidemiology,
 from the tables printed in the paper, shows each result beside the published one, and says where the two
 differ and why. The unit is the paper's own (a score, a count of beds, a growth rate, or the authors'
@@ -249,6 +249,7 @@ with the provenance of every number, are `test/fixtures/replications/*.json` and
 | 22 | [Which entomological uncertainty matters for malaria control](vignettes/22_epidemiology_kim_malaria/22_epidemiology_kim_malaria.md) | Kim et al. 2017, *Risk Analysis* | The lognormal column of Table V (EVPI up to 8.4 dollars per person) from the printed payoff table; the uniform column is **not** reproducible (its probabilities are not printed). The value of each parameter of a pair alone is added. |
 | 30 | [Epidemiological and operational uncertainty in Ebola control](vignettes/30_epidemiology_li_ebola/30_epidemiology_li_ebola.md) | Li et al. 2019, *Proceedings of the Royal Society B* | Every cell of Table 2 from the supplement's Table S3 (EVPI 343, 366 and 356 cases at three budgets, and the value of resolving the model or the costs alone); two percentages transposed in the text; two counts of the text are **not** reproduced. The value of each intervention's cost function alone is added. |
 | 31 | [Vaccinating before the efficacy is known](vignettes/31_epidemiology_atkins_vaccination/31_epidemiology_atkins_vaccination.md) | Atkins et al. 2020, *Journal of Theoretical Biology* | The choices of the non-adaptive, passive and active approaches in both scenarios and the thresholds (continue if 14, or 21, of 35 monitored vaccinations succeed), with the epidemic model rebuilt from the appendix and `adaptive_management`; two readings of the appendix were needed; the published gain of 30 days in the second scenario is matched only against never vaccinating. Sensitivity analyses are not reproduced. |
+| 32 | [What surveillance is worth: closing mink farms](vignettes/32_epidemiology_devries_mink/32_epidemiology_devries_mink.md) | de Vries et al. 2021, *BMJ Global Health* | Every number of the paper's worked example (Box 2): expected loss of 125 million euros deciding now, 50 with perfect information, EVPI 75 million. The sensitivity figure is a picture and is not compared; the value of an imperfect test by sensitivity and specificity is added. |
 
 ## Conventions
 

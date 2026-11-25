@@ -1,0 +1,62 @@
+{
+ "name": "devries2021_mink",
+ "citation": "de Vries L, Koopmans M, Morton A, van Baal P (2021) The economics of improving global infectious disease surveillance. BMJ Global Health 6(9):e006597",
+ "doi": "10.1136/bmjgh-2021-006597",
+ "licence": "CC BY-NC 4.0 (non-commercial); only the numbers of Box 2 are transcribed, as facts, with their source",
+ "retrieved": "2026-11-25, full text XML from Europe PMC (PMC8413876); Box 2 and its footnotes read in full",
+ "decision": "Whether to close a mink farm that may be infected with SARS-CoV-2, for each of about 125 farms in the Netherlands, and what information on which farms are infected would be worth",
+ "unit": "millions of euros (the paper's figures: the cost of closing a farm is from earlier research; the cost of an infected farm left open and the share of farms infected are, in the authors' words, 'hypothetical and generated solely to illustrate the principle')",
+ "baseline": "keep_open",
+ "actions": [
+  "keep_open",
+  "close"
+ ],
+ "states": [
+  "infected",
+  "not_infected"
+ ],
+ "box2": {
+  "provenance": "Box 2, 'Value of information and the closure of mink farms'",
+  "farms": 125,
+  "cost_of_closing": "4",
+  "cost_of_infected_open_farm": "10",
+  "probability_infected": "1/10",
+  "implied": "A farm that is open and not infected costs nothing, and closing costs the same whether or not the farm is infected; the box does not print these two cells but uses them (10% x -10 = -1; 'only 10% of the farms will be closed with an expected loss of 50 million')."
+ },
+ "targets": [
+  {
+   "id": "expected_value_keep_open_per_farm",
+   "value": -1,
+   "tolerance": 0,
+   "where": "Box 2, 'Value of information and the closure of mink farms': 'the expected value of not closing a farm would be -€1 million'"
+  },
+  {
+   "id": "expected_value_close_per_farm",
+   "value": -4,
+   "tolerance": 0,
+   "where": "Box 2, 'Value of information and the closure of mink farms': 'the expected value of closing a farm of -€4 million'"
+  },
+  {
+   "id": "expected_loss_without_information",
+   "value": 125,
+   "tolerance": 0,
+   "where": "Box 2, 'Value of information and the closure of mink farms': 'For 125 farms, this decision would lead to an expected loss of €125 million'"
+  },
+  {
+   "id": "expected_loss_with_perfect_information",
+   "value": 50,
+   "tolerance": 0,
+   "where": "Box 2, 'Value of information and the closure of mink farms': 'only 10% of the farms will be closed with an expected loss of €50 million'"
+  },
+  {
+   "id": "evpi",
+   "value": 75,
+   "tolerance": 0,
+   "where": "Box 2, 'Value of information and the closure of mink farms': 'which is €75 million'"
+  }
+ ],
+ "not_replicated": {
+  "items": "The sensitivity analysis of Figure 2",
+  "reason": "It is a picture; the text gives neither the ranges nor the values. The vignette computes its own, and says so."
+ }
+}
