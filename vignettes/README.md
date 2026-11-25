@@ -1,7 +1,7 @@
 # Vignettes
 
-Thirty-two vignettes. Twenty are tutorials on illustrative examples (1 to 15, ordered
-from basic to advanced, and 21 and 25 to 28); the other twelve are case studies, in a
+Thirty-three vignettes. Twenty are tutorials on illustrative examples (1 to 15, ordered
+from basic to advanced, and 21 and 25 to 28); the other thirteen are case studies, in a
 section of their own below, grouped by field. Each
 lives in its own directory `NN_name/NN_name.qmd` and is rendered to GitHub-flavoured
 Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTML
@@ -62,6 +62,7 @@ report. The same comparisons, with the provenance and licence of every input, ar
 | 30 | [Epidemiological and operational uncertainty in Ebola control](30_epidemiology_li_ebola/30_epidemiology_li_ebola.md) | Li et al. 2019, doi:10.1098/rspb.2019.0774; cases in a simulated population of 10,000 | a payoff table of 999 states (37 models × 27 cost combinations) read from the fixture; `evpi`; `evppi` by model, by cost combination and by each intervention's cost function; non-additivity; `MinimaxRegret` beside expected value |
 | 31 | [Vaccinating before the efficacy is known](31_epidemiology_atkins_vaccination/31_epidemiology_atkins_vaccination.md) | Atkins et al. 2020, doi:10.1016/j.jtbi.2020.110380; cost in units of one infection, and days of outbreak (the paper's weights) | an SEIR model with vaccination, integrated in the vignette; a two-decision problem as `adaptive_management` with `transitions` carrying the first action; the paper's passive and active approaches as `passive` and `active`; how many monitored vaccinations make starting worthwhile |
 | 32 | [What surveillance is worth: closing mink farms](32_epidemiology_devries_mink/32_epidemiology_devries_mink.md) | de Vries et al. 2021, doi:10.1136/bmjgh-2021-006597; EUR million (the paper's figures, two of them its authors' illustrations) | a two-by-two table; `evpi` against the probability of infection and the cost of closing; `evsi` of an imperfect test by sensitivity and specificity; `information_can_change_decision` |
+| 33 | [Seventeen models of reopening, and what knowing the right one is worth](33_epidemiology_shea_covid_models/33_epidemiology_shea_covid_models.md) | Shea et al. 2023, doi:10.1073/pnas.2207537120; infections, deaths, hospital beds and days closed, as the models projected them | a linear opinion pool of the models' quantile submissions, read from the fixture; a payoff table with the models as states; `evpi` over models for each outcome; `MinimaxRegret`; a sweep of the rate at which a day of closure is traded against deaths |
 
 Their conventions differ from those of the tutorials in two ways: **the unit is
 the paper's own** (individuals or another count where the paper has no valuation, money

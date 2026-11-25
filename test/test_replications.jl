@@ -172,10 +172,28 @@ function atkins_successes_needed(result)
     @assert maximum(stopped) < minimum(continued)
     return minimum(continued)
 end
+
+# The pooled projections of Shea et al. 2023 (fixture shea2023_covid_models). A
+# submission is a list of values at consecutive quantile levels (per cent); its
+# distribution function is taken as linear between them.
+function shea_cdf(first_level, values, x)
+    x < values[1] && return 0.0
+    x >= values[end] && return 1.0
+    j = searchsortedlast(values, x)
+    lower, upper = values[j], values[j + 1]
+    p = (first_level + j - 1) / 100
+    return upper > lower ? p + (x - lower) / (upper - lower) / 100 : p + 1 / 100
+end
+# The mean of a submission: the area under its quantile function.
+function shea_mean(values)
+    length(values) == 1 && return values[1]
+    return sum((values[k] + values[k + 1]) / 2 for k in 1:(length(values) - 1)) /
+           (length(values) - 1)
+end
 @testset "replications of published analyses" begin
     @testset "every fixture states its provenance" begin
         files = filter(endswith(".json"), readdir(REPLICATIONS))
-        @test length(files) == 12
+        @test length(files) == 13
         for f in files
             fix = JSON.parse(read(joinpath(REPLICATIONS, f), String))
             for key in ("citation", "doi", "licence", "retrieved", "decision", "unit",
@@ -1201,6 +1219,129 @@ end
         # A test that misses nothing is still worthless below a specificity of 5/6.
         @test evsi(problem, testing(1, 5 // 6)) == 0
         @test evsi(problem, testing(1, 9 // 10)) == 6 // 25
+    end
+
+    @testset "Shea et al. 2023, seventeen models of reopening" begin
+        fix = replication("shea2023_covid_models")
+        rows = fix["dataset_s2"]["rows"]
+        @test length(rows) == 17 * 4 * 5
+        series = Dict((r[1], r[2], r[3]) => (Int(r[4]), parse.(Float64, r[5:end]))
+                      for r in rows)
+        models = sort(unique(r[1] for r in rows))
+        interventions, objectives = fix["actions"], fix["objectives"]
+        @test length(models) == 17
+        @test all(issorted(last(v))
+                  for (k, v) in series if k[3] in ("cumu_infections",
+                                                   "cumu_deaths"))
+        # Sixteen groups of equal weight; G.1 and G.2 are one group.
+        weight = Dict(m => (startswith(m, "G") ? 1 // 2 : 1 // 1) // 16 for m in models)
+        @test sum(values(weight)) == 1
+        pooled(objective, intervention, x) = sum(weight[m] *
+                                                 shea_cdf(series[(m, intervention,
+                                                                  objective)]..., x)
+                                                 for m in models)
+        function pooled_quantile(objective, intervention, q)
+            lo = minimum(first(last(series[(m, intervention, objective)])) for m in models)
+            hi = maximum(last(last(series[(m, intervention, objective)])) for m in models)
+            for _ in 1:100
+                mid = (lo + hi) / 2
+                pooled(objective, intervention, mid) < q ? (lo = mid) : (hi = mid)
+            end
+            return hi
+        end
+        median(objective, intervention) = pooled_quantile(objective, intervention, 0.5)
+
+        # The aggregate medians printed in the article.
+        infections = Dict(i => median("cumu_infections", i) for i in interventions)
+        @test agrees(infections["open"], fix, "infections_open_median")
+        @test agrees(infections["closed"], fix, "infections_closed_median")
+        @test round(Int, infections["closed"]) == 8530          # the article has 8,527
+        for i in ("closed", "5percent", "2weeks")
+            @test agrees(100 * (1 - infections[i] / infections["open"]), fix,
+                         "infections_reduction_" * i * "_percent")
+        end
+        @test agrees(median("cumu_deaths", "closed"), fix, "deaths_closed_median")
+        @test agrees(pooled_quantile("cumu_deaths", "closed", 0.25), fix,
+                     "deaths_closed_lower_quartile")
+        @test agrees(pooled_quantile("cumu_deaths", "closed", 0.75), fix,
+                     "deaths_closed_upper_quartile")
+        @test agrees(median("days_closed", "closed"), fix, "days_closed_closed")
+        @test agrees(median("days_closed", "5percent"), fix, "days_closed_5percent_median")
+        @test agrees(median("days_closed", "2weeks"), fix, "days_closed_2weeks_median")
+        # The chance of needing more than the county's 200 hospital beds.
+        for i in ("2weeks", "closed")
+            exceed = 100 * (1 - pooled("peak_hosp", i, 200.0))
+            @test agrees(exceed, fix, "exceed_200_beds_" * i * "_percent")
+            @test isapprox(exceed, fix["ours"]["exceed_200_beds_" * i * "_percent"];
+                           atol=0.05)
+        end
+        # Our pooled medians against the aggregate sheet of the dataset, within 0.5%.
+        for (key, theirs) in fix["aggregate_sheet_medians"]["values"]
+            intervention, objective = split(key, '|')
+            objective in ("cumu_infections", "cumu_deaths", "peak_hosp") || continue
+            @test isapprox(median(objective, intervention), theirs; rtol=0.005)
+        end
+        # The same order of the interventions for every health outcome in the pool.
+        for objective in ("cumu_infections", "cumu_deaths", "peak_hosp")
+            @test issorted([median(objective, i) for i in interventions])
+        end
+        @test issorted([median("days_closed", i) for i in interventions]; rev=true)
+
+        # The published median probability of an outbreak under "closed" (71%) is not
+        # reproduced: the submissions are of different kinds (one probability, a list
+        # of zeros and ones, or a distribution), so a pooled median is not well
+        # defined. Each model's probability is taken as the mean of what it submitted.
+        chance = Dict(m => shea_mean(last(series[(m, "closed", "prob_outbreak")]))
+                      for m in models)
+        ours = fix["ours"]["probability_of_outbreak_closed"]
+        @test count(m -> Set(last(series[(m, "closed", "prob_outbreak")])) ==
+                         Set([0.0, 1.0]),
+                    models) == 4
+        @test isapprox(sum(weight[m] * chance[m] for m in models),
+                       ours["weighted_mean_over_models"]; atol=0.005)
+        half = ours["half_of_weight_at_or_below"]
+        @test sum(weight[m] for m in models if chance[m] <= half) == 1 // 2
+        @test isapprox(minimum(chance[m] for m in models if chance[m] > half),
+                       ours["next_model_at"]; atol=0.01)
+        published = target(fix, "probability_of_outbreak_closed_median")["value"] / 100
+        @test published > ours["next_model_at"] > ours["weighted_mean_over_models"] - 0.06
+        @test !agrees(100 * sum(weight[m] * chance[m] for m in models), fix,
+                      "probability_of_outbreak_closed_median")
+
+        # One payoff table for each outcome: the mean projection of each model under
+        # each intervention; the states are the models.
+        actions, states = symbols(interventions), Symbol.("model_", models)
+        prior = FiniteBelief(states, [weight[m] for m in models])
+        means(objective) = [shea_mean(last(series[(m, i, objective)]))
+                            for i in interventions, m in models]
+        problem(costs) = DecisionProblem(PayoffTable(actions, states, -costs), prior;
+                                         baseline=Symbol(fix["baseline"]))
+        worst(costs) = [interventions[argmax(view(costs, :, j))] for j in eachindex(models)]
+        best(costs) = [interventions[argmin(view(costs, :, j))] for j in eachindex(models)]
+        @test count(==("open"), worst(means("cumu_infections"))) ==
+              target(fix, "models_ranking_open_worst_for_infections")["value"]
+        # Staying closed is best in expectation for each health outcome, but not in
+        # every model, so knowing which model is right has a value.
+        deaths = problem(means("cumu_deaths"))
+        @test first_choice(decide(deaths, MaxExpectedUtility())) == :closed
+        @test count(==("closed"), best(means("cumu_deaths"))) == 14
+        @test count(==("5percent"), best(means("cumu_deaths"))) == 3
+        @test count(==("closed"), best(means("cumu_infections"))) == 15
+        @test 0 < evpi(deaths) < -act_now_value(deaths) / 10
+        @test isapprox(evpi(deaths), 25.8; atol=0.1)
+        @test isapprox(evpi(problem(means("cumu_infections"))), 962; atol=1)
+        # Every model agrees on the days closed, so nothing can be learned there.
+        @test evpi(problem(means("days_closed"))) < 1e-9
+        @test first_choice(decide(problem(means("days_closed")), MaxExpectedUtility())) ==
+              :open
+        # Trading deaths against days closed: the choice moves from closed to open as a
+        # day of closure counts for more, and it is in between that the models matter.
+        tradeoff(rate) = problem(means("cumu_deaths") .+ rate .* means("days_closed"))
+        choices = [first_choice(decide(tradeoff(rate), MaxExpectedUtility()))
+                   for rate in (0, 1, 5, 100)]
+        @test choices == [:closed, Symbol("5percent"), :open, :open]
+        @test evpi(tradeoff(3)) > 5 * evpi(tradeoff(0))
+        @test evpi(tradeoff(100)) < 1e-6
     end
 
     @testset "the functions added for the replications" begin
