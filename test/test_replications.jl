@@ -28,10 +28,62 @@ function agrees(ours, fix, id)
     return abs(Float64(ours) - t["value"]) <= t["tolerance"] + 1e-9
 end
 
+# The model of Bal et al. 2018 (fixture bal2018_monitoring): 64 models of which threat
+# causes which species to decline, a budget split between two threats, and observations
+# of declines with and without an experimental removal of one threat.
+const BAL_MODELS = vec([permutedims(reshape(collect(d), 3, 2))
+                        for d in Iterators.product(ntuple(_ -> (0, 1), 6)...)])
+const BAL_STATES = [Symbol("model", k) for k in 1:64]
+function bal_declines(d, q, c, m1, m2; wallaby=false)
+    r1, r2 = (c[1] - m1) / c[1], (c[2] - m2) / c[2]
+    return sum(1:3) do j
+        second = wallaby && j == 3 ? d[2, j] - d[2, j] * r2 : 1 - d[2, j] * r2
+        return q[j] + (1 - q[j]) * (1 - (1 - d[1, j] * r1) * second)
+    end
+end
+# Utility is minus the number of species declining. The first action spends nothing
+# (the baseline); the others spend the whole budget, on a grid of splits.
+function bal_problem(p, q, c, budget; wallaby=false, n=2000)
+    lo, hi = max(0.0, budget - c[2]), min(budget, c[1])
+    grid = [lo + max(hi - lo, 0.0) * g / n for g in 0:n]
+    Q = zeros(n + 2, 64)
+    for (s, d) in enumerate(BAL_MODELS)
+        Q[1, s] = -bal_declines(d, q, c, 0.0, 0.0; wallaby)
+        for (g, m1) in enumerate(grid)
+            Q[g + 1, s] = -bal_declines(d, q, c, m1, budget - m1; wallaby)
+        end
+    end
+    prior = [prod(d[i, j] == 1 ? p[i, j] : 1 - p[i, j] for i in 1:2, j in 1:3)
+             for d in BAL_MODELS]
+    actions = vcat(:no_management, [Symbol("split", g) for g in 0:n])
+    return DecisionProblem(PayoffTable(actions, BAL_STATES, Q),
+                           FiniteBelief(BAL_STATES, prior ./ sum(prior));
+                           baseline=:no_management)
+end
+function bal_observation(d, q, j, alpha, beta, manage)
+    cause = maximum(i == manage ? 0 : d[i, j] for i in 1:2)
+    D = q[j] + (1 - q[j]) * cause
+    return D * (1 - beta) + (1 - D) * alpha
+end
+function bal_experiment(q, species; manage=nothing, alpha=0.0, beta=0.0)
+    probs = Vector{Float64}[]
+    for j in species
+        push!(probs, [bal_observation(d, q, j, alpha, beta, nothing) for d in BAL_MODELS])
+        manage === nothing ||
+            push!(probs,
+                  [bal_observation(d, q, j, alpha, beta, manage) for d in BAL_MODELS])
+    end
+    outcomes = vec(collect(Iterators.product(ntuple(_ -> (0, 1), length(probs))...)))
+    L = [prod(x[k] == 1 ? probs[k][s] : 1 - probs[k][s] for k in eachindex(probs))
+         for x in outcomes, s in 1:64]
+    return Experiment(L; signals=[Symbol("x", join(x)) for x in outcomes],
+                      states=BAL_STATES)
+end
+
 @testset "replications of published analyses" begin
     @testset "every fixture states its provenance" begin
         files = filter(endswith(".json"), readdir(REPLICATIONS))
-        @test length(files) == 5
+        @test length(files) == 8
         for f in files
             fix = JSON.parse(read(joinpath(REPLICATIONS, f), String))
             for key in ("citation", "doi", "licence", "retrieved", "decision", "unit",
@@ -499,6 +551,202 @@ end
         @test all(>=(0), single)
         @test !isapprox(sum(single), evppi(joint, by_effect); rtol=1e-3)
         @test maximum(single) <= evppi(joint, by_effect) + 1e-12 <= evpi(joint) + 2e-12
+    end
+
+    @testset "Kim et al. 2017, malaria vector control" begin
+        fix = replication("kim2017_malaria")
+        actions = symbols(fix["actions"])
+        function kim_problem(case; weights=nothing)
+            c = fix["table4"][case]
+            function marginal(name)
+                return weights === nothing ?
+                       exact_vector(fix["table3"][name]["probabilities"]) : weights
+            end
+            first, second = marginal(c["first"]), marginal(c["second"])
+            prior = BigRat[a * b for a in first for b in second]
+            states = [Symbol(case, "_", i, j) for i in 1:3 for j in 1:3]
+            Q = vcat(zeros(BigRat, 1, 9),
+                     reduce(hcat, [exact_vector(r) for r in c["payoff"]]))
+            return DecisionProblem(PayoffTable(actions, states, Q),
+                                   FiniteBelief(states, prior); baseline=:status_quo),
+                   states
+        end
+        for case in ("A", "B", "C", "D")
+            problem, states = kim_problem(case)
+            @test first_choice(decide(problem, MaxExpectedUtility())) == :larviciding_8
+            @test agrees(act_now_value(problem), fix, case * "_prior_value")
+            @test agrees(act_now_value(problem) + evpi(problem), fix,
+                         case * "_perfect_value")
+            @test agrees(evpi(problem), fix, case * "_evpi")
+            # Ours, not the paper's: what each parameter of the pair is worth alone.
+            one = evppi(problem, [div(k - 1, 3) for k in 1:9])
+            other = evppi(problem, [mod1(k, 3) for k in 1:9])
+            @test 0 <= one <= evpi(problem) && 0 <= other <= evpi(problem)
+        end
+        # The printed EVPI is the difference of the rounded values (fixture, resolution).
+        @test round(Float64(evpi(first(kim_problem("A")))); digits=2) == 0.38
+        @test round(Float64(evpi(first(kim_problem("B")))); digits=2) == 4.17
+        # The saturation the paper reports: the two higher values of the fitness cost
+        # (and of the evolutionary speed) give the same payoffs, so in case D only the
+        # low evolutionary speed is worth telling apart from the rest.
+        d, states = kim_problem("D")
+        @test d.payoff.Q[:, 4:6] == d.payoff.Q[:, 7:9]
+        @test evppi(d, [k <= 3 for k in 1:9]) == evppi(d, [div(k - 1, 3) for k in 1:9])
+        # The uniform column cannot be recomputed: equal thirds do not give it, and in
+        # case D they make another action the best one without information.
+        third = fill(big(1) // 3, 3)
+        uniform_a = first(kim_problem("A"; weights=third))
+        @test abs(Float64(act_now_value(uniform_a)) -
+                  fix["not_replicated"]["uniform"]["A"][1]) > 0.5
+        @test first_choice(decide(first(kim_problem("D"; weights=third)),
+                                  MaxExpectedUtility())) == :irs_larviciding_4
+    end
+
+    @testset "Christensen et al. 2026, alligator snapping turtle" begin
+        fix = replication("christensen2026_turtle")
+        actions, states = symbols(fix["actions"]), symbols(fix["states"])
+        prior = exact_vector(fix["prior"])
+        @test sum(prior) == 1
+        table(rows) = permutedims(reduce(hcat, [exact_vector(r) for r in rows]))
+        turtle(Q) = DecisionProblem(PayoffTable(actions, states, permutedims(Q)),
+                                    FiniteBelief(states, prior); baseline=:no_action)
+        curves = ("Convex" => "convex", "Linear" => "linear", "S-curve" => "s_curve",
+                  "Concave" => "concave")
+        best = Dict("lambda" => :reduce_extent_bycatch,
+                    "time_to_extirpation" => :reduce_extent_bycatch,
+                    "fecundity" => :reduce_extent_nest_predators)
+        # From the printed payoff tables: all of Table 3.
+        for metric in ("lambda", "time_to_extirpation", "fecundity"), (block, id) in curves
+            problem = turtle(table(fix["payoffs"][metric][block]))
+            @test best[metric] in decide(problem, MaxExpectedUtility()).chosen
+            @test agrees(act_now_value(problem), fix, "$(metric)_$(id)_uncertainty")
+            @test agrees(act_now_value(problem) + evpi(problem), fix,
+                         "$(metric)_$(id)_certainty")
+            @test agrees(evpi(problem), fix, "$(metric)_$(id)_evpi")
+        end
+        # The largest value in the paper, unrounded (fixture, resolution).
+        headline = turtle(table(fix["payoffs"]["time_to_extirpation"]["S-curve"]))
+        @test round(Float64(evpi(headline)); digits=5) == 0.01434
+        @test round(100 * Float64(evpi(headline) / act_now_value(headline)); digits=2) ==
+              5.94
+        # From the raw model outputs through the value functions as printed.
+        logistic(f) = x -> Float64(exact_number(f["scale"])) /
+                           (1 + exp(-12 * (x - Float64(exact_number(f["midpoint"]))))) +
+                           Float64(exact_number(f["shift"]))
+        functions = fix["value_functions"]
+        raw = Dict("lambda" => "lambda", "time_to_extirpation" => "years",
+                   "fecundity" => "fecundity")
+        scaled(metric) = Float64.(table(fix["raw"][raw[metric]])) ./
+                         Float64(exact_number(fix["scaling"][raw[metric]]))
+        deviation(metric, block, f) = begin
+            ours, printed = f.(scaled(metric)),
+                            Float64.(table(fix["payoffs"][metric][block]))
+            # The no-action column of the time table is printed as zero (resolution).
+            keep = metric == "time_to_extirpation" ? (1:5) : (1:6)
+            maximum(abs, ours[:, keep] .- printed[:, keep])
+        end
+        for metric in keys(raw)
+            @test deviation(metric, "Linear", identity) < 1e-12
+            @test deviation(metric, "Convex", logistic(functions["convex"])) < 6e-5
+            @test deviation(metric, "S-curve", logistic(functions["s_curve"])) < 6e-5
+            @test deviation(metric, "Concave",
+                            logistic(functions["concave_fitted_by_us"])) <
+                  6e-5
+        end
+        # The concave function as printed does not give the printed concave table.
+        @test deviation("lambda", "Concave", logistic(functions["concave_as_printed"])) >
+              0.15
+        printed_concave = turtle(logistic(functions["concave_as_printed"]).(scaled("lambda")))
+        @test round(Float64(act_now_value(printed_concave)); digits=4) == 0.4125
+        # The raw years, before any value function (Table S5).
+        years = turtle(table(fix["raw"]["years"]))
+        @test Float64.(aggregate(Expectation(), years)) ≈
+              [9.34, 6.785, 0.055, 6.06, 0.345, 0]
+        @test expected_gain_over_baseline(years)[1] == act_now_value(years)
+        # Ours, not the paper's: the two halves of the uncertainty, taken alone.
+        magnitude = [div(k - 1, 3) for k in 1:9]
+        extent = [mod1(k, 3) for k in 1:9]
+        @test 0 <= evppi(headline, magnitude) <= evpi(headline)
+        @test 0 <= evppi(headline, extent) <= evpi(headline)
+    end
+
+    @testset "Bal et al. 2018, monitoring species and threats" begin
+        fix = replication("bal2018_monitoring")
+        s2 = fix["table_s2"]
+        number(x) = Float64(exact_number(x))
+        p, q = fill(number(s2["p"]), 2, 3), fill(number(s2["q"]), 3)
+        c, budget = number.(s2["c"]), number(s2["budget"])
+        singles, pairs = [[1], [2], [3]], [[1, 2], [1, 3], [2, 3]]
+        problem = bal_problem(p, q, c, budget)
+        @test length(problem.payoff.states) == 64
+        @test abs(evpi(problem) - s2["evpi"]) <= s2["tolerance"]
+        for row in s2["rows"]
+            alpha, beta = number(row["alpha"]), number(row["beta"])
+            for species in vcat(singles, pairs)
+                # Watching without intervening tells nothing here.
+                @test abs(evsi(problem, bal_experiment(q, species; alpha, beta))) < 1e-12
+                printed = row[length(species) == 1 ? "one_species" : "two_species"]
+                for threat in 1:2
+                    e = bal_experiment(q, species; manage=threat, alpha, beta)
+                    @test abs(evsi(problem, e) - printed[threat]) <= s2["tolerance"]
+                    @test evsi(problem, e) <= evpi(problem)
+                end
+            end
+        end
+        # No value at an empty or a full budget.
+        @test abs(evpi(bal_problem(p, q, c, 0.0))) < 1e-12
+        @test abs(evpi(bal_problem(p, q, c, 1.0))) < 1e-12
+
+        case(name) = begin
+            t = fix["table_s1"][name]
+            (p=permutedims(reduce(hcat, [number.(r) for r in t["p"]])), q=number.(t["q"]),
+             c=number.(t["c"]))
+        end
+        strategies = [(species, threat) for threat in 1:2
+                      for species in vcat(singles, pairs)]
+        function sweep(name; wallaby)
+            k = case(name)
+            map(0.1:0.1:0.9) do share
+                pr = bal_problem(k.p, k.q, k.c, share * sum(k.c); wallaby)
+                return (; evpi=evpi(pr),
+                        evsi=Dict(s => evsi(pr, bal_experiment(k.q, s[1]; manage=s[2]))
+                                  for s in strategies),
+                        surveillance=maximum(evsi(pr, bal_experiment(k.q, s))
+                                             for s in vcat(singles, pairs)))
+            end
+        end
+        best(row, n) = argmax(s -> row.evsi[s], filter(s -> length(s[1]) == n, strategies))
+
+        fitz = sweep("fitz_stirling"; wallaby=true)
+        at30 = fitz[3]
+        @test agrees(at30.evpi, fix, "fitz_evpi")
+        @test argmax(i -> fitz[i].evpi, 1:9) == 3
+        @test agrees(at30.evsi[best(at30, 2)], fix, "fitz_best_evsi")
+        @test agrees(at30.evsi[best(at30, 2)] / at30.evsi[best(at30, 1)], fix,
+                     "fitz_two_over_one")
+        # The bandicoot and the possum, with fire managed experimentally, at every budget.
+        @test all(row -> best(row, 2) == ([1, 2], 2), fitz)
+        # One species: the possum at the low and the middle-high budgets, the bandicoot
+        # between, always with fire (Section 3.2).
+        @test [best(row, 1) for row in fitz[1:6]] ==
+              [([2], 2), ([1], 2), ([1], 2), ([1], 2), ([2], 2), ([2], 2)]
+        # Without the wallaby term of equation S4.1 the published numbers are not reached.
+        standard = sweep("fitz_stirling"; wallaby=false)[3]
+        @test round(standard.evpi; digits=4) == 0.0504
+        @test round(standard.evsi[best(standard, 2)]; digits=4) == 0.0153
+
+        pilbara = sweep("pilbara"; wallaby=false)
+        top = argmax(i -> pilbara[i].evsi[best(pilbara[i], 2)], 1:9)
+        @test top == 6
+        @test agrees(pilbara[top].evsi[best(pilbara[top], 2)], fix, "pilbara_best_evsi")
+        @test agrees(maximum(row.evsi[best(row, 2)] / row.evpi for row in pilbara), fix,
+                     "pilbara_share_of_evpi")
+        @test all(row -> row.surveillance < 1e-9, pilbara)
+        # The bilby is the species to monitor at every budget; the experiment changes
+        # from grazing to fire at 60% (Results; the Discussion says otherwise).
+        @test all(row -> best(row, 1)[1] == [1], pilbara)
+        @test [best(row, 1)[2] for row in pilbara[1:6]] == [1, 1, 1, 1, 1, 2]
+        @test all(row -> best(row, 2) == ([1, 2], 1), pilbara)
     end
 
     @testset "the functions added for the replications" begin

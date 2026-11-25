@@ -1,7 +1,7 @@
 # Vignettes
 
 Twenty vignettes. The first fifteen, ordered from basic to advanced, together cover the
-package on illustrative examples; 16 to 20 are replications of published analyses and
+package on illustrative examples; 16 to 20 and 22 to 24 are replications of published analyses and
 have a section of their own below. Each
 lives in its own directory `NN_name/NN_name.qmd` and is rendered to GitHub-flavoured
 Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTML
@@ -28,7 +28,7 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 
 ## Replications of published analyses
 
-Vignettes 16 to 20 reproduce published value-of-information analyses from the tables
+Vignettes 16 to 20 and 22 to 24 reproduce published value-of-information analyses from the tables
 printed in the papers and their supplements. Their numbers are the papers', not
 illustrations; each result is shown beside the published one, and each vignette says
 what was reproduced, what was not and why, and then adds something the paper did not
@@ -42,6 +42,9 @@ report. The same comparisons, with the provenance and licence of every input, ar
 | 18 | [ICU beds, and EVPXI against EVPPI](18_replication_eze_icu/18_replication_eze_icu.md) | Eze et al. 2023, doi:10.1186/s12913-023-09479-4; mismatch in ICU beds | EVPI against a weight in the loss; the value of testing a scenario, the collapsed "per-parameter EVPI" and the EVPPI of a parameter as three different numbers; non-additivity; a credal set of the paper's four beliefs |
 | 19 | [Biological and operational uncertainty in weed control](19_replication_li_thistle/19_replication_li_thistle.md) | Li et al. 2021, doi:10.1111/1365-2664.13904; population growth rate λ | a payoff table from matrix models; `evppi` by model, by effectiveness and by agent; non-additivity of partial values; a replication that fails in part, with the reason |
 | 20 | [The value of imperfect water-quality monitoring](20_replication_luhede_monitoring/20_replication_luhede_monitoring.md) | Luhede et al. 2024, doi:10.1016/j.ecolecon.2024.108128; EUR million per year (the paper's valuation) | `evsi` of single and repeated imperfect readings; `information_can_change_decision`; break-even cost and the best programme against its price; `optimal_design`; `robust_evsi` |
+| 22 | [Which entomological uncertainty matters for malaria control](22_replication_kim_malaria/22_replication_kim_malaria.md) | Kim et al. 2017, doi:10.1111/risa.12606; USD per person over ten years (the paper's valuation) | `evpi` on four pairs of parameters; `evppi` of each parameter of a pair; overlap and complementarity of partial values |
+| 23 | [Recovery planning for a turtle](23_replication_christensen_turtle/23_replication_christensen_turtle.md) | Christensen et al. 2026, doi:10.1111/csp2.70421; decision-maker value on 0-1, and years | `evpi` under four value functions and three measures; `evppi` of threat magnitude and of extent |
+| 24 | [Which species to monitor, and how](24_replication_bal_monitoring/24_replication_bal_monitoring.md) | Bal et al. 2018, doi:10.1111/2041-210X.13037; species declining, of three | a payoff table from a model of 64 hypotheses and a budget split; `Experiment` for surveillance and for targeted monitoring with detection errors; `evsi` against the budget |
 
 Their conventions differ from those of vignettes 1 to 15 in two ways: **the unit is
 the paper's own** (individuals or another count where the paper has no valuation, money

@@ -213,7 +213,7 @@ pounds at 20,000 pounds per QALY; a validation target only).
 
 ### Published analyses
 
-Five published value-of-information analyses are recomputed from the tables printed in
+Eight published value-of-information analyses are recomputed from the tables printed in
 the papers and their supplements. Unlike the comparisons above, no script writes these
 fixtures: `test/fixtures/replications/<name>.json` were transcribed from the sources
 named in each file (DOI, table or figure, licence, date and place of retrieval), and
@@ -246,11 +246,22 @@ unit of each is the paper's own.
 | Luhede et al. 2024, Ecol. Econ. (CC BY) | value under the prior; with perfect information; EVPI, EUR million per year | 110; 119; 9 | 110; 119; 9 | exact |
 | | EVPI at cost 100, prior 0.5; prior of the peak at cost 50 | 50; 0.75 | 50; 0.75 | exact |
 | | value of imperfect monitoring | 2.21 | not computable | likelihood unpublished |
+| Kim et al. 2017, Risk Anal. | best expected payoff; with perfect information, USD per person, four cases (Table V, lognormal) | 119.9, 86.1, 76.9, 40.6; 120.2, 90.2, 77.5, 49.0 | 119.86, 86.07, 76.89, 40.62; 120.24, 90.23, 77.52, 48.99 | to the 0.1 printed |
+| | EVPI, four cases | 0.3; 4.1; 0.6; 8.4 | 0.38; 4.17; 0.62; 8.37 | the paper subtracts the rounded values |
+| | the same under uniform distributions | 12 values | not computable | probabilities not printed (below) |
+| Christensen et al. 2026, Conserv. Sci. Pract. (CC BY) | Table 3: value under uncertainty and under certainty, 3 measures by 4 value functions | 24 values | | all to the fourth decimal, from the printed payoff tables |
+| | EVPI, largest case (time to extirpation, S-curve) | 0.0144 (5.97%) | 0.0143 (5.94%) | the paper subtracts the rounded values |
+| | payoff tables S4, S6, S7 from the raw outputs and the value functions | 648 cells | | convex, linear and S-curve to the fourth decimal; concave **not** with the printed function (below) |
+| Bal et al. 2018, Methods Ecol. Evol. | Table S2: EVPI; EVSI of targeted monitoring, 4 error settings by 12 strategies; surveillance | 0.1329; 48 values; 0 | | every cell to the fourth decimal |
+| | Fitz-Stirling: EVPI; largest EVSI; two species over one | 0.066; c. 0.058; three-fold | 0.0664; 0.0581; 3.2 | yes, with equation S4.1 (below) |
+| | Pilbara: largest EVSI; share of EVPI | c. 0.058; up to 45% | 0.0558; 0.44 to 0.47 | approximately |
+| | which species and which experiment, by budget (Section 3.2) | | | yes |
 
-The authors' code was available for one of the five (Eze et al.: a Jupyter notebook
+The authors' code was read for one of the eight (Eze et al.: a Jupyter notebook
 and a workbook on GitHub, without a licence). It was read, not executed, and its
 printed outputs are the targets marked "authors' notebook"; nothing else is taken from
-it. No R code accompanies any of the five.
+it. Code is cited by Christensen et al. (doi:10.5066/P1LHWZFU) and by Bal et al.
+(Zenodo) and was not consulted. No R code accompanies any of the first five.
 
 What the comparisons found:
 
@@ -277,6 +288,23 @@ What the comparisons found:
   uncertainty is necessarily zero; the published 8.5% implies that the effect of
   *T. horridus* entered the authors' calculation in another way. Unresolved: the Dryad
   deposit (doi:10.5061/dryad.83bk3j9rf) could not be retrieved.
+- **Kim et al. 2017.** The uniform column of Table V cannot be recomputed: the
+  probabilities of the three values under the uniform distributions are not printed,
+  equal thirds do not give it, and in case D they make another programme the best one,
+  against the text. The two higher values of the fitness cost, and of the evolutionary
+  speed, have identical payoffs in Table IV.
+- **Christensen et al. 2026.** The concave value function printed in the supporting
+  information, 2 / (1 + exp(-12 (x - 1))), does not give the concave blocks of the
+  paper's own Tables S4, S6 and S7 (up to 0.19 a cell; 0.4125 for the growth rate where
+  Table 3 has 0.5768). 1.3 / (1 + exp(-12 (x - 0.9))) gives every cell; it is our fit.
+  The no-action column of Table S6 is printed as zero where the value functions give
+  0.0315 and 0.0025; nothing depends on it.
+- **Bal et al. 2018.** The Fitz-Stirling numbers need the wallaby term of equation S4.1
+  (the standard objective gives an EVPI of 0.0504 and a best EVSI of 0.0153 at 30% of
+  the budget). The detection errors are written for surveillance only; applying them to
+  each observation of an experiment reproduces Table S2. The Discussion says that in the
+  Pilbara the best experiment was always to manage grazing; the Results and our numbers
+  have it change to fire at 60% for one species.
 - **No bug was found in the package.** Three functions were added because the
   replications needed them: `hypothesis_partition`, `two_stage_value` and
   `gaussian_experiment`.
@@ -382,13 +410,19 @@ What the comparisons found:
 
 ### Published analyses not replicated
 
-Of the 14 papers of `lab/reviews/voi_epidemiology_ecology_review.md`, nine were not
-replicated. Impalli et al. 2025 (PLOS Comput. Biol.) and the measles case study of
-Shea et al. 2014 print no table of outcomes: their targets exist only as figures, and
-each needs the authors' simulation model. Meeyai et al. 2015 and Phillips et al. 2023
-publish model code but not the probabilistic-sensitivity output that a
-value-of-information calculation starts from; Kim et al. 2017 and Zang et al. 2020 are
-author manuscripts without either. Christensen et al. 2026 and Bal et al. 2018 are
-free to read at the publisher, which refuses automated retrieval, and have no copy in
-an open repository; Moore and Runge 2012 and Raymond et al. 2020 are behind a paywall.
+Of the 14 papers of `lab/reviews/voi_epidemiology_ecology_review.md`, six were not
+replicated. They were read again on 2026-11-24 from the publishers' PDFs and
+supplements. Moore and Runge 2012 prints no table of outcomes; its model is given, but
+not how the effort on bogs is divided between juvenile and mature willows, how fires
+are drawn or shared between strategies, nor the design of the partial analysis, and
+every EVPI is in a figure or in rounded prose. Raymond et al. 2020 prints its method in
+full (the R code is in the supplement) but not its inputs: the occurrence probabilities
+and land prices of 238,247 map cells are not archived (licensed data), so Tables B2 to
+B4 cannot be recomputed. Impalli et al. 2025 can be rebuilt, but prints no number: every
+cost, optimum and value is in a figure, the miss probability of its analytic model is
+not printed, and an evaluation of its equation 6 did not reproduce the optima marked in
+its Figure 1. Zang et al. 2020 publishes neither a payoff table nor code. Meeyai et al.
+2015 and Phillips et al. 2023 publish model code but not the probabilistic-sensitivity
+output that a value-of-information calculation starts from, and the measles case study
+of Shea et al. 2014 exists only as figures.
 

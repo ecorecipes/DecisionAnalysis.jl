@@ -1,0 +1,100 @@
+{
+  "name": "kim2017_malaria",
+  "citation": "Kim D, Brown Z, Anderson R, Mutero C, Miranda ML, Wiener J, Kramer R (2017) The value of information in decision-analytic modeling for malaria vector control in East Africa. Risk Analysis 37:231-244",
+  "doi": "10.1111/risa.12606",
+  "licence": "All rights reserved (Society for Risk Analysis); only the numbers of Tables III to V are transcribed, as facts, with their source",
+  "retrieved": "2026-11-24, article PDF supplied by the user; Tables III to V compared across two text extractions and the PDF pages",
+  "decision": "Which malaria vector-control programme to run for ten years in a rural East African setting: the status quo (indoor residual spraying), larviciding four or eight times a year, or spraying with larviciding",
+  "unit": "net benefit in US dollars per person over ten years, relative to the status quo (the paper's valuation: DALYs averted at 7,773 dollars each, less programme cost, discounted at 3%)",
+  "baseline": "status_quo",
+  "actions": ["status_quo", "larviciding_4", "larviciding_8", "irs_larviciding_4"],
+  "action_names": {
+    "status_quo": "90% indoor residual spraying only (payoff zero: Table IV is relative to it)",
+    "larviciding_4": "Alternative 1: full larviciding, 4 rounds a year",
+    "larviciding_8": "Alternative 2: full larviciding, 8 rounds a year",
+    "irs_larviciding_4": "Alternative 3: 90% indoor residual spraying with full larviciding, 4 rounds a year"
+  },
+  "table3": {
+    "provenance": "Table III: the three values chosen for each parameter and their probabilities under the lognormal distributions; low, medium, high",
+    "fitness_cost": {"values": ["3%", "11%", "19%"], "probabilities": ["0.65", "0.19", "0.16"]},
+    "evolutionary_speed": {"values": ["5", "9", "13"], "probabilities": ["0.42", "0.45", "0.13"]},
+    "half_life": {"values": ["3 days", "2 weeks", "3 months"], "probabilities": ["0.39", "0.18", "0.43"]},
+    "initial_efficacy": {"values": ["70%", "85%", "100%"], "probabilities": ["0.65", "0.17", "0.18"]}
+  },
+  "table4": {
+    "provenance": "Table IV, ex post payoffs relative to the status quo: for each case, nine scenarios (the first parameter varies slowest) by the three alternatives in the order larviciding_4, larviciding_8, irs_larviciding_4. The two parameters of a case are independent (Section 2.4)",
+    "A": {"first": "fitness_cost", "second": "half_life",
+      "scenarios": [["3%", "3 days"], ["3%", "2 weeks"], ["3%", "3 months"], ["11%", "3 days"], ["11%", "2 weeks"], ["11%", "3 months"], ["19%", "3 days"], ["19%", "2 weeks"], ["19%", "3 months"]],
+      "payoff": [
+        ["153.3", "183.6", "150.0"],
+        ["79.4", "158.6", "76.1"],
+        ["47.2", "117.6", "43.9"],
+        ["-47.7", "25.5", "20.9"],
+        ["-14.4", "68.0", "43.0"],
+        ["62.2", "93.9", "96.4"],
+        ["-47.7", "25.5", "20.9"],
+        ["-14.4", "68.0", "43.0"],
+        ["62.2", "93.9", "96.4"]
+      ]},
+    "B": {"first": "fitness_cost", "second": "initial_efficacy",
+      "scenarios": [["3%", "70%"], ["3%", "85%"], ["3%", "100%"], ["11%", "70%"], ["11%", "85%"], ["11%", "100%"], ["19%", "70%"], ["19%", "85%"], ["19%", "100%"]],
+      "payoff": [
+        ["69.6", "127.3", "66.3"],
+        ["79.4", "158.6", "76.1"],
+        ["12.8", "48.2", "9.5"],
+        ["-24.8", "35.2", "37.7"],
+        ["-14.4", "68.0", "43.0"],
+        ["-81.8", "-46.6", "10.5"],
+        ["-24.8", "35.2", "37.7"],
+        ["-14.4", "68.0", "43.0"],
+        ["-81.8", "-46.6", "10.5"]
+      ]},
+    "C": {"first": "evolutionary_speed", "second": "half_life",
+      "scenarios": [["5", "3 days"], ["5", "2 weeks"], ["5", "3 months"], ["9", "3 days"], ["9", "2 weeks"], ["9", "3 months"], ["13", "3 days"], ["13", "2 weeks"], ["13", "3 months"]],
+      "payoff": [
+        ["-11.9", "60.1", "27.2"],
+        ["21.0", "102.1", "53.4"],
+        ["96.4", "127.6", "115.4"],
+        ["-47.7", "25.5", "20.9"],
+        ["-14.4", "68.0", "43.0"],
+        ["62.2", "93.9", "96.4"],
+        ["-47.7", "25.5", "20.9"],
+        ["-14.4", "68.0", "43.0"],
+        ["62.2", "93.9", "96.4"]
+      ]},
+    "D": {"first": "evolutionary_speed", "second": "initial_efficacy",
+      "scenarios": [["5", "70%"], ["5", "85%"], ["5", "100%"], ["9", "70%"], ["9", "85%"], ["9", "100%"], ["13", "70%"], ["13", "85%"], ["13", "100%"]],
+      "payoff": [
+        ["10.8", "69.8", "47.2"],
+        ["21.0", "102.1", "53.4"],
+        ["-46.2", "-11.0", "8.4"],
+        ["-24.8", "35.2", "37.7"],
+        ["-14.4", "68.0", "43.0"],
+        ["-81.8", "-46.6", "10.5"],
+        ["-24.8", "35.2", "37.7"],
+        ["-14.4", "68.0", "43.0"],
+        ["-81.8", "-46.6", "10.5"]
+      ]}
+  },
+  "targets": [
+    {"id": "A_prior_value", "value": 119.9, "tolerance": 0.05, "where": "Table V, lognormal, maximum EPU"},
+    {"id": "A_perfect_value", "value": 120.2, "tolerance": 0.05, "where": "Table V, lognormal, EPPI"},
+    {"id": "A_evpi", "value": 0.3, "tolerance": 0.1, "where": "Table V, lognormal, EVPI"},
+    {"id": "B_prior_value", "value": 86.1, "tolerance": 0.05, "where": "Table V, lognormal, maximum EPU"},
+    {"id": "B_perfect_value", "value": 90.2, "tolerance": 0.05, "where": "Table V, lognormal, EPPI"},
+    {"id": "B_evpi", "value": 4.1, "tolerance": 0.1, "where": "Table V, lognormal, EVPI"},
+    {"id": "C_prior_value", "value": 76.9, "tolerance": 0.05, "where": "Table V, lognormal, maximum EPU"},
+    {"id": "C_perfect_value", "value": 77.5, "tolerance": 0.05, "where": "Table V, lognormal, EPPI"},
+    {"id": "C_evpi", "value": 0.6, "tolerance": 0.1, "where": "Table V, lognormal, EVPI"},
+    {"id": "D_prior_value", "value": 40.6, "tolerance": 0.05, "where": "Table V, lognormal, maximum EPU"},
+    {"id": "D_perfect_value", "value": 49.0, "tolerance": 0.05, "where": "Table V, lognormal, EPPI"},
+    {"id": "D_evpi", "value": 8.4, "tolerance": 0.1, "where": "Table V, lognormal, EVPI"}
+  ],
+  "resolution": {
+    "evpi_rounding": "Table V prints EVPI as the difference of the rounded prior and perfect-information values: unrounded, cases A and B are 0.38 and 4.17 where the paper prints 0.3 and 4.1."
+  },
+  "not_replicated": {
+    "uniform": {"A": [91.8, 92.4, 0.6], "B": [49.2, 62.3, 13.1], "C": [73.1, 73.7, 0.6], "D": [30.2, 45.4, 15.2]},
+    "reason": "The uniform column of Table V (maximum EPU, EPPI, EVPI) cannot be recomputed: the probabilities of the three values under the uniform distributions are not printed. Equal thirds do not give it (case A: 92.73 and 93.29), and in case D they make Alternative 3 the best action without information, where the text says Alternative 2 always is. The payoffs themselves are outputs of the authors' model (MDAST), which is not rerun; the paper computes no single-parameter or sample information."
+  }
+}

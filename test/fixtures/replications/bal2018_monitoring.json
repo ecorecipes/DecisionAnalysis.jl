@@ -1,0 +1,71 @@
+{
+  "name": "bal2018_monitoring",
+  "citation": "Bal P, Tulloch AIT, Chades I, Carwardine J, McDonald-Madden E, Rhodes JR (2018) Quantifying the value of monitoring species in multi-species, multi-threat systems. Methods in Ecology and Evolution 9:1706-1717",
+  "doi": "10.1111/2041-210X.13037",
+  "licence": "All rights reserved (the authors and the British Ecological Society); only the parameter values of Table S1, the settings of Table S2 and the published results are transcribed, as facts, with their source",
+  "retrieved": "2026-11-24, article PDF and supporting information (docx) supplied by the user; Table S1 read from the docx cell by cell, Table S2 compared between the docx text and a rendering",
+  "decision": "How to split a fixed budget between the management of two threats so that as few of three species as possible decline, when it is not known which threat causes which species to decline",
+  "unit": "expected number of species declining, out of three (the paper's objective, minimised); values of information are reductions in that number",
+  "baseline": "no_management",
+  "model": {
+    "provenance": "Equations 2 to 6 of the article and S1.2 to S1.5, S3.1 to S3.13 and S4.1 of the supporting information",
+    "states": "the 64 matrices d[i][j] in {0, 1}: threat i does or does not cause species j to decline (2 threats, 3 species)",
+    "prior": "Pr(s) = product over i, j of p[i][j] if d[i][j] = 1, else 1 - p[i][j]",
+    "action": "m1 spent on threat 1 and m2 = B - m1 on threat 2, with 0 <= m1 <= c1 and 0 <= m2 <= c2",
+    "objective": "f_s(m1) = sum over species j of q[j] + (1 - q[j]) (1 - (1 - d[1][j] (c1 - m1)/c1) (1 - d[2][j] (c2 - m2)/c2))",
+    "objective_fitz_stirling": "for the third species (the tammar wallaby) of the Fitz-Stirling case the second factor is (d[2][3] - d[2][3] (c2 - m2)/c2), equation S4.1",
+    "surveillance": "one observation a species: it declines with probability D = q[j] + (1 - q[j]) max_i d[i][j]",
+    "targeted": "two observations a species, a control (as surveillance) and an experiment in which one threat is removed: D with that threat's d set to zero. Observations are independent given the model",
+    "errors": "an observation reports a decline with probability D (1 - beta) + (1 - D) alpha: alpha is the type I and beta the type II error"
+  },
+  "table_s1": {
+    "provenance": "Table S1 of the supporting information. p[i][j]: rows = threats, columns = species. Costs are dollars a year; the Pilbara costs are printed in millions to three figures",
+    "pilbara": {
+      "species": ["Macrotis lagotis", "Dasyurus hallucatus", "Rattus tunneyi"],
+      "threats": ["over-grazing", "increasing fire frequency"],
+      "q": ["0.2717", "0.1900", "0.4750"],
+      "p": [["0.1121", "0.0679", "0.0952"], ["0.2328", "0.1975", "0.2381"]],
+      "c": ["1490000", "2680000"]
+    },
+    "fitz_stirling": {
+      "species": ["Isoodon obesulus", "Trichosurus vulpecula", "Macropus eugenii"],
+      "threats": ["invasive predator (fox)", "increasing fire frequency"],
+      "q": ["0.1246", "0.0030", "0.2301"],
+      "p": [["0.4831", "0.1637", "0.9488"], ["0.0177", "0.2053", "0.6199"]],
+      "c": ["10209.72", "22951.62"]
+    }
+  },
+  "table_s2": {
+    "provenance": "Table S2 of the supporting information: budget 50% of c1 + c2, c1 and c2 70% and 30% of their sum, every p = 0.5, every q = 0.01. EVPI is 0.1329 in every row and the EVSI of surveillance is zero in every case. The printed values are the same for each of the three species and for each of the three pairs, so one number stands for three printed cells",
+    "p": "0.5",
+    "q": "0.01",
+    "c": ["0.7", "0.3"],
+    "budget": "0.5",
+    "evpi": 0.1329,
+    "rows": [
+      {"alpha": "0", "beta": "0", "one_species": [0.0127, 0.0012], "two_species": [0.0650, 0.0296]},
+      {"alpha": "0", "beta": "0.05", "one_species": [0.0049, 0.0011], "two_species": [0.0473, 0.0246]},
+      {"alpha": "0.05", "beta": "0", "one_species": [0.0104, 0.0003], "two_species": [0.0586, 0.0229]},
+      {"alpha": "0.05", "beta": "0.05", "one_species": [0.0036, 0.0003], "two_species": [0.0408, 0.0185]}
+    ],
+    "row_layout": "one_species and two_species: [experiment removes threat 1, experiment removes threat 2]",
+    "tolerance": 0.00006
+  },
+  "targets": [
+    {"id": "fitz_evpi", "value": 0.066, "tolerance": 0.0005, "where": "Section 3.2: 'EVPI = 0.066 reduction in the expected number of species declining' (the budget is not stated; ours is at 30%)"},
+    {"id": "fitz_best_evsi", "value": 0.058, "tolerance": 0.0005, "where": "Section 3.2: maximum EVSI 'c. 0.058' in both case studies"},
+    {"id": "fitz_two_over_one", "value": 3, "tolerance": 0.3, "where": "Section 3.2: monitoring two species 'increased the maximum EVSI three-fold'"},
+    {"id": "pilbara_best_evsi", "value": 0.058, "tolerance": 0.003, "where": "Section 3.2: maximum EVSI 'c. 0.058' in both case studies (ours: 0.0558 at 60%)"},
+    {"id": "pilbara_share_of_evpi", "value": 0.45, "tolerance": 0.02, "where": "Discussion: targeted monitoring 'can achieve up to 45% of the EVPI' (ours: 0.44 at 60% of the budget, where EVSI is largest, and up to 0.47 at 10%)"}
+  ],
+  "resolution": {
+    "budget_grid": "The budgets of the case studies are given only as percentages of c1 + c2 and the grid is not printed; the markers of Figure 4 suggest steps of 10%, which we use. The published 0.066 and 0.058 for Fitz-Stirling are both reached at 30%.",
+    "fitz_objective": "The Fitz-Stirling numbers need the wallaby term of equation S4.1. With the standard objective the EVPI at 30% is 0.0504 and the best EVSI 0.0153.",
+    "targeted_errors": "The supporting information writes the detection errors for surveillance only; applying the same formula to each of the control and experiment observations reproduces Table S2.",
+    "pilbara_discussion": "The Discussion says that in the Pilbara the best strategy was always to manage grazing experimentally; the Results, and our numbers, have the best experiment for one species change to fire at 60% of the budget.",
+    "optimiser": "The paper minimises with MATLAB's fmincon; the expected objective is quadratic in m1, and we search a grid of 2,001 allocations, which bounds the error far below the printed precision."
+  },
+  "not_replicated": {
+    "reason": "Figures 2, 3 and S1 to S4 (the simulated systems) are printed as figures only, and their grids are not given; the statements that targeted monitoring reaches 'up to 50%' of EVPI for one species and '80%' for two are not tied to a stated setting. The decline probabilities behind Table S1 are unpublished."
+  }
+}

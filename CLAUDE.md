@@ -246,10 +246,10 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `compare_voi.jl`, which prints our estimates beside those of `voi`, `requirements.txt`,
   `requirements-py27.txt` and a README with the versions used and the findings. The Python environments
   are `validation/.venv` and, for `improb` (Python 2.7), `validation/.venv27` (both ignored).
-- `vignettes/NN_name/NN_name.qmd`: twenty-one Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
+- `vignettes/NN_name/NN_name.qmd`: twenty-four Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
-  multi-attribute utilities on the toy simulator), and 16 to 20 the replications of published analyses
+  multi-attribute utilities on the toy simulator), and 16 to 20 and 22 to 24 the replications of published analyses
   (`NN_replication_*`: Shea et al. 2014, Runge et al. 2011, Eze et al. 2023, Li et al. 2021, Luhede et al.
   2024; `docs/make.jl` lists them under a heading of their own), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for

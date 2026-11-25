@@ -180,7 +180,7 @@ information_can_change_decision(problem, gauge)                       # true: EV
 Twenty vignettes in [`vignettes/`](vignettes/). The first fifteen go from a first decision table to
 Lean-checked certificates, sample-based analysis and an application to chytridiomycosis,
 on ecological examples whose outcomes are counted in individuals and always compared with no intervention
-(all numbers illustrative). Vignettes 16 to 20 are replications of published analyses, listed after the
+(all numbers illustrative). Vignettes 16 to 20 and 22 to 24 are replications of published analyses, listed after the
 table. Each is rendered to Markdown, HTML and PDF beside its `.qmd`, with the code run
 once: `julia scripts/render_vignettes.jl` (see [`vignettes/README.md`](vignettes/README.md)). The Markdown
 is also published as the Tutorials of the documentation, copied by `julia scripts/sync_vignettes.jl`.
@@ -220,6 +220,9 @@ with the provenance of every number, are `test/fixtures/replications/*.json` and
 | 18 | [ICU beds, and EVPXI against EVPPI](vignettes/18_replication_eze_icu/18_replication_eze_icu.md) | Eze et al. 2023, *BMC Health Services Research* | The EVPI curves and the authors' notebook; not the article's Table 5 nor two numbers in its text. Three different "partial" values on one table. |
 | 19 | [Biological and operational uncertainty in weed control](vignettes/19_replication_li_thistle/19_replication_li_thistle.md) | Li et al. 2021, *Journal of Applied Ecology* | Table 1 (EVPI 0.15) and the matrix models; the joint analysis is **not** reproduced, and the vignette shows where it parts. Partial values do not add. |
 | 20 | [The value of imperfect water-quality monitoring](vignettes/20_replication_luhede_monitoring/20_replication_luhede_monitoring.md) | Luhede et al. 2024, *Ecological Economics* | The perfect-information results exactly; the value of imperfect monitoring is quoted, not recomputed (its likelihood is unpublished), and set against the EVSI and break-even cost of monitoring programmes. |
+| 22 | [Which entomological uncertainty matters for malaria control](vignettes/22_replication_kim_malaria/22_replication_kim_malaria.md) | Kim et al. 2017, *Risk Analysis* | The lognormal column of Table V (EVPI up to 8.4 dollars per person) from the printed payoff table; the uniform column is **not** reproducible (its probabilities are not printed). The value of each parameter of a pair alone is added. |
+| 23 | [Recovery planning for a turtle](vignettes/23_replication_christensen_turtle/23_replication_christensen_turtle.md) | Christensen et al. 2026, *Conservation Science and Practice* | All twelve rows of Table 3 from the supplement's model outputs and value functions; the concave value function as printed does not give the paper's own tables, and a fitted one does. |
+| 24 | [Which species to monitor, and how](vignettes/24_replication_bal_monitoring/24_replication_bal_monitoring.md) | Bal et al. 2018, *Methods in Ecology and Evolution* | The model rebuilt from the paper: every cell of Table S2 (EVPI, and the EVSI of surveillance and of targeted monitoring with detection errors) and the headline numbers of both case studies; the figures of the simulated systems are not. |
 
 ## Conventions
 
