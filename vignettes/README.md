@@ -27,6 +27,7 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 | 15 | [Risk attitude and several attributes](15_risk_attitude_and_attributes/15_risk_attitude_and_attributes.md) | `LinearUtility`, `ExponentialUtility`, `PowerUtility`, `certainty_equivalent`, `risk_premium`, a non-linear utility applied per run, `AdditiveUtility`, `MultiplicativeUtility` |
 | 25 | [Survey first or act now, under a budget](25_survey_or_act/25_survey_or_act.md) | `survey_or_act` and `select_under_budget` on synthetic parcels, after Raymond et al. (2020): the closed form of the rule, never, always and mixed surveying under a budget, expected against largest cost, more than one species |
 | 26 | [Act now, or wait and learn?](26_value_of_waiting/26_value_of_waiting.md) | `value_of_waiting` on an invented outbreak in a herd: the value of a test result to the late decision, the cost of the delay, the best length of wait, and why EVSI with the delay ignored overstates |
+| 27 | [Learning while managing](27_adaptive_management/27_adaptive_management.md) | `adaptive_management` on an invented bird colony: no learning, passive and active adaptive management and perfect information over several years, the value of updating against the value of probing, the policy tree, and how both depend on the horizon and the prior |
 
 ## Replications of published analyses
 

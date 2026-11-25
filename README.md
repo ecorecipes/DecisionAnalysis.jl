@@ -101,6 +101,10 @@ an optional source of problems, each loaded as a weak-dependency extension.
 - **Waiting to learn.** `value_of_waiting` compares acting now with waiting, learning and acting late,
   given the payoffs of late action on the same outcome horizon; it splits the value into what the
   information is worth to the late decision and what the delay costs, for one or several lengths of wait.
+- **Sequential adaptive management.** `adaptive_management` values a decision repeated over a horizon
+  when each action also reveals something: no learning, passive (update, but never act in order to
+  learn), active (the best policy, by exact recursion over beliefs) and perfect information, with the
+  active policy as a tree.
 - **Influence diagrams.** With InfluenceDiagrams.jl loaded, `normal_form(model)` turns a single-decision
   influence diagram into a `DecisionProblem` and its information into an `Experiment`; the diagram's
   structural values of information are then `evpi` and `evsi` on the table.
@@ -211,6 +215,7 @@ is also published as the Tutorials of the documentation, copied by `julia script
 | 21 | [Which vital rate to measure](vignettes/21_estimation_studies_and_scenarios/21_estimation_studies_and_scenarios.md) | Value of information for a model that estimates (variance removed, by input and output), the EVSI of standard study designs by regression, Gaussian approximation and moment matching, a check by two-level Monte Carlo, the sample size with the largest net benefit, and scenario designs (value of information and sensitivity designs, a half fraction), after Jackson et al. (2021, 2022) and Runge et al. (2024) |
 | 25 | [Survey first or act now, under a budget](vignettes/25_survey_or_act/25_survey_or_act.md) | `survey_or_act` and `select_under_budget` on synthetic parcels, after Raymond et al. (2020): the closed form of the rule, never, always and mixed surveying under a budget, expected against largest cost, more than one species |
 | 26 | [Act now, or wait and learn?](vignettes/26_value_of_waiting/26_value_of_waiting.md) | `value_of_waiting` on an invented outbreak in a herd: the value of a test result to the late decision, the cost of the delay, the best length of wait, and why EVSI with the delay ignored overstates |
+| 27 | [Learning while managing](vignettes/27_adaptive_management/27_adaptive_management.md) | `adaptive_management` on an invented bird colony: no learning, passive and active adaptive management and perfect information over several years, the value of updating against the value of probing, the policy tree, and how both depend on the horizon and the prior |
 
 ### Replications of published analyses
 

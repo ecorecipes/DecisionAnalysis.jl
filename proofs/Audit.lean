@@ -149,6 +149,13 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.valueOfWaiting_le_evsi
 #print axioms DecisionAnalysisProofs.valueOfWaiting_neg_example
 
+-- Sequential adaptive management (`adaptive_management`).
+#print axioms DecisionAnalysisProofs.policyValue_le_adaptiveValue
+#print axioms DecisionAnalysisProofs.exists_policyValue_eq_adaptiveValue
+#print axioms DecisionAnalysisProofs.horizonWeight_mul_actNowValue_le_policyValue
+#print axioms DecisionAnalysisProofs.horizonWeight_mul_actNowValue_le_adaptiveValue
+#print axioms DecisionAnalysisProofs.adaptiveValue_le_horizonWeight_mul_perfectValue
+
 -- T8: minimax regret and independence of irrelevant alternatives.
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaSmall_iff
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaLarge_iff

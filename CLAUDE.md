@@ -206,6 +206,10 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - `src/design.jl`: `voi_profile`, `expected_variance_reduction`, `optimal_design`, and `value_of_waiting`
   (act now against wait, learn and act late, with a second payoff table for late action on the same
   horizon; `value = evsi_delayed − delay_cost`; backed by `proofs/DecisionAnalysisProofs/Finite/Waiting.lean`).
+- `src/adaptive.jl`: `adaptive_management`, the finite-horizon recursion over unnormalised beliefs for a
+  fixed unknown state with action-dependent experiments; returns `no_learning ≤ passive ≤ active ≤
+  perfect` (the order is proved in `proofs/DecisionAnalysisProofs/Finite/Adaptive.lean`) and the active
+  policy tree. Its closures recurse, so their variables are declared `local`.
 - `src/survey.jl`: `survey_or_act` (act now or survey first, by value per unit of expected cost, after
   Raymond et al. 2020; values are gains over the baseline, the baseline costs zero, a tie means act now,
   and the survey policy is the best over all policies unless one is imposed) and `select_under_budget`
@@ -242,7 +246,7 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   layer; `test_outcomes.jl` defines the toy simulator that the driver is tested on, and
   `test_voi_sample.jl` checks `MissingExtensionError` before it loads GAM. `test_utilities.jl` (risk
   attitude and multi-attribute utilities), `test_gaussian_process.jl`, `test_standard_errors.jl`
-  (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`, `test_survey.jl`,
+  (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`, `test_survey.jl`, `test_adaptive.jl`,
   `test_additions.jl` (separating problem, upper-EVPI prior, the maximality shortcut, sharper
   constants), `test_voi_methods.jl` (the methods that follow `voi`: closed forms of its normal model,
   explicit loops, and the fixture `voi_extra_reference.json`), `test_validation.jl` and `test_validation_improb.jl` (the cross-language fixtures),
@@ -253,10 +257,10 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `compare_voi.jl`, which prints our estimates beside those of `voi`, `requirements.txt`,
   `requirements-py27.txt` and a README with the versions used and the findings. The Python environments
   are `validation/.venv` and, for `improb` (Python 2.7), `validation/.venv27` (both ignored).
-- `vignettes/NN_name/NN_name.qmd`: twenty-six Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
+- `vignettes/NN_name/NN_name.qmd`: twenty-seven Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
-  multi-attribute utilities on the toy simulator), 25 `survey_or_act` on synthetic parcels, 26 `value_of_waiting` on an invented outbreak, and 16 to 20 and 22 to 24 the replications of published analyses
+  multi-attribute utilities on the toy simulator), 25 `survey_or_act` on synthetic parcels, 26 `value_of_waiting` on an invented outbreak, 27 `adaptive_management` on an invented colony, and 16 to 20 and 22 to 24 the replications of published analyses
   (`NN_replication_*`: Shea et al. 2014, Runge et al. 2011, Eze et al. 2023, Li et al. 2021, Luhede et al.
   2024; `docs/make.jl` lists them under a heading of their own), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for

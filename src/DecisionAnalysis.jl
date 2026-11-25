@@ -115,7 +115,7 @@ export act_now_value, value_with_information, evpi, evppi, hypothesis_partition,
        information_can_change_decision, RobustVOI,
        robust_evpi, robust_evsi, voi_profile, expected_variance_reduction,
        optimal_design, normal_form, survey_or_act, select_under_budget,
-       value_of_waiting
+       value_of_waiting, adaptive_management
 # Sample-based value of information
 export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Grouping,
        StrongOakley, Sadatsafavi, SplineRegression, GAMRegression,
@@ -170,6 +170,7 @@ include("solve.jl")
 include("fidelity.jl")
 include("design.jl")
 include("survey.jl")
+include("adaptive.jl")
 include("estimation.jl")
 include("scenarios.jl")
 include("report.jl")
