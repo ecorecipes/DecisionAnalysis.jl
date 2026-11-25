@@ -83,7 +83,7 @@ end
 @testset "replications of published analyses" begin
     @testset "every fixture states its provenance" begin
         files = filter(endswith(".json"), readdir(REPLICATIONS))
-        @test length(files) == 9
+        @test length(files) == 10
         for f in files
             fix = JSON.parse(read(joinpath(REPLICATIONS, f), String))
             for key in ("citation", "doi", "licence", "retrieved", "decision", "unit",
@@ -874,6 +874,114 @@ end
         sure, _ = unobserved(perfect, pmoves, pseen, 100)
         @test spell(sure, :survey) ==
               target(fix, "years_surveying_perfect_detection")["value"]
+    end
+
+    @testset "Li et al. 2019, Ebola: epidemiological and operational uncertainty" begin
+        fix = replication("li2019_ebola")
+        actions = symbols(fix["actions"])
+        rows = fix["table_s3"]["rows"]
+        @test length(rows) == 37 * 27 == 999
+        @test length(fix["table_s3"]["columns"]) == 13 == length(first(rows))
+        models = [Int(r[1]) for r in rows]
+        combinations = [(Int(r[2]), Int(r[3]), Int(r[4])) for r in rows]
+        @test sort(unique(models)) == 1:37 && length(unique(combinations)) == 27
+        @test allunique(zip(models, combinations))
+        states = [Symbol("model", m, "_cost", c...) for (m, c) in zip(models, combinations)]
+        # Minus the caseload of Table S3, exactly, for one budget: rows are the three
+        # interventions, columns the 999 pairs of a model and a cost combination.
+        function ebola(budget)
+            first_column = 5 +
+                           3 * (findfirst(==(budget), ["low", "intermediate", "high"]) - 1)
+            cases = permutedims(reduce(hcat,
+                                       [exact_vector(r[first_column:(first_column + 2)])
+                                        for r in rows]))
+            return DecisionProblem(PayoffTable(actions, states, -permutedims(cases)),
+                                   FiniteBelief(states, fill(1 // big(999), 999));
+                                   baseline=Symbol(fix["baseline"]))
+        end
+        # The best intervention for each group of states, on the group's average.
+        function best_by(problem, labels)
+            Q = problem.payoff.Q
+            return Dict(g => actions[argmax([sum(Q[a, j]
+                                                 for j in eachindex(labels)
+                                                 if labels[j] == g)
+                                             for a in eachindex(actions)])]
+                        for g in unique(labels))
+        end
+        for budget in ("low", "intermediate", "high")
+            problem = ebola(budget)
+            minimum_of_average = -act_now_value(problem)
+            # Reducing community transmission is best under present knowledge at
+            # every budget, which is why it serves as the baseline.
+            @test first_choice(decide(problem, MaxExpectedUtility())) == :community
+            @test all(>=(0), expected_gain_over_baseline(problem)[[1]])
+            total = evpi(problem)
+            by_model, by_cost = evppi(problem, models), evppi(problem, combinations)
+            for (id, ours) in (("minimum_of_average", minimum_of_average),
+                               ("average_of_lowest", minimum_of_average - total),
+                               ("evpi", total),
+                               ("evpi_percent", 100 * total / minimum_of_average),
+                               ("average_of_lowest_across_models",
+                                minimum_of_average - by_model),
+                               ("evxi_epidemiological", by_model),
+                               ("evxi_epidemiological_percent",
+                                100 * by_model / minimum_of_average),
+                               ("average_of_lowest_across_cost_functions",
+                                minimum_of_average - by_cost),
+                               ("evxi_operational", by_cost),
+                               ("evxi_operational_percent",
+                                100 * by_cost / minimum_of_average))
+                @test agrees(ours, fix, id * "_" * budget)
+            end
+            # Partial values are bounded by the whole and do not add up to it.
+            @test 0 < by_cost < total && 0 < by_model < total
+            @test by_model + by_cost != total
+            # Knowing both is knowing the state.
+            @test evppi(problem, collect(zip(models, combinations))) == total
+        end
+        # The text transposes two percentages that its Table 2 has in this order.
+        low, middle = ebola("low"), ebola("intermediate")
+        share(p) = round(Float64(100 * evppi(p, combinations) / -act_now_value(p));
+                         digits=1)
+        @test (share(low), share(middle)) == (11.3, 13.1)
+        # With more money the two sources change places.
+        high = ebola("high")
+        @test evppi(low, combinations) > evppi(low, models)
+        @test evppi(high, models) > 10 * evppi(high, combinations)
+
+        # The counts quoted for the low budget (Table 1 of the article).
+        over_models = best_by(low, combinations)      # one best action per combination
+        over_costs = best_by(low, models)             # one best action per model
+        @test count(==(:community), values(over_models)) ==
+              target(fix, "community_best_cost_combinations_low")["value"]
+        @test count(==(:funeral), values(over_costs)) ==
+              target(fix, "funeral_best_models_low")["value"]
+        @test first_choice(decide(low, MaxExpectedUtility())) == :community
+        # An intervention that is cheap while both others are expensive (cost function
+        # 2), counted over the 37 models, in both of its cheap forms (1 and 3).
+        function wins(action, combination)
+            a = findfirst(==(action), actions)
+            return count(j -> combinations[j] == combination &&
+                             argmax(view(low.payoff.Q, :, j)) == a, eachindex(states))
+        end
+        # The count for community transmission is the paper's (37 of 37). Those for the
+        # other two are not (36 and 31 in the text): the fixture pins ours, and no
+        # single combination of Table S3 gives the published ones.
+        cheap_forms = ((1, "cheap_and_effective"), (3, "cheap_and_partly_effective"))
+        for (cheap, _) in cheap_forms
+            @test wins(:community, ntuple(k -> k == 1 ? cheap : 2, 3)) ==
+                  target(fix, "community_best_models_when_cheap_others_expensive")["value"]
+        end
+        for (action, place) in ((:funeral, 2), (:hospitalization, 3))
+            id = String(action) * "_best_models_when_cheap_others_expensive"
+            for (cheap, form) in cheap_forms
+                ours = wins(action, ntuple(k -> k == place ? cheap : 2, 3))
+                @test ours == fix["ours"][id][form]
+                @test ours < target(fix, id)["value"]
+            end
+            published = target(fix, id)["value"]
+            @test !any(wins(action, c) == published for c in unique(combinations))
+        end
     end
 
     @testset "the functions added for the replications" begin

@@ -1,7 +1,7 @@
 # Vignettes
 
-Twenty-nine vignettes. Twenty are tutorials on illustrative examples (1 to 15, ordered
-from basic to advanced, and 21 and 25 to 28); the other nine are case studies, in a
+Thirty vignettes. Twenty are tutorials on illustrative examples (1 to 15, ordered
+from basic to advanced, and 21 and 25 to 28); the other ten are case studies, in a
 section of their own below, grouped by field. Each
 lives in its own directory `NN_name/NN_name.qmd` and is rendered to GitHub-flavoured
 Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTML
@@ -59,6 +59,7 @@ report. The same comparisons, with the provenance and licence of every input, ar
 |---|---|---|---|
 | 18 | [ICU beds, and EVPXI against EVPPI](18_epidemiology_eze_icu/18_epidemiology_eze_icu.md) | Eze et al. 2023, doi:10.1186/s12913-023-09479-4; mismatch in ICU beds | EVPI against a weight in the loss; the value of testing a scenario, the collapsed "per-parameter EVPI" and the EVPPI of a parameter as three different numbers; non-additivity; a credal set of the paper's four beliefs |
 | 22 | [Which entomological uncertainty matters for malaria control](22_epidemiology_kim_malaria/22_epidemiology_kim_malaria.md) | Kim et al. 2017, doi:10.1111/risa.12606; USD per person over ten years (the paper's valuation) | `evpi` on four pairs of parameters; `evppi` of each parameter of a pair; overlap and complementarity of partial values |
+| 30 | [Epidemiological and operational uncertainty in Ebola control](30_epidemiology_li_ebola/30_epidemiology_li_ebola.md) | Li et al. 2019, doi:10.1098/rspb.2019.0774; cases in a simulated population of 10,000 | a payoff table of 999 states (37 models × 27 cost combinations) read from the fixture; `evpi`; `evppi` by model, by cost combination and by each intervention's cost function; non-additivity; `MinimaxRegret` beside expected value |
 
 Their conventions differ from those of the tutorials in two ways: **the unit is
 the paper's own** (individuals or another count where the paper has no valuation, money
