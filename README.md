@@ -98,6 +98,9 @@ an optional source of problems, each loaded as a weak-dependency extension.
 - **Survey or act, under a budget.** `survey_or_act` compares acting on a management unit now with
   surveying it first, by value per unit of expected cost, when actions and the survey both cost money
   (after Raymond et al. 2020); `select_under_budget` then chooses units for a fixed budget.
+- **Waiting to learn.** `value_of_waiting` compares acting now with waiting, learning and acting late,
+  given the payoffs of late action on the same outcome horizon; it splits the value into what the
+  information is worth to the late decision and what the delay costs, for one or several lengths of wait.
 - **Influence diagrams.** With InfluenceDiagrams.jl loaded, `normal_form(model)` turns a single-decision
   influence diagram into a `DecisionProblem` and its information into an `Experiment`; the diagram's
   structural values of information are then `evpi` and `evsi` on the table.
@@ -206,6 +209,8 @@ is also published as the Tutorials of the documentation, copied by `julia script
 | 14 | [Bd epizootic response](vignettes/14_bd_epizootic_response/14_bd_epizootic_response.md) | The Drawert et al. (2017) model from a cached table of runs: gains, rules, groups, EVPI, EVPPI and the EVSI of a survey |
 | 15 | [Risk attitude and several attributes](vignettes/15_risk_attitude_and_attributes/15_risk_attitude_and_attributes.md) | Certainty equivalents and risk premiums in animals, exponential and power utilities on simulator runs, additive and multiplicative utilities over uninfected and infected counts |
 | 21 | [Which vital rate to measure](vignettes/21_estimation_studies_and_scenarios/21_estimation_studies_and_scenarios.md) | Value of information for a model that estimates (variance removed, by input and output), the EVSI of standard study designs by regression, Gaussian approximation and moment matching, a check by two-level Monte Carlo, the sample size with the largest net benefit, and scenario designs (value of information and sensitivity designs, a half fraction), after Jackson et al. (2021, 2022) and Runge et al. (2024) |
+| 25 | [Survey first or act now, under a budget](vignettes/25_survey_or_act/25_survey_or_act.md) | `survey_or_act` and `select_under_budget` on synthetic parcels, after Raymond et al. (2020): the closed form of the rule, never, always and mixed surveying under a budget, expected against largest cost, more than one species |
+| 26 | [Act now, or wait and learn?](vignettes/26_value_of_waiting/26_value_of_waiting.md) | `value_of_waiting` on an invented outbreak in a herd: the value of a test result to the late decision, the cost of the delay, the best length of wait, and why EVSI with the delay ignored overstates |
 
 ### Replications of published analyses
 

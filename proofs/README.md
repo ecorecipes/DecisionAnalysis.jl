@@ -163,6 +163,7 @@ were written by the Julia package itself, and those for the two proposed schemas
 | `Finite/Alternative.lean` | T12b and S1: completeness of the "no" certificates |
 | `Finite/Dilation.lean` | T13: the negative robust EVSI of the Julia test |
 | `Finite/SurveyOrAct.lean` | The arithmetic of `survey_or_act`: the survey-first threshold and the stopping test of the policy search |
+| `Finite/Waiting.lean` | The value of waiting to learn (`value_of_waiting`): its split into information and delay, and the bound by the EVSI of acting now |
 | `Theory/FiniteKernels.lean` | The link to `FiniteKernelsProofs` kernels at `K = ℝ` |
 | `Certificate/Check.lean` | The decision-certificate checker and its soundness |
 | `Certificate/Witness.lean` | The garbling and E-admissibility witness checkers and their soundness |

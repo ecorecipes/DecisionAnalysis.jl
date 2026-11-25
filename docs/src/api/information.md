@@ -41,6 +41,7 @@ RobustVOI
 voi_profile
 expected_variance_reduction
 optimal_design
+value_of_waiting
 survey_or_act
 select_under_budget
 ```

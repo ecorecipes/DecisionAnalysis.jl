@@ -18,6 +18,7 @@ import DecisionAnalysisProofs.Finite.Farkas
 import DecisionAnalysisProofs.Finite.Alternative
 import DecisionAnalysisProofs.Finite.Dilation
 import DecisionAnalysisProofs.Finite.SurveyOrAct
+import DecisionAnalysisProofs.Finite.Waiting
 import DecisionAnalysisProofs.Theory.FiniteKernels
 import DecisionAnalysisProofs.Certificate.Check
 import DecisionAnalysisProofs.Certificate.Witness

@@ -141,6 +141,14 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.survey_same_action_lt
 #print axioms DecisionAnalysisProofs.ratio_le_of_parametric
 
+-- The value of waiting (`value_of_waiting`).
+#print axioms DecisionAnalysisProofs.valueOfWaiting_eq
+#print axioms DecisionAnalysisProofs.valueOfWaiting_pos_iff
+#print axioms DecisionAnalysisProofs.valueOfWaiting_constant
+#print axioms DecisionAnalysisProofs.valueWithInformation_mono
+#print axioms DecisionAnalysisProofs.valueOfWaiting_le_evsi
+#print axioms DecisionAnalysisProofs.valueOfWaiting_neg_example
+
 -- T8: minimax regret and independence of irrelevant alternatives.
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaSmall_iff
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaLarge_iff

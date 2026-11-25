@@ -301,3 +301,109 @@ function optimal_design(problem::DecisionProblem, designs; costs=nothing,
     return (; designs=rows, best=first(tied), tied,
             criterion=all(iszero, cost) ? :evsi : :net_benefit, population)
 end
+
+function _check_delayed(problem::DecisionProblem, delayed::PayoffTable)
+    delayed.actions == problem.payoff.actions ||
+        throw(LabelMismatchError("actions of the delayed payoff table",
+                                 problem.payoff.actions, delayed.actions))
+    delayed.states == problem.payoff.states ||
+        throw(LabelMismatchError("states of the delayed payoff table",
+                                 problem.payoff.states, delayed.states))
+    return delayed.Q[problem.feasible, :]
+end
+
+"""
+    value_of_waiting(problem::DecisionProblem, delayed::PayoffTable, experiment::Experiment)
+    value_of_waiting(problem::DecisionProblem, options) -> NamedTuple
+
+**Act now, or wait, learn, and act late?** `problem` holds the payoffs of acting now.
+`delayed` holds the payoffs of taking each action late, after the wait, for the same
+actions and states and **on the same outcome horizon** (the deaths, animals or money
+of the whole period, the wait included), so that the damage done while waiting is in
+the table and is not a fee subtracted afterwards. `experiment` is what the wait
+reveals. With `V0` the value of acting now ([`act_now_value`](@ref)),
+
+    value = Σ_z max_a Σ_θ p(θ) L[z, θ] Q_late[a, θ] − V0,
+
+which can be negative, and waiting is chosen (`wait`) when it is strictly positive. It
+splits into what the information is worth to the late decision and what the delay
+costs with nothing learned (Lean: `valueOfWaiting_eq`):
+
+    value = evsi_delayed − delay_cost,
+    delay_cost = V0 − max_a Σ_θ p(θ) Q_late[a, θ].
+
+The result is `(; value, wait, act_now_value, act_now_action, waiting_value,
+delay_cost, evsi_delayed, evsi_now, late_action, policy)`. `evsi_now` is
+[`evsi`](@ref)`(problem, experiment)`, the value of the same information if it
+arrived at once: when no action pays more late than now in any state, `value ≤
+evsi_now` (Lean: `valueOfWaiting_le_evsi`), so a study that looks worth running on the
+payoffs of acting now may not be worth waiting for. `late_action` is the best late
+action with nothing learned, and `policy` gives the best late action after each signal
+of positive probability (the first on a tie). Infeasible actions are left out, now and
+late. Exact in, exact out. Needs a single prior.
+
+With `options`, a collection of `name => (delayed, experiment)` pairs (several lengths
+of wait, each with its payoffs and what it reveals), the result is `(;
+act_now_value, act_now_action, options, values, results, best)`: `best` is the name
+with the largest value, the first on a tie, or `:act_now` when no value is positive.
+
+```jldoctest
+julia> now = PayoffTable([:none, :cull], [:mild, :severe], [0 -100; -30 -30]);
+
+julia> late = PayoffTable([:none, :cull], [:mild, :severe], [0 -100; -40 -55]);
+
+julia> p = DecisionProblem(now, [3 // 5, 2 // 5]; baseline=:none);
+
+julia> w = value_of_waiting(p, late, Experiment([1 0; 0 1]; signals=[:mild, :severe]));
+
+julia> w.value, w.wait, w.evsi_delayed, w.delay_cost, w.evsi_now
+(8//1, true, 18//1, 10//1, 18//1)
+
+julia> w.policy
+2-element Vector{Pair{Symbol, Symbol}}:
+   :mild => :none
+ :severe => :cull
+```
+"""
+function value_of_waiting(problem::DecisionProblem, delayed::PayoffTable,
+                          experiment::Experiment)
+    _check_states(experiment, problem.payoff.states, "payoff table")
+    p = _prior(problem, :value_of_waiting)
+    Q = _feasible_Q(problem)
+    late = _check_delayed(problem, delayed)
+    L = experiment.likelihood
+    actions = feasible_actions(problem)
+    now = Q * p
+    a0 = argmax(now)
+    late_now = late * p
+    joint = [late * (p .* view(L, z, :)) for z in axes(L, 1)]
+    waiting = sum(maximum, joint)
+    policy = [experiment.signals[z] => actions[argmax(joint[z])]
+              for z in axes(L, 1) if !iszero(sum(p .* view(L, z, :)))]
+    value = waiting - now[a0]
+    return (; value, wait=value > 0, act_now_value=now[a0], act_now_action=actions[a0],
+            waiting_value=waiting, delay_cost=now[a0] - maximum(late_now),
+            evsi_delayed=waiting - maximum(late_now),
+            evsi_now=sum(maximum(Q * (p .* view(L, z, :))) for z in axes(L, 1)) - now[a0],
+            late_action=actions[argmax(late_now)], policy)
+end
+
+_waiting_options(options::AbstractVector{<:Pair}) = options
+_waiting_options(options) = collect(pairs(options))
+
+function value_of_waiting(problem::DecisionProblem, options)
+    named = [Symbol(name) => option for (name, option) in _waiting_options(options)]
+    isempty(named) && throw(ArgumentError("no option for waiting was given"))
+    results = map(named) do (name, option)
+        (option isa Tuple && length(option) == 2 && option[1] isa PayoffTable &&
+         option[2] isa Experiment) ||
+            throw(ArgumentError("the option $name must be a tuple (delayed payoff " *
+                                "table, experiment)"))
+        return value_of_waiting(problem, option[1], option[2])
+    end
+    values = [r.value for r in results]
+    k = argmax(values)
+    return (; act_now_value=first(results).act_now_value,
+            act_now_action=first(results).act_now_action, options=first.(named), values,
+            results, best=values[k] > 0 ? first(named[k]) : :act_now)
+end

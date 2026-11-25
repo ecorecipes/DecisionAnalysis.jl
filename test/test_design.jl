@@ -236,3 +236,126 @@ end
         @test_throws BeliefFormError DecisionReport(scenario; profile=true)
     end
 end
+
+# The value of waiting to learn (Lean: Finite/Waiting.lean).
+@testset "value_of_waiting" begin
+    states, actions = [:mild, :severe], [:none, :cull]
+    now = PayoffTable(actions, states, [0 -100; -30 -30])
+    late = PayoffTable(actions, states, [0 -100; -40 -55])
+    problem = DecisionProblem(now, [3 // 5, 2 // 5]; baseline=:none)
+    perfect = Experiment([1 0; 0 1]; signals=[:mild, :severe])
+
+    @testset "a worked example" begin
+        w = value_of_waiting(problem, late, perfect)
+        @test w.act_now_value == -30 && w.act_now_action == :cull
+        @test w.waiting_value == 3 // 5 * 0 + 2 // 5 * -55
+        @test w.value == 8 && w.wait
+        @test w.delay_cost == 10 && w.late_action == :none
+        @test w.evsi_delayed == 18 && w.evsi_now == evsi(problem, perfect)
+        @test w.policy == [:mild => :none, :severe => :cull]
+        # Waiting costs nothing: the value of waiting is the EVSI.
+        same = value_of_waiting(problem, now, perfect)
+        @test same.value == same.evsi_now == same.evsi_delayed
+        @test same.delay_cost == 0
+        # Nothing is learned: waiting is worth minus the cost of the delay
+        # (valueOfWaiting_constant).
+        nothing_learned = value_of_waiting(problem, late, Experiment([1 1]))
+        @test nothing_learned.value == -10 && !nothing_learned.wait
+        @test nothing_learned.evsi_delayed == 0
+        # A value of exactly zero is not a reason to wait.
+        level = PayoffTable(actions, states, [0 -100; -40 -75])
+        @test value_of_waiting(problem, level, perfect).value == 0
+        @test !value_of_waiting(problem, level, perfect).wait
+    end
+
+    @testset "the instance proved in Lean" begin
+        # valueOfWaiting_neg_example: EVSI 2 on the payoffs of acting now, and waiting
+        # worth −1.
+        p = DecisionProblem(PayoffTable([4 0; 0 4]), [1 // 2, 1 // 2])
+        w = value_of_waiting(p, PayoffTable([1 -3; -3 1]), Experiment([1 0; 0 1]))
+        @test w.evsi_now == 2 && w.value == -1 && !w.wait
+    end
+
+    @testset "against the definitions" begin
+        rng = Random.Xoshiro(20261128)
+        waits, above = 0, 0
+        for trial in 1:200
+            m, n, nz = rand(rng, 2:4), rand(rng, 2:4), rand(rng, 1:3)
+            base = exact_problem(rng, m, n)
+            p = probabilities(base.belief)
+            L = random_stochastic(rng, BigRat, nz, n)
+            e = Experiment(L)
+            # Late payoffs: lower everywhere on even trials, unrelated on odd ones.
+            Q = base.payoff.Q
+            Qlate = iseven(trial) ? Q .- BigRat.(rand(rng, 0:6, m, n)) :
+                    random_payoff_table(rng, m, n; T=BigRat).Q
+            delayed = PayoffTable(base.payoff.actions, base.payoff.states, Qlate)
+            w = value_of_waiting(base, delayed, e)
+            @test w.act_now_value == maximum(oracle_expected_utility(Q, p))
+            @test w.waiting_value == oracle_value_with_information(Qlate, p, L)
+            @test w.value == w.waiting_value - w.act_now_value
+            # valueOfWaiting_eq and valueOfWaiting_pos_iff.
+            @test w.value == w.evsi_delayed - w.delay_cost
+            @test w.wait == (w.evsi_delayed > w.delay_cost)
+            @test w.evsi_delayed == oracle_evsi(Qlate, p, L) >= 0
+            @test w.evsi_now == oracle_evsi(Q, p, L)
+            @test w.delay_cost ==
+                  w.act_now_value - maximum(oracle_expected_utility(Qlate, p))
+            # valueOfWaiting_le_evsi, and that it needs its hypothesis.
+            iseven(trial) && @test w.value <= w.evsi_now
+            above += w.value > w.evsi_now
+            waits += w.wait
+            for (signal, action) in w.policy
+                z = findfirst(==(signal), e.signals)
+                scores = [sum(p[t] * L[z, t] * Qlate[a, t] for t in 1:n) for a in 1:m]
+                @test scores[findfirst(==(action), base.payoff.actions)] == maximum(scores)
+            end
+            @test length(w.policy) == count(z -> sum(p .* L[z, :]) > 0, 1:nz)
+        end
+        @test 0 < waits < 200
+        @test above > 0
+    end
+
+    @testset "feasibility" begin
+        three = PayoffTable([:none, :cull, :vaccinate], states, [0 -100; -30 -30; -5 -20])
+        three_late = PayoffTable([:none, :cull, :vaccinate], states,
+                                 [0 -100; -40 -55; -5 -25])
+        restricted = DecisionProblem(three, [3 // 5, 2 // 5]; feasible=[:none, :cull])
+        w = value_of_waiting(restricted, three_late, perfect)
+        @test w.value == value_of_waiting(problem, late, perfect).value
+        @test all(a != :vaccinate for (_, a) in w.policy)
+    end
+
+    @testset "several lengths of wait" begin
+        longer = PayoffTable(actions, states, [0 -100; -50 -80])
+        noisy = Experiment([3//4 1//4; 1//4 3//4])
+        r = value_of_waiting(problem,
+                             [:week_noisy => (late, noisy),
+                              :week => (late, perfect),
+                              :month => (longer, perfect)])
+        @test r.options == [:week_noisy, :week, :month]
+        @test r.values == [-5 // 2, 8, -2]
+        @test r.best == :week
+        @test r.act_now_value == -30 && r.act_now_action == :cull
+        @test r.results[2] == value_of_waiting(problem, late, perfect)
+        @test value_of_waiting(problem, (; month=(longer, perfect))).best == :act_now
+        @test value_of_waiting(problem, Dict(:week => (late, perfect))).best == :week
+    end
+
+    @testset "what is refused" begin
+        @test_throws LabelMismatchError value_of_waiting(problem,
+                                                         PayoffTable([:none, :treat],
+                                                                     states, late.Q),
+                                                         perfect)
+        @test_throws LabelMismatchError value_of_waiting(problem,
+                                                         PayoffTable(actions, [:a, :b],
+                                                                     late.Q), perfect)
+        @test_throws LabelMismatchError value_of_waiting(problem, late,
+                                                         Experiment([1 0; 0 1];
+                                                                    states=[:a, :b]))
+        credal = DecisionProblem(now, CredalSet(states, [[0.6, 0.4], [0.5, 0.5]]))
+        @test_throws BeliefFormError value_of_waiting(credal, late, perfect)
+        @test_throws ArgumentError value_of_waiting(problem, Pair{Symbol,Any}[])
+        @test_throws ArgumentError value_of_waiting(problem, [:week => late])
+    end
+end
