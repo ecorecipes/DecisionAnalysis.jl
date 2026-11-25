@@ -354,8 +354,8 @@ md_table(["quantity, 60 years", "value"],
 | treatments in the fixed plan               |     19 |
 
 The [next
-vignette](29_replication_chades_tiger.md)
-uses it to reproduce a published 30-year analysis.
+vignette](29_ecology_chades_tiger.md) uses it
+to reproduce a published 30-year analysis.
 
 ## What to take from this
 

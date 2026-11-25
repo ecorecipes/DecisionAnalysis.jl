@@ -1,8 +1,8 @@
 # Vignettes
 
-Twenty vignettes. The first fifteen, ordered from basic to advanced, together cover the
-package on illustrative examples; 16 to 20 and 22 to 24 are replications of published analyses and
-have a section of their own below. Each
+Twenty-nine vignettes. Twenty are tutorials on illustrative examples (1 to 15, ordered
+from basic to advanced, and 21 and 25 to 28); the other nine are case studies, in a
+section of their own below, grouped by field. Each
 lives in its own directory `NN_name/NN_name.qmd` and is rendered to GitHub-flavoured
 Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTML
 (`NN_name.html`) and PDF (`NN_name.pdf`). All rendered files are kept next to the
@@ -29,29 +29,38 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 | 26 | [Act now, or wait and learn?](26_value_of_waiting/26_value_of_waiting.md) | `value_of_waiting` on an invented outbreak in a herd: the value of a test result to the late decision, the cost of the delay, the best length of wait, and why EVSI with the delay ignored overstates |
 | 27 | [Learning while managing](27_adaptive_management/27_adaptive_management.md) | `adaptive_management` on an invented bird colony: no learning, passive and active adaptive management and perfect information over several years, the value of updating against the value of probing, the policy tree, and how both depend on the horizon and the prior |
 | 28 | [Managing a state that changes](28_changing_state/28_changing_state.md) | `adaptive_management` with `transitions` on an invented reserve and weed: the fixed plan as a schedule, why the passive manager must plan ahead, an inspection as an action taken only to learn, and which state the signal is about |
-| 29 | [Replication: when to stop managing or surveying a cryptic species](29_replication_chades_tiger/29_replication_chades_tiger.md) | Chadès et al. 2008, the Sumatran tiger: the published schedule (manage 12 years, survey 3, stop) reproduced exactly as the long-run solution with `adaptive_management`, `transitions` and `method=:vectors`; 11 and 2 for a strict 30-year horizon, and why |
 
-## Replications of published analyses
+## Case studies
 
-Vignettes 16 to 20 and 22 to 24 reproduce published value-of-information analyses from the tables
-printed in the papers and their supplements. Their numbers are the papers', not
+Each case study replicates a published value-of-information analysis from the tables
+printed in the paper and its supplement. They are grouped by field: ecology, which
+includes diseases of animals, and human epidemiology. A case study's directory is named
+`NN_ecology_*` or `NN_epidemiology_*`, and `docs/make.jl` files it by that name. Their numbers are the papers', not
 illustrations; each result is shown beside the published one, and each vignette says
 what was reproduced, what was not and why, and then adds something the paper did not
 report. The same comparisons, with the provenance and licence of every input, are
 `test/fixtures/replications/*.json` and `test/test_replications.jl`.
 
+### Ecology (including diseases of animals)
+
 | | Vignette | Paper and unit | Covers |
 |---|---|---|---|
-| 16 | [Adaptive culling for foot-and-mouth disease](16_replication_shea_fmd/16_replication_shea_fmd.md) | Shea et al. 2014, doi:10.1371/journal.pbio.1001970; cost of livestock lost, GBP million (the paper's valuation) | a misprint found in the paper's Table 2; `evpi`; `two_stage_value` for the adaptive policy and the share of EVPI it recovers; regret; a credal set over the kernel weights; a coarser partition for what monitoring must establish |
-| 17 | [Learning by doing for whooping cranes](17_replication_runge_cranes/17_replication_runge_cranes.md) | Runge et al. 2011, doi:10.1016/j.biocon.2010.12.020; weighted score on 0-1, and fledging rate | `hypothesis_partition` (the paper's "EVPXI"); `gaussian_experiment` and the EVSI of trying a strategy; the trial net of the score forgone; `robust_evpi` |
-| 18 | [ICU beds, and EVPXI against EVPPI](18_replication_eze_icu/18_replication_eze_icu.md) | Eze et al. 2023, doi:10.1186/s12913-023-09479-4; mismatch in ICU beds | EVPI against a weight in the loss; the value of testing a scenario, the collapsed "per-parameter EVPI" and the EVPPI of a parameter as three different numbers; non-additivity; a credal set of the paper's four beliefs |
-| 19 | [Biological and operational uncertainty in weed control](19_replication_li_thistle/19_replication_li_thistle.md) | Li et al. 2021, doi:10.1111/1365-2664.13904; population growth rate λ | a payoff table from matrix models; `evppi` by model, by effectiveness and by agent; non-additivity of partial values; a replication that fails in part, with the reason |
-| 20 | [The value of imperfect water-quality monitoring](20_replication_luhede_monitoring/20_replication_luhede_monitoring.md) | Luhede et al. 2024, doi:10.1016/j.ecolecon.2024.108128; EUR million per year (the paper's valuation) | `evsi` of single and repeated imperfect readings; `information_can_change_decision`; break-even cost and the best programme against its price; `optimal_design`; `robust_evsi` |
-| 22 | [Which entomological uncertainty matters for malaria control](22_replication_kim_malaria/22_replication_kim_malaria.md) | Kim et al. 2017, doi:10.1111/risa.12606; USD per person over ten years (the paper's valuation) | `evpi` on four pairs of parameters; `evppi` of each parameter of a pair; overlap and complementarity of partial values |
-| 23 | [Recovery planning for a turtle](23_replication_christensen_turtle/23_replication_christensen_turtle.md) | Christensen et al. 2026, doi:10.1111/csp2.70421; decision-maker value on 0-1, and years | `evpi` under four value functions and three measures; `evppi` of threat magnitude and of extent |
-| 24 | [Which species to monitor, and how](24_replication_bal_monitoring/24_replication_bal_monitoring.md) | Bal et al. 2018, doi:10.1111/2041-210X.13037; species declining, of three | a payoff table from a model of 64 hypotheses and a budget split; `Experiment` for surveillance and for targeted monitoring with detection errors; `evsi` against the budget |
+| 16 | [Adaptive culling for foot-and-mouth disease](16_ecology_shea_fmd/16_ecology_shea_fmd.md) | Shea et al. 2014, doi:10.1371/journal.pbio.1001970; cost of livestock lost, GBP million (the paper's valuation) | a misprint found in the paper's Table 2; `evpi`; `two_stage_value` for the adaptive policy and the share of EVPI it recovers; regret; a credal set over the kernel weights; a coarser partition for what monitoring must establish |
+| 17 | [Learning by doing for whooping cranes](17_ecology_runge_cranes/17_ecology_runge_cranes.md) | Runge et al. 2011, doi:10.1016/j.biocon.2010.12.020; weighted score on 0-1, and fledging rate | `hypothesis_partition` (the paper's "EVPXI"); `gaussian_experiment` and the EVSI of trying a strategy; the trial net of the score forgone; `robust_evpi` |
+| 19 | [Biological and operational uncertainty in weed control](19_ecology_li_thistle/19_ecology_li_thistle.md) | Li et al. 2021, doi:10.1111/1365-2664.13904; population growth rate λ | a payoff table from matrix models; `evppi` by model, by effectiveness and by agent; non-additivity of partial values; a replication that fails in part, with the reason |
+| 20 | [The value of imperfect water-quality monitoring](20_ecology_luhede_monitoring/20_ecology_luhede_monitoring.md) | Luhede et al. 2024, doi:10.1016/j.ecolecon.2024.108128; EUR million per year (the paper's valuation) | `evsi` of single and repeated imperfect readings; `information_can_change_decision`; break-even cost and the best programme against its price; `optimal_design`; `robust_evsi` |
+| 23 | [Recovery planning for a turtle](23_ecology_christensen_turtle/23_ecology_christensen_turtle.md) | Christensen et al. 2026, doi:10.1111/csp2.70421; decision-maker value on 0-1, and years | `evpi` under four value functions and three measures; `evppi` of threat magnitude and of extent |
+| 24 | [Which species to monitor, and how](24_ecology_bal_monitoring/24_ecology_bal_monitoring.md) | Bal et al. 2018, doi:10.1111/2041-210X.13037; species declining, of three | a payoff table from a model of 64 hypotheses and a budget split; `Experiment` for surveillance and for targeted monitoring with detection errors; `evsi` against the budget |
+| 29 | [When to stop managing or surveying a cryptic species](29_ecology_chades_tiger/29_ecology_chades_tiger.md) | Chadès et al. 2008, doi:10.1073/pnas.0805265105; USD per year (the paper's valuation) | `adaptive_management` with `transitions`, `signal_of=:next` and `method=:vectors`; `value_function` and the switching beliefs by years left; the long-run schedule against a 30-year horizon; the four ways of managing over 30 years |
 
-Their conventions differ from those of vignettes 1 to 15 in two ways: **the unit is
+### Human epidemiology
+
+| | Vignette | Paper and unit | Covers |
+|---|---|---|---|
+| 18 | [ICU beds, and EVPXI against EVPPI](18_epidemiology_eze_icu/18_epidemiology_eze_icu.md) | Eze et al. 2023, doi:10.1186/s12913-023-09479-4; mismatch in ICU beds | EVPI against a weight in the loss; the value of testing a scenario, the collapsed "per-parameter EVPI" and the EVPPI of a parameter as three different numbers; non-additivity; a credal set of the paper's four beliefs |
+| 22 | [Which entomological uncertainty matters for malaria control](22_epidemiology_kim_malaria/22_epidemiology_kim_malaria.md) | Kim et al. 2017, doi:10.1111/risa.12606; USD per person over ten years (the paper's valuation) | `evpi` on four pairs of parameters; `evppi` of each parameter of a pair; overlap and complementarity of partial values |
+
+Their conventions differ from those of the tutorials in two ways: **the unit is
 the paper's own** (individuals or another count where the paper has no valuation, money
 where the paper supplies one, always labelled as the paper's), and **no cost is
 invented**: where a paper gives no cost of information, the vignette reports the

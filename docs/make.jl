@@ -36,13 +36,19 @@ pages = Any["Home" => "index.md", "Certificates" => "certificates.md",
                                 "Risk attitude and multi-attribute utilities" => "api/utilities.md",
                                 "Linear programmes, reports, certificates and exceptions" => "api/programmes.md"]]
 tutorials = tutorial_pages()
-# Vignettes named NN_replication_* reproduce published analyses and get a heading of
-# their own, so that nobody takes their numbers for the illustrations of the others.
-is_replication(page) = occursin("_replication_", last(page))
-replications = filter(is_replication, tutorials)
-tutorials = filter(!is_replication, tutorials)
+# The case studies replicate published analyses and get a heading of their own, so that
+# nobody takes their numbers for the illustrations of the tutorials. They are grouped by
+# field, which is the word after the number in the vignette's name: NN_ecology_*
+# (including diseases of animals) and NN_epidemiology_* (human).
+in_field(field) = page -> occursin(Regex("/\\d+_" * field * "_"), "/" * last(page))
+ecology = filter(in_field("ecology"), tutorials)
+epidemiology = filter(in_field("epidemiology"), tutorials)
+tutorials = filter(p -> !(p in ecology) && !(p in epidemiology), tutorials)
 isempty(tutorials) || push!(pages, "Tutorials" => tutorials)
-isempty(replications) || push!(pages, "Replications of published analyses" => replications)
+case_studies = Any[]
+isempty(ecology) || push!(case_studies, "Ecology" => ecology)
+isempty(epidemiology) || push!(case_studies, "Human epidemiology" => epidemiology)
+isempty(case_studies) || push!(pages, "Case studies" => case_studies)
 
 # Source links need a commit to point at. A checkout without commits (a fresh
 # scaffold, a tarball) builds without them instead of failing.

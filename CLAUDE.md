@@ -272,9 +272,12 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - `vignettes/NN_name/NN_name.qmd`: twenty-nine Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
-  multi-attribute utilities on the toy simulator), 25 `survey_or_act` on synthetic parcels, 26 `value_of_waiting` on an invented outbreak, 27 `adaptive_management` on an invented colony, 28 the same with a state that moves (`transitions`) on an invented reserve, and 16 to 20, 22 to 24 and 29 the replications of published analyses
-  (`NN_replication_*`: Shea et al. 2014, Runge et al. 2011, Eze et al. 2023, Li et al. 2021, Luhede et al.
-  2024; `docs/make.jl` lists them under a heading of their own), each rendered to
+  multi-attribute utilities on the toy simulator), 25 `survey_or_act` on synthetic parcels, 26 `value_of_waiting` on an invented outbreak, 27 `adaptive_management` on an invented colony, 28 the same with a state that moves (`transitions`) on an invented reserve, and nine case studies, each a replication of a published analysis, grouped by field in the
+  directory name (`NN_ecology_*`, which includes diseases of animals: 16 Shea et al. 2014, 17 Runge et al.
+  2011, 19 Li et al. 2021, 20 Luhede et al. 2024, 23 Christensen et al. 2026, 24 Bal et al. 2018, 29 Chadès
+  et al. 2008; `NN_epidemiology_*`, human: 18 Eze et al. 2023, 22 Kim et al. 2017). Their titles do not
+  say "replication"; the opening section "About this case study" does. `docs/make.jl` lists them under
+  "Case studies", by field, from the directory name), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for
   ad hoc summaries; package objects display themselves), `vignettes/_pandoc/`
   (HTML style, LaTeX preamble). Vignette rules: utility is in the example's own unit, individuals where no
@@ -283,7 +286,7 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   gives no cost of information, report the break-even cost); every vignette has a no-intervention or
   status-quo action as the `baseline` and reports gains over it; in vignettes 1 to 15 examples are
   ecological and every number is labelled illustrative (in vignette 14, every number not read from the
-  cached table, and nothing is presented as a published result); in the replications every input is a
+  cached table, and nothing is presented as a published result); in the case studies every input is a
   table printed in the paper or its supplement, every result is shown beside the published one, and what
   was not reproduced is said, with the reason.
 - `scripts/render_vignettes.jl` (run-once render) and `scripts/sync_vignettes.jl` (copy to `docs/src/tutorials`).

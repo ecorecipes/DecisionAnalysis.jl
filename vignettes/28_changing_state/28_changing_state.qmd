@@ -240,7 +240,7 @@ md_table(["quantity, 60 years", "value"],
           ["treatments in the fixed plan", count(==(:treat), sixty.plan)]]; digits=1)
 ```
 
-The [next vignette](../29_replication_chades_tiger/29_replication_chades_tiger.md)
+The [next vignette](../29_ecology_chades_tiger/29_ecology_chades_tiger.md)
 uses it to reproduce a published 30-year analysis.
 
 ## What to take from this

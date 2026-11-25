@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Simon Frost" />
+  <title>Value of information in recovery planning for a turtle (Christensen et al. 2026)</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">
+html { font-size: 17px; }
+body {
+font-family: "STIX Two Text", "Source Serif 4", Georgia, "Times New Roman", serif;
+line-height: 1.5; color: #1a1a1a; background: #fdfdfd;
+max-width: 50em; margin: 0 auto; padding: 2em 1.5em 4em;
+}
+h1, h2, h3, h4 { line-height: 1.25; margin-top: 1.6em; }
+h1.title { margin-top: 0.5em; }
+p.author { color: #555; }
+a { color: #1f5fa8; }
+code, pre {
+font-family: "JuliaMono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+font-size: 0.86em;
+}
+pre { background: #f4f4f2; padding: 0.8em 1em; overflow-x: auto; border-radius: 4px; }
+code { background: #f4f4f2; padding: 0.05em 0.25em; border-radius: 3px; }
+pre code { background: none; padding: 0; font-size: 1em; }
+table { border-collapse: collapse; margin: 1em 0; font-size: 0.95em; display: block; overflow-x: auto; }
+th, td { padding: 0.3em 0.8em; border-bottom: 1px solid #ddd; }
+thead th { border-bottom: 2px solid #888; }
+img { max-width: 100%; height: auto; }
+nav#TOC { background: #f4f4f2; padding: 0.6em 1em; border-radius: 4px; }
+nav#TOC ul { margin: 0.2em 0; padding-left: 1.2em; }
+@media (prefers-color-scheme: dark) {
+body { color: #e6e6e6; background: #1c1c1e; }
+a { color: #8ab4f8; }
+pre, code, nav#TOC { background: #2a2a2d; }
+th, td { border-bottom-color: #444; }
+img { background: #fff; }
+}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Value of information in recovery planning for a turtle
+(Christensen et al. 2026)</h1>
+<p class="author">Simon Frost</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#about-this-case-study" id="toc-about-this-case-study">About this case study</a></li>
+<li><a href="#the-paper" id="toc-the-paper">The paper</a></li>
+<li><a href="#in-years-before-any-value-function" id="toc-in-years-before-any-value-function">In years, before any value
+function</a></li>
+<li><a href="#the-value-functions" id="toc-the-value-functions">The
+value functions</a></li>
+<li><a href="#magnitude-or-extent-ours" id="toc-magnitude-or-extent-ours">Magnitude or extent (ours)</a></li>
+<li><a href="#what-the-replication-shows" id="toc-what-the-replication-shows">What the replication shows</a></li>
+</ul>
+</nav>
+<h1 id="about-this-case-study">About this case study</h1>
+<p>This case study replicates a published analysis. The inputs are
+tables printed in the paper’s supporting information, every result is
+shown beside the published one, and the same comparisons are in the test
+suite
+(<code>test/fixtures/replications/christensen2026_turtle.json</code>,
+<code>test/test_replications.jl</code>).</p>
+<h1 id="the-paper">The paper</h1>
+<p>Christensen, McGowan and Lawson (2026), “Using value of information
+in recovery planning for imperiled species”, <em>Conservation Science
+and Practice</em> e70421, <a href="https://doi.org/10.1111/csp2.70421">doi:10.1111/csp2.70421</a>, CC
+BY 4.0. The inputs are Tables S4, S5 and S7 of the supporting
+information and the targets Table 3 of the article.</p>
+<p><strong>Decision.</strong> Which recovery strategy to adopt for the
+western analysis unit of the alligator snapping turtle (<em>Macrochelys
+temminckii</em>).</p>
+<p><strong>Actions.</strong> Five strategies: reduce the spatial extent
+of recreational bycatch and hook ingestion by 30%, of illegal
+collection, or of subsidised nest predation; reduce the magnitude of
+bycatch and hook ingestion by 30%; or head-start hatchlings. No action
+is the <code>baseline</code>.</p>
+<p><strong>States.</strong> Experts’ estimates of the magnitude (M) and
+the extent (E) of the threats may each be overestimated (1), accurate
+(2) or underestimated (3): nine hypotheses, weighted by a bivariate
+normal density (0.28 for the centre, 0.125 for an edge, 0.055 for a
+corner).</p>
+<p><strong>Outcome.</strong> Three measures from the authors’ population
+model, each the mean of 1,000 simulations: the population growth rate,
+the years added to the expected time to extirpation, and adult
+fecundity. The paper turns each into a decision-maker’s value between 0
+and 1 with four hypothetical value functions. <strong>No cost appears in
+the paper.</strong> The population model is not rerun here; this
+vignette recomputes the value-of-information layer on its printed
+outputs.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">DecisionAnalysis</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">include</span>(<span class="fu">joinpath</span>(<span class="st">&quot;..&quot;</span>, <span class="st">&quot;_common.jl&quot;</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>actions <span class="op">=</span> [<span class="op">:</span>reduce_extent_bycatch, <span class="op">:</span>reduce_extent_collection, <span class="op">:</span>reduce_extent_nest_predators,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>           <span class="op">:</span>reduce_magnitude_bycatch, <span class="op">:</span>head_start, <span class="op">:</span>no_action]</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>states <span class="op">=</span> [<span class="op">:</span>M1E1, <span class="op">:</span>M1E2, <span class="op">:</span>M1E3, <span class="op">:</span>M2E1, <span class="op">:</span>M2E2, <span class="op">:</span>M2E3, <span class="op">:</span>M3E1, <span class="op">:</span>M3E2, <span class="op">:</span>M3E3]</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>weights <span class="op">=</span> [<span class="fl">55</span>, <span class="fl">125</span>, <span class="fl">55</span>, <span class="fl">125</span>, <span class="fl">280</span>, <span class="fl">125</span>, <span class="fl">55</span>, <span class="fl">125</span>, <span class="fl">55</span>] <span class="op">.//</span> <span class="fl">1000</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Rows = hypotheses, columns = actions. Table S4 (linear block): population growth rate.</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>lambda <span class="op">=</span> [<span class="fl">0.9564</span> <span class="fl">0.9552</span> <span class="fl">0.9523</span> <span class="fl">0.9532</span> <span class="fl">0.9525</span> <span class="fl">0.9524</span>; <span class="fl">0.9335</span> <span class="fl">0.9313</span> <span class="fl">0.9242</span> <span class="fl">0.9255</span> <span class="fl">0.9241</span> <span class="fl">0.9244</span>;</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>          <span class="fl">0.9069</span> <span class="fl">0.9040</span> <span class="fl">0.8928</span> <span class="fl">0.8946</span> <span class="fl">0.8929</span> <span class="fl">0.8930</span>; <span class="fl">0.9265</span> <span class="fl">0.9247</span> <span class="fl">0.9195</span> <span class="fl">0.9266</span> <span class="fl">0.9192</span> <span class="fl">0.9193</span>;</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>          <span class="fl">0.8851</span> <span class="fl">0.8808</span> <span class="fl">0.8676</span> <span class="fl">0.8796</span> <span class="fl">0.8673</span> <span class="fl">0.8671</span>; <span class="fl">0.8357</span> <span class="fl">0.8304</span> <span class="fl">0.8100</span> <span class="fl">0.8283</span> <span class="fl">0.8104</span> <span class="fl">0.8099</span>;</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>          <span class="fl">0.8834</span> <span class="fl">0.8792</span> <span class="fl">0.8717</span> <span class="fl">0.8892</span> <span class="fl">0.8714</span> <span class="fl">0.8715</span>; <span class="fl">0.8144</span> <span class="fl">0.8062</span> <span class="fl">0.7852</span> <span class="fl">0.8152</span> <span class="fl">0.7855</span> <span class="fl">0.7852</span>;</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>          <span class="fl">0.7341</span> <span class="fl">0.7229</span> <span class="fl">0.6921</span> <span class="fl">0.7340</span> <span class="fl">0.6910</span> <span class="fl">0.6920</span>]</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Table S5: years added to the expected time to extirpation.</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>years <span class="op">=</span> [<span class="fl">4</span> <span class="fl">2</span> <span class="fl">1</span> <span class="fl">3</span> <span class="fl">1</span> <span class="fl">0</span>; <span class="fl">15</span> <span class="fl">11</span> <span class="fl">0</span> <span class="fl">2</span> <span class="fl">0</span> <span class="fl">0</span>; <span class="fl">12</span> <span class="fl">9</span> <span class="fl">0</span> <span class="fl">1</span> <span class="fl">0</span> <span class="fl">0</span>; <span class="fl">10</span> <span class="fl">7</span> <span class="fl">0</span> <span class="fl">10</span> <span class="fl">0</span> <span class="fl">0</span>; <span class="fl">10</span> <span class="fl">8</span> <span class="fl">0</span> <span class="fl">7</span> <span class="fl">0</span> <span class="fl">0</span>;</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>         <span class="fl">8</span> <span class="fl">6</span> <span class="fl">0</span> <span class="fl">5</span> <span class="fl">1</span> <span class="fl">0</span>; <span class="fl">7</span> <span class="fl">5</span> <span class="fl">0</span> <span class="fl">11</span> <span class="fl">1</span> <span class="fl">0</span>; <span class="fl">7</span> <span class="fl">4</span> <span class="fl">0</span> <span class="fl">7</span> <span class="fl">0</span> <span class="fl">0</span>; <span class="fl">5</span> <span class="fl">3</span> <span class="fl">0</span> <span class="fl">5</span> <span class="fl">2</span> <span class="fl">0</span>]</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Table S7 (linear block): adult fecundity.</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>fecundity <span class="op">=</span> [<span class="fl">0.2909</span> <span class="fl">0.2697</span> <span class="fl">0.2778</span> <span class="fl">0.2773</span> <span class="fl">0.2906</span> <span class="fl">0.2773</span>; <span class="fl">0.2624</span> <span class="fl">0.2612</span> <span class="fl">0.2836</span> <span class="fl">0.2707</span> <span class="fl">0.2679</span> <span class="fl">0.2762</span>;</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>             <span class="fl">0.2600</span> <span class="fl">0.2411</span> <span class="fl">0.2687</span> <span class="fl">0.2557</span> <span class="fl">0.2650</span> <span class="fl">0.2691</span>; <span class="fl">0.2754</span> <span class="fl">0.2746</span> <span class="fl">0.2846</span> <span class="fl">0.2693</span> <span class="fl">0.2670</span> <span class="fl">0.2710</span>;</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>             <span class="fl">0.2436</span> <span class="fl">0.2347</span> <span class="fl">0.2643</span> <span class="fl">0.2398</span> <span class="fl">0.2337</span> <span class="fl">0.2263</span>; <span class="fl">0.1982</span> <span class="fl">0.2284</span> <span class="fl">0.2449</span> <span class="fl">0.2161</span> <span class="fl">0.2189</span> <span class="fl">0.2090</span>;</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>             <span class="fl">0.2365</span> <span class="fl">0.2460</span> <span class="fl">0.2643</span> <span class="fl">0.2458</span> <span class="fl">0.2527</span> <span class="fl">0.2414</span>; <span class="fl">0.1952</span> <span class="fl">0.2085</span> <span class="fl">0.2451</span> <span class="fl">0.1996</span> <span class="fl">0.2061</span> <span class="fl">0.2069</span>;</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>             <span class="fl">0.1821</span> <span class="fl">0.1735</span> <span class="fl">0.2083</span> <span class="fl">0.1684</span> <span class="fl">0.1627</span> <span class="fl">0.1747</span>]</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="fu">problem</span>(values) <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>(actions, states, <span class="fu">permutedims</span>(values)),</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>                                  <span class="fu">FiniteBelief</span>(states, weights); baseline<span class="op">=:</span>no_action)</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="fu">problem</span>(years).payoff</span></code></pre></div>
+<p><strong>PayoffTable{Int64}: 6 actions × 9 states</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;"><code>M1E1</code></th>
+<th style="text-align: right;"><code>M1E2</code></th>
+<th style="text-align: right;"><code>M1E3</code></th>
+<th style="text-align: right;"><code>M2E1</code></th>
+<th style="text-align: right;"><code>M2E2</code></th>
+<th style="text-align: right;"><code>M2E3</code></th>
+<th style="text-align: right;"><code>M3E1</code></th>
+<th style="text-align: right;"><code>M3E2</code></th>
+<th style="text-align: right;"><code>M3E3</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>reduce_extent_collection</code></td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>reduce_extent_nest_predators</code></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>reduce_magnitude_bycatch</code></td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>head_start</code></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>no_action</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+<h1 id="in-years-before-any-value-function">In years, before any value
+function</h1>
+<div class="sourceCode" id="cb2"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>by_years <span class="op">=</span> <span class="fu">problem</span>(years)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;action&quot;</span>, <span class="st">&quot;expected years added (paper, Table S5)&quot;</span>, <span class="st">&quot;this package&quot;</span>, <span class="st">&quot;chosen&quot;</span>],</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>         [[a, p, <span class="fu">Float64</span>(<span class="cn">e</span>), a <span class="kw">in</span> <span class="fu">decide</span>(by_years, <span class="fu">MaxExpectedUtility</span>()).chosen]</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>          for (a, p, <span class="cn">e</span>) <span class="kw">in</span> <span class="fu">zip</span>(actions, (<span class="fl">9.34</span>, <span class="fl">6.785</span>, <span class="fl">0.055</span>, <span class="fl">6.06</span>, <span class="fl">0.345</span>, <span class="fl">0</span>),</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>                               <span class="fu">expected_gain_over_baseline</span>(by_years))]; digits<span class="op">=</span><span class="fl">3</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;">expected years added (paper, Table
+S5)</th>
+<th style="text-align: right;">this package</th>
+<th style="text-align: right;">chosen</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">9.34</td>
+<td style="text-align: right;">9.34</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>reduce_extent_collection</code></td>
+<td style="text-align: right;">6.785</td>
+<td style="text-align: right;">6.785</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>reduce_extent_nest_predators</code></td>
+<td style="text-align: right;">0.055</td>
+<td style="text-align: right;">0.055</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>reduce_magnitude_bycatch</code></td>
+<td style="text-align: right;">6.06</td>
+<td style="text-align: right;">6.06</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>head_start</code></td>
+<td style="text-align: right;">0.345</td>
+<td style="text-align: right;">0.345</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>no_action</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">-</td>
+</tr>
+</tbody>
+</table>
+<p>Years are counted from no action, so each entry is already a gain
+over the baseline. Reducing the extent of bycatch adds most, 9.34 years
+on average, and learning the true hypothesis first would add 0.22 years
+more: reducing the <em>magnitude</em> of bycatch is better only when the
+threat magnitude was underestimated and its extent overestimated.</p>
+<h1 id="the-value-functions">The value functions</h1>
+<p>The paper applies four curves: <code>V = x</code>, and three logistic
+curves <code>V = scale / (1 + exp(-12 (x - midpoint))) + shift</code>.
+Growth rate and fecundity enter unscaled, and years are divided by
+25.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">logistic</span>(scale, midpoint, shift) <span class="op">=</span> x <span class="op">-&gt;</span> scale <span class="op">/</span> (<span class="fl">1</span> <span class="op">+</span> <span class="fu">exp</span>(<span class="op">-</span><span class="fl">12</span> <span class="op">*</span> (x <span class="op">-</span> midpoint))) <span class="op">+</span> shift</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>curves <span class="op">=</span> [<span class="st">&quot;convex&quot;</span> <span class="op">=&gt;</span> <span class="fu">logistic</span>(<span class="fl">1.5</span>, <span class="fl">0.05</span>, <span class="op">-</span><span class="fl">0.5</span>), <span class="st">&quot;linear&quot;</span> <span class="op">=&gt;</span> identity,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;S-curve&quot;</span> <span class="op">=&gt;</span> <span class="fu">logistic</span>(<span class="fl">1.0</span>, <span class="fl">0.5</span>, <span class="fl">0.0</span>), <span class="st">&quot;concave&quot;</span> <span class="op">=&gt;</span> <span class="fu">logistic</span>(<span class="fl">1.3</span>, <span class="fl">0.9</span>, <span class="fl">0.0</span>)]</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>metrics <span class="op">=</span> [<span class="st">&quot;growth rate&quot;</span> <span class="op">=&gt;</span> lambda, <span class="st">&quot;time to extirpation&quot;</span> <span class="op">=&gt;</span> years <span class="op">./</span> <span class="fl">25</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;fecundity&quot;</span> <span class="op">=&gt;</span> fecundity]</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>table3 <span class="op">=</span> [(<span class="fl">0.9999</span>, <span class="fl">0.9999</span>, <span class="fl">0.0000</span>), (<span class="fl">0.8780</span>, <span class="fl">0.8785</span>, <span class="fl">0.0005</span>), (<span class="fl">0.9865</span>, <span class="fl">0.9866</span>, <span class="fl">0.0001</span>),</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>          (<span class="fl">0.5768</span>, <span class="fl">0.5784</span>, <span class="fl">0.0016</span>), (<span class="fl">0.9381</span>, <span class="fl">0.9422</span>, <span class="fl">0.0041</span>), (<span class="fl">0.3736</span>, <span class="fl">0.3824</span>, <span class="fl">0.0088</span>),</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>          (<span class="fl">0.2413</span>, <span class="fl">0.2557</span>, <span class="fl">0.0144</span>), (<span class="fl">0.0064</span>, <span class="fl">0.0066</span>, <span class="fl">0.0002</span>), (<span class="fl">0.8887</span>, <span class="fl">0.8894</span>, <span class="fl">0.0007</span>),</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>          (<span class="fl">0.2623</span>, <span class="fl">0.2631</span>, <span class="fl">0.0008</span>), (<span class="fl">0.0557</span>, <span class="fl">0.0563</span>, <span class="fl">0.0006</span>), (<span class="fl">0.0006</span>, <span class="fl">0.0006</span>, <span class="fl">0.0000</span>)]</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>rows, k <span class="op">=</span> <span class="dt">Vector</span>{<span class="dt">Any</span>}[], <span class="fl">0</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (metric, values) <span class="kw">in</span> metrics, (curve, f) <span class="kw">in</span> curves</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">global</span> k <span class="op">+=</span> <span class="fl">1</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    p <span class="op">=</span> <span class="fu">problem</span>(<span class="fu">f</span>.(values))</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">push!</span>(rows,</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>          [metric, curve, <span class="fu">first</span>(<span class="fu">decide</span>(p, <span class="fu">MaxExpectedUtility</span>()).chosen), table3[k][<span class="fl">1</span>],</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>           <span class="fu">act_now_value</span>(p), table3[k][<span class="fl">2</span>], <span class="fu">act_now_value</span>(p) <span class="op">+</span> <span class="fu">evpi</span>(p), table3[k][<span class="fl">3</span>], <span class="fu">evpi</span>(p)])</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;measure&quot;</span>, <span class="st">&quot;curve&quot;</span>, <span class="st">&quot;chosen&quot;</span>, <span class="st">&quot;paper: uncertainty&quot;</span>, <span class="st">&quot;ours&quot;</span>, <span class="st">&quot;paper: certainty&quot;</span>,</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;ours&quot;</span>, <span class="st">&quot;paper: EVPI&quot;</span>, <span class="st">&quot;ours&quot;</span>], rows; digits<span class="op">=</span><span class="fl">4</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">measure</th>
+<th style="text-align: right;">curve</th>
+<th style="text-align: right;">chosen</th>
+<th style="text-align: right;">paper: uncertainty</th>
+<th style="text-align: right;">ours</th>
+<th style="text-align: right;">paper: certainty</th>
+<th style="text-align: right;">ours</th>
+<th style="text-align: right;">paper: EVPI</th>
+<th style="text-align: right;">ours</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">growth rate</td>
+<td style="text-align: right;">convex</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.9999</td>
+<td style="text-align: right;">0.9999</td>
+<td style="text-align: right;">0.9999</td>
+<td style="text-align: right;">0.9999</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;">growth rate</td>
+<td style="text-align: right;">linear</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.878</td>
+<td style="text-align: right;">0.878</td>
+<td style="text-align: right;">0.8785</td>
+<td style="text-align: right;">0.8785</td>
+<td style="text-align: right;">0.0005</td>
+<td style="text-align: right;">0.0004</td>
+</tr>
+<tr>
+<td style="text-align: left;">growth rate</td>
+<td style="text-align: right;">S-curve</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.9865</td>
+<td style="text-align: right;">0.9865</td>
+<td style="text-align: right;">0.9866</td>
+<td style="text-align: right;">0.9866</td>
+<td style="text-align: right;">0.0001</td>
+<td style="text-align: right;">0.0001</td>
+</tr>
+<tr>
+<td style="text-align: left;">growth rate</td>
+<td style="text-align: right;">concave</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.5768</td>
+<td style="text-align: right;">0.5768</td>
+<td style="text-align: right;">0.5784</td>
+<td style="text-align: right;">0.5784</td>
+<td style="text-align: right;">0.0016</td>
+<td style="text-align: right;">0.0016</td>
+</tr>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">convex</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.9381</td>
+<td style="text-align: right;">0.9381</td>
+<td style="text-align: right;">0.9422</td>
+<td style="text-align: right;">0.9422</td>
+<td style="text-align: right;">0.0041</td>
+<td style="text-align: right;">0.0042</td>
+</tr>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">linear</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.3736</td>
+<td style="text-align: right;">0.3736</td>
+<td style="text-align: right;">0.3824</td>
+<td style="text-align: right;">0.3824</td>
+<td style="text-align: right;">0.0088</td>
+<td style="text-align: right;">0.0088</td>
+</tr>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">S-curve</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.2413</td>
+<td style="text-align: right;">0.2413</td>
+<td style="text-align: right;">0.2557</td>
+<td style="text-align: right;">0.2557</td>
+<td style="text-align: right;">0.0144</td>
+<td style="text-align: right;">0.0143</td>
+</tr>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">concave</td>
+<td style="text-align: right;"><code>reduce_extent_bycatch</code></td>
+<td style="text-align: right;">0.0064</td>
+<td style="text-align: right;">0.0064</td>
+<td style="text-align: right;">0.0066</td>
+<td style="text-align: right;">0.0066</td>
+<td style="text-align: right;">0.0002</td>
+<td style="text-align: right;">0.0002</td>
+</tr>
+<tr>
+<td style="text-align: left;">fecundity</td>
+<td style="text-align: right;">convex</td>
+<td style="text-align: right;"><code>reduce_extent_nest_predators</code></td>
+<td style="text-align: right;">0.8887</td>
+<td style="text-align: right;">0.8887</td>
+<td style="text-align: right;">0.8894</td>
+<td style="text-align: right;">0.8894</td>
+<td style="text-align: right;">0.0007</td>
+<td style="text-align: right;">0.0007</td>
+</tr>
+<tr>
+<td style="text-align: left;">fecundity</td>
+<td style="text-align: right;">linear</td>
+<td style="text-align: right;"><code>reduce_extent_nest_predators</code></td>
+<td style="text-align: right;">0.2623</td>
+<td style="text-align: right;">0.2623</td>
+<td style="text-align: right;">0.2631</td>
+<td style="text-align: right;">0.2631</td>
+<td style="text-align: right;">0.0008</td>
+<td style="text-align: right;">0.0007</td>
+</tr>
+<tr>
+<td style="text-align: left;">fecundity</td>
+<td style="text-align: right;">S-curve</td>
+<td style="text-align: right;"><code>reduce_extent_nest_predators</code></td>
+<td style="text-align: right;">0.0557</td>
+<td style="text-align: right;">0.0557</td>
+<td style="text-align: right;">0.0563</td>
+<td style="text-align: right;">0.0563</td>
+<td style="text-align: right;">0.0006</td>
+<td style="text-align: right;">0.0006</td>
+</tr>
+<tr>
+<td style="text-align: left;">fecundity</td>
+<td style="text-align: right;">concave</td>
+<td style="text-align: right;"><code>reduce_extent_nest_predators</code></td>
+<td style="text-align: right;">0.0006</td>
+<td style="text-align: right;">0.0006</td>
+<td style="text-align: right;">0.0006</td>
+<td style="text-align: right;">0.0006</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+<p>All twelve rows of Table 3 are reproduced, and the same action is
+chosen as in the paper: reducing the extent of bycatch for the growth
+rate and for the time to extirpation, and reducing the extent of nest
+predation for fecundity. (Under the convex curve every action has the
+same value of the growth rate to four decimals.)</p>
+<p>Three things differ from the print, and the reasons are known.</p>
+<ul>
+<li><strong>The paper’s EVPI is the difference of the two rounded
+values.</strong> For the largest case, time to extirpation under the
+S-curve, it prints 0.0144 and 5.97%; unrounded they are 0.0143 and
+5.94%.</li>
+<li><strong>The concave curve as printed does not give the paper’s own
+tables.</strong> The supporting information prints
+<code>2 / (1 + exp(-12 (x - 1)))</code>. The concave columns of its
+Tables S4, S6 and S7 are instead matched, in every cell, by
+<code>1.3 / (1 + exp(-12 (x - 0.9)))</code>, which is <strong>our
+fit</strong> and is printed nowhere. The table above uses the fitted
+curve; the printed one gives the following.</li>
+<li><strong>No action under the time to extirpation</strong> is printed
+as zero under every curve, though the convex and S-curves give 0.0315
+and 0.0025 at zero years. No action is never best, so no value depends
+on it; the table above applies the curves throughout.</li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>as_printed <span class="op">=</span> <span class="fu">problem</span>(<span class="fu">logistic</span>(<span class="fl">2.0</span>, <span class="fl">1.0</span>, <span class="fl">0.0</span>).(lambda))</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;growth rate, concave curve&quot;</span>, <span class="st">&quot;value under uncertainty&quot;</span>],</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;paper, Table 3&quot;</span>, <span class="fl">0.5768</span>], [<span class="st">&quot;the curve as printed&quot;</span>, <span class="fu">act_now_value</span>(as_printed)],</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;the fitted curve&quot;</span>, <span class="fu">act_now_value</span>(<span class="fu">problem</span>(<span class="fu">logistic</span>(<span class="fl">1.3</span>, <span class="fl">0.9</span>, <span class="fl">0.0</span>).(lambda)))]];</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>         digits<span class="op">=</span><span class="fl">4</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">growth rate, concave curve</th>
+<th style="text-align: right;">value under uncertainty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">paper, Table 3</td>
+<td style="text-align: right;">0.5768</td>
+</tr>
+<tr>
+<td style="text-align: left;">the curve as printed</td>
+<td style="text-align: right;">0.4125</td>
+</tr>
+<tr>
+<td style="text-align: left;">the fitted curve</td>
+<td style="text-align: right;">0.5768</td>
+</tr>
+</tbody>
+</table>
+<h1 id="magnitude-or-extent-ours">Magnitude or extent (ours)</h1>
+<p>The paper values the nine hypotheses together. The same tables give
+the value of learning only the magnitude, or only the extent; these
+numbers are <strong>ours, not the paper’s</strong>.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>magnitude, extent <span class="op">=</span> [<span class="fu">div</span>(s <span class="op">-</span> <span class="fl">1</span>, <span class="fl">3</span>) for s <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">9</span>], [<span class="fu">mod1</span>(s, <span class="fl">3</span>) for s <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">9</span>]</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> <span class="dt">Vector</span>{<span class="dt">Any</span>}[]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (metric, values) <span class="kw">in</span> metrics[<span class="fl">2</span><span class="op">:</span><span class="fl">2</span>], (curve, f) <span class="kw">in</span> curves</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    p <span class="op">=</span> <span class="fu">problem</span>(<span class="fu">f</span>.(values))</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">push!</span>(rows, [metric, curve, <span class="fu">evppi</span>(p, magnitude), <span class="fu">evppi</span>(p, extent), <span class="fu">evpi</span>(p)])</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;measure&quot;</span>, <span class="st">&quot;curve&quot;</span>, <span class="st">&quot;magnitude alone&quot;</span>, <span class="st">&quot;extent alone&quot;</span>, <span class="st">&quot;both (EVPI)&quot;</span>], rows; digits<span class="op">=</span><span class="fl">4</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">measure</th>
+<th style="text-align: right;">curve</th>
+<th style="text-align: right;">magnitude alone</th>
+<th style="text-align: right;">extent alone</th>
+<th style="text-align: right;">both (EVPI)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">convex</td>
+<td style="text-align: right;">0.0042</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0.0042</td>
+</tr>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">linear</td>
+<td style="text-align: right;">0.0088</td>
+<td style="text-align: right;">0.0066</td>
+<td style="text-align: right;">0.0088</td>
+</tr>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">S-curve</td>
+<td style="text-align: right;">0.0143</td>
+<td style="text-align: right;">0.014</td>
+<td style="text-align: right;">0.0143</td>
+</tr>
+<tr>
+<td style="text-align: left;">time to extirpation</td>
+<td style="text-align: right;">concave</td>
+<td style="text-align: right;">0.0002</td>
+<td style="text-align: right;">0.0002</td>
+<td style="text-align: right;">0.0002</td>
+</tr>
+</tbody>
+</table>
+<h1 id="what-the-replication-shows">What the replication shows</h1>
+<p>The value of information is small throughout because one action is
+best under nearly every hypothesis, which is the paper’s conclusion. It
+also depends on the value function as much as on the biology: for the
+time to extirpation the same model outputs give an EVPI of 0.4% of the
+expected value under the convex curve and 6% under the S-curve.</p>
+</body>
+</html>
