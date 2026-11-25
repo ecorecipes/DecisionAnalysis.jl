@@ -95,6 +95,9 @@ an optional source of problems, each loaded as a weak-dependency extension.
   `expected_variance_reduction` is the value of information for estimating a quantity;
   `optimal_design` compares candidate experiments, studies or sample sizes by EVSI, or by net benefit in
   individuals where payoffs are additive.
+- **Survey or act, under a budget.** `survey_or_act` compares acting on a management unit now with
+  surveying it first, by value per unit of expected cost, when actions and the survey both cost money
+  (after Raymond et al. 2020); `select_under_budget` then chooses units for a fixed budget.
 - **Influence diagrams.** With InfluenceDiagrams.jl loaded, `normal_form(model)` turns a single-decision
   influence diagram into a `DecisionProblem` and its information into an `Experiment`; the diagram's
   structural values of information are then `evpi` and `evsi` on the table.

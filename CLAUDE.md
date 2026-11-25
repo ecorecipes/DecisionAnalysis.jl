@@ -204,6 +204,11 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - `src/voi_model.jl`: the estimators that run the model: `evppi_nested` (two-level Monte Carlo) and
   `MomentMatching` with its `evsi` method.
 - `src/design.jl`: `voi_profile`, `expected_variance_reduction`, `optimal_design`.
+- `src/survey.jl`: `survey_or_act` (act now or survey first, by value per unit of expected cost, after
+  Raymond et al. 2020; values are gains over the baseline, the baseline costs zero, a tie means act now,
+  and the survey policy is the best over all policies unless one is imposed) and `select_under_budget`
+  (ranking by value per cost; a heuristic, and the budget holds in expected cost only). Backed by
+  `proofs/DecisionAnalysisProofs/Finite/SurveyOrAct.lean`.
 - `src/estimation.jl`: value of information for estimation from a `SampleBelief` alone
   (`expected_variance_reduction` with a study, `variance_reduction_table`,
   `equivalent_binomial_sample_size`), `population_value`, `enbs_curve`, `optimal_sample_size`, and the
@@ -235,7 +240,7 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   layer; `test_outcomes.jl` defines the toy simulator that the driver is tested on, and
   `test_voi_sample.jl` checks `MissingExtensionError` before it loads GAM. `test_utilities.jl` (risk
   attitude and multi-attribute utilities), `test_gaussian_process.jl`, `test_standard_errors.jl`
-  (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`,
+  (standard errors against repetitions; the exhaustive Sadatsafavi search), `test_design.jl`, `test_survey.jl`,
   `test_additions.jl` (separating problem, upper-EVPI prior, the maximality shortcut, sharper
   constants), `test_voi_methods.jl` (the methods that follow `voi`: closed forms of its normal model,
   explicit loops, and the fixture `voi_extra_reference.json`), `test_validation.jl` and `test_validation_improb.jl` (the cross-language fixtures),

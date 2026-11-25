@@ -418,7 +418,12 @@ are drawn or shared between strategies, nor the design of the partial analysis, 
 every EVPI is in a figure or in rounded prose. Raymond et al. 2020 prints its method in
 full (the R code is in the supplement) but not its inputs: the occurrence probabilities
 and land prices of 238,247 map cells are not archived (licensed data), so Tables B2 to
-B4 cannot be recomputed. Impalli et al. 2025 can be rebuilt, but prints no number: every
+B4 cannot be recomputed. Its method is implemented as `survey_or_act` and
+`select_under_budget`, written from the paper's equations and description and tested on
+its one worked example (prior 0.10, detection 0.70), on the closed form of its rule and
+on synthetic units; in the multi-species case the value we give a surveyed unit is the
+expected number of species present where it is bought, which is larger than the count
+of species found that the paper's listing uses. Impalli et al. 2025 can be rebuilt, but prints no number: every
 cost, optimum and value is in a figure, the miss probability of its analytic model is
 not printed, and an evaluation of its equation 6 did not reproduce the optima marked in
 its Figure 1. Zang et al. 2020 publishes neither a payoff table nor code. Meeyai et al.

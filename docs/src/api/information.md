@@ -41,6 +41,8 @@ RobustVOI
 voi_profile
 expected_variance_reduction
 optimal_design
+survey_or_act
+select_under_budget
 ```
 
 ## Influence diagrams

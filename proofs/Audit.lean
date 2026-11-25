@@ -135,6 +135,12 @@ import DecisionAnalysisProofs
 -- T13: negative value of information under Gamma-maximin.
 #print axioms DecisionAnalysisProofs.dilation_robust_evsi_negative
 
+-- Survey first or act now (`survey_or_act`).
+#print axioms DecisionAnalysisProofs.survey_first_iff
+#print axioms DecisionAnalysisProofs.survey_first_tie
+#print axioms DecisionAnalysisProofs.survey_same_action_lt
+#print axioms DecisionAnalysisProofs.ratio_le_of_parametric
+
 -- T8: minimax regret and independence of irrelevant alternatives.
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaSmall_iff
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaLarge_iff
