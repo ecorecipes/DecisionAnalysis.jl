@@ -105,6 +105,37 @@ voi_table(contact)
 | ten bins of equal weight   | 1.638 |          0.088 |            0 |              \- |
 | GAM.jl smooth              | 1.503 |          0.086 |            0 |              \- |
 
+`SplineRegression()` chooses the size of its basis from the draws: a
+constant (the payoffs do not depend on the parameter, and the value is
+zero), a polynomial, or a cubic with one to four knots, whichever has
+the smallest generalised cross-validation score. A basis that is too
+large fits the simulation noise and reports value that is not there; one
+that is too small misses a curve. The estimate records the choice and
+every score:
+
+``` julia
+chosen = contact[1][2].details
+md_table(["degree", "knots", "coefficients", "score"],
+         [[s.degree, s.knots, s.coefficients, s.gcv] for s in chosen.gcv]; digits=4)
+```
+
+| degree | knots | coefficients |   score |
+|:-------|------:|-------------:|--------:|
+| 0      |     0 |            1 | 60.2022 |
+| 1      |     0 |            2 | 44.9407 |
+| 2      |     0 |            3 | 30.8938 |
+| 3      |     0 |            4 | 27.0048 |
+| 3      |     1 |            5 | 25.5051 |
+| 3      |     2 |            6 | 25.2909 |
+| 3      |     3 |            7 | 25.4578 |
+| 3      |     4 |            8 | 25.1645 |
+
+``` julia
+(degree=chosen.degree, knots=chosen.knots)
+```
+
+    (degree = 3, knots = 4)
+
 The estimates agree to within about two standard errors (they share one
 sample, so their errors are correlated). Learning the transmission rate
 is worth about a newt and a half per pond.
@@ -131,7 +162,7 @@ end
 png_figure(plt)
 ```
 
-![](12_evppi_methods_files/figure-commonmark/cell-4-output-1.png)
+![](12_evppi_methods_files/figure-commonmark/cell-6-output-1.png)
 
 At low transmission the outbreak fades out by itself, and catching
 animals only costs some. Above a threshold, treatment pays.
@@ -154,7 +185,7 @@ md_table(["standard error", "value"],
 | standard error           | value |
 |:-------------------------|------:|
 | linearised (default)     | 0.087 |
-| bootstrap, 200 resamples | 0.078 |
+| bootstrap, 200 resamples | 0.081 |
 
 ## A discrete parameter
 
@@ -279,7 +310,7 @@ plt = Plots.bar(labels, [Float64(v.value) for v in values];
 png_figure(plt)
 ```
 
-![](12_evppi_methods_files/figure-commonmark/cell-12-output-1.png)
+![](12_evppi_methods_files/figure-commonmark/cell-14-output-1.png)
 
 ## Five or more parameters: a Gaussian process
 
@@ -328,9 +359,9 @@ md_table(["focal parameters", "method chosen", "EVPPI (newts)", "standard error"
 | focal parameters | method chosen | EVPPI (newts) | standard error |
 |:---|---:|---:|---:|
 | five parameters (default: Gaussian process) | GaussianProcessRegression | 1.928 | 0.112 |
-| the same five, additive spline | SplineRegression | 1.823 | 0.111 |
+| the same five, additive spline | SplineRegression | 1.795 | 0.109 |
 | all six | GaussianProcessRegression | 2.067 | 0.113 |
-| the four added ones only (spline, by default) | SplineRegression | 0.525 | 0.128 |
+| the four added ones only (spline, by default) | SplineRegression | 0.429 | 0.147 |
 
 The method column shows the rule at work: four parameters go to the
 spline and five or six to the Gaussian process. An explicit method
@@ -370,10 +401,10 @@ voi_table(checks; digits=4,
 |:---|---:|---:|---:|---:|---:|
 | EVPI, sample average | 0.4871 | 0.0049 | 0 | 0 | 0.4798 |
 | EVPI, regression on p1 and p2 | 0.4871 | 0.0049 | 0 | \- | 0.4798 |
-| EVPPI(p1), spline | 0.0915 | 0.0044 | 0 | \- | 0.0833 |
+| EVPPI(p1), spline | 0.0892 | 0.0043 | 0 | \- | 0.0833 |
 | EVPPI(p1), Strong and Oakley | 0.0927 | 0.0044 | 0 | \- | 0.0833 |
 | EVPPI(p1), Sadatsafavi | 0.0935 | 0.0044 | 0 | \- | 0.0833 |
-| EVPPI(p2), spline | 0.4005 | 0.005 | 0 | \- | 0.3956 |
+| EVPPI(p2), spline | 0.4017 | 0.005 | 0 | \- | 0.3956 |
 | EVPPI(p2), Strong and Oakley | 0.4009 | 0.005 | 0 | \- | 0.3956 |
 | EVPPI(p2), Sadatsafavi | 0.4012 | 0.005 | 0 | \- | 0.3956 |
 

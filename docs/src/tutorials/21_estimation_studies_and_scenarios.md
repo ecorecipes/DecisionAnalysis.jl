@@ -163,10 +163,10 @@ labelled_table("standard deviation left after learning", vcat("nothing", shares.
 | standard deviation left after learning | growth rate | adults in five years | declines (0 or 1) |
 |:---|---:|---:|---:|
 | nothing | 0.158 | 59.58 | 0.494 |
-| adult_survival | 0.14 | 54.608 | 0.45 |
-| juvenile_survival | 0.126 | 48.535 | 0.432 |
-| maturation | 0.149 | 55.985 | 0.472 |
-| log_fecundity | 0.134 | 52.623 | 0.453 |
+| adult_survival | 0.14 | 54.625 | 0.45 |
+| juvenile_survival | 0.126 | 48.535 | 0.433 |
+| maturation | 0.149 | 56.002 | 0.472 |
+| log_fecundity | 0.134 | 52.634 | 0.453 |
 
 Learning juvenile survival exactly would bring the standard deviation of
 the growth rate from 0.16 to about 0.13. Perfect knowledge of any one
@@ -216,9 +216,9 @@ md_table(["adults marked", "share of variance removed (regression)",
 | adults marked | share of variance removed (regression) | share (Gaussian approximation) | sd of the growth rate left |
 |:---|---:|---:|---:|
 | 20 | 0.114 | 0.11 | 0.149 |
-| 50 | 0.152 | 0.157 | 0.146 |
-| 100 | 0.186 | 0.183 | 0.143 |
-| 200 | 0.203 | 0.2 | 0.141 |
+| 50 | 0.151 | 0.157 | 0.146 |
+| 100 | 0.185 | 0.183 | 0.143 |
+| 200 | 0.203 | 0.199 | 0.141 |
 | 500 | 0.209 | 0.211 | 0.141 |
 | adult survival known exactly | 0.219 | 0.219 | 0.14 |
 
@@ -283,10 +283,10 @@ voi_table(vcat("EVPI: all four rates" => perfect,
 | estimate                 | value | standard error | act-now bias | cell-noise bias |
 |:-------------------------|------:|---------------:|-------------:|----------------:|
 | EVPI: all four rates     | 3.699 |           0.08 |            0 |               0 |
-| EVPPI: adult_survival    | 1.373 |          0.098 |            0 |              \- |
-| EVPPI: juvenile_survival | 1.998 |          0.074 |            0 |              \- |
-| EVPPI: maturation        | 1.135 |          0.073 |            0 |              \- |
-| EVPPI: log_fecundity     |  0.92 |          0.068 |            0 |              \- |
+| EVPPI: adult_survival    | 1.401 |          0.098 |            0 |              \- |
+| EVPPI: juvenile_survival |     2 |          0.075 |            0 |              \- |
+| EVPPI: maturation        | 1.103 |          0.075 |            0 |              \- |
+| EVPPI: log_fecundity     | 0.909 |          0.069 |            0 |              \- |
 
 Knowing everything would be worth under four adults per pond. Side by
 side with the estimation shares:
@@ -299,10 +299,10 @@ md_table(["input", "share of the growth rate's variance", "EVPPI for the decisio
 
 | input | share of the growth rate’s variance | EVPPI for the decision (adults) |
 |:---|---:|---:|
-| adult_survival | 0.22 | 1.37 |
+| adult_survival | 0.22 | 1.4 |
 | juvenile_survival | 0.36 | 2 |
-| maturation | 0.12 | 1.13 |
-| log_fecundity | 0.28 | 0.92 |
+| maturation | 0.12 | 1.1 |
+| log_fecundity | 0.28 | 0.91 |
 
 The two orders are not the same. Fecundity is the second largest source
 of uncertainty about the growth rate and the least valuable thing to
@@ -332,7 +332,7 @@ md_table(["method", "variance of held-out draws explained", "EVPPI", "standard e
 | method | variance of held-out draws explained | EVPPI | standard error |
 |:-------|-------------------------------------:|------:|---------------:|
 | linear |                                0.113 | 0.888 |           0.08 |
-| spline |                                0.133 |  0.92 |          0.068 |
+| spline |                                0.136 | 0.909 |          0.069 |
 | mars   |                                0.136 |  0.94 |          0.075 |
 | blocks |                                0.114 | 0.959 |          0.089 |
 
@@ -359,7 +359,7 @@ voi_table(["two-level Monte Carlo, 3 million runs of the model" => nested,
 | estimate | value | standard error | act-now bias | cell-noise bias |
 |:---|---:|---:|---:|---:|
 | two-level Monte Carlo, 3 million runs of the model | 1.014 | 0.049 | 0.004 | 0.011 |
-| regression on 4,000 runs | 0.92 | 0.068 | 0 | \- |
+| regression on 4,000 runs | 0.909 | 0.069 | 0 | \- |
 
 Three million runs and four thousand agree to within about one standard
 error of their difference. The two-level estimate carries a second bias,
@@ -391,9 +391,9 @@ md_table(["method", "EVSI, 5 females", "standard error", "EVSI, 80 females", "st
 
 | method | EVSI, 5 females | standard error | EVSI, 80 females | standard error |
 |:---|---:|---:|---:|---:|
-| regression on the study’s mean | 0.669 | 0.063 | 0.89 | 0.065 |
-| Gaussian approximation | 0.694 | 0.053 | 0.901 | 0.067 |
-| moment matching | 0.825 | 0.249 | 0.898 | 0.21 |
+| regression on the study’s mean | 0.671 | 0.061 | 0.893 | 0.063 |
+| Gaussian approximation | 0.687 | 0.05 | 0.891 | 0.067 |
+| moment matching | 0.843 | 0.282 | 0.903 | 0.176 |
 
 Five dissections are already worth about three quarters of what
 fecundity is worth to the decision (its EVPPI, about 0.9 adults). The
@@ -411,7 +411,7 @@ between zero and one:
  expected=(five=5 / (prior_worth + 5), eighty=80 / (prior_worth + 80)))
 ```
 
-    (five_females = 0.9115080717963177, eighty_females = 1.4691511192500541, expected = (five = 0.7101449275362319, eighty = 0.9751243781094526))
+    (five_females = 0.9143605738644096, eighty_females = 1.4746394685168742, expected = (five = 0.7101449275362319, eighty = 0.9751243781094526))
 
 At five females it is above the share expected for a normal mean, and at
 eighty it is above one, which no study can be: the estimate is then
@@ -444,9 +444,9 @@ md_table(["ponds under the decision", "best number of females", "near-optimal ra
 
 | ponds under the decision | best number of females | near-optimal range | expected net benefit (adults) |
 |:---|---:|---:|---:|
-| 5 | 2 | 2 to 2 | 0.32 |
-| 20 | 4 | 3 to 6 | 8.46 |
-| 50 | 7 | 5 to 11 | 29.37 |
+| 5 | 2 | 2 to 2 | 0.48 |
+| 20 | 4 | 3 to 5 | 8.64 |
+| 50 | 7 | 5 to 11 | 29.36 |
 
 ``` julia
 plt = Plots.plot(; xlabel="females dissected", ylabel="expected net benefit of sampling (adults)",

@@ -77,6 +77,22 @@ contact = ["additive spline (built in)" => evppi(problem, :contact, SplineRegres
 voi_table(contact)
 ```
 
+`SplineRegression()` chooses the size of its basis from the draws: a constant (the
+payoffs do not depend on the parameter, and the value is zero), a polynomial, or a cubic
+with one to four knots, whichever has the smallest generalised cross-validation score. A
+basis that is too large fits the simulation noise and reports value that is not there; one
+that is too small misses a curve. The estimate records the choice and every score:
+
+```{julia}
+chosen = contact[1][2].details
+md_table(["degree", "knots", "coefficients", "score"],
+         [[s.degree, s.knots, s.coefficients, s.gcv] for s in chosen.gcv]; digits=4)
+```
+
+```{julia}
+(degree=chosen.degree, knots=chosen.knots)
+```
+
 The estimates agree to within about two standard errors (they share one sample, so
 their errors are correlated). Learning the transmission rate is worth about a newt and a
 half per pond.

@@ -326,6 +326,21 @@ What the comparisons found:
    of the discounted formula as the rate goes to zero. The smoothed optimum uses a
    regression spline here and `mgcv` there, and agrees to within the flat top of the
    curve.
+10. **The size of the spline basis, by simulation** (`spline_basis_simulation.jl`, which
+   needs neither R nor Python: problems with known values, one, two and four parameters,
+   30 to 1,000 draws, noise 0.5 and 2 against a signal of about 1, 300 repetitions). The
+   cubic spline with four knots, the default until then, reports value that is not
+   there when the payoffs are noisy: for parameters the payoffs do not depend on, a
+   mean of 0.31 at 50 draws and 0.04 at 1,000 for a true value of 0. A limit on the
+   basis by draws per coefficient does not repair it. At 10 draws per coefficient the
+   root mean squared error at 50 draws is 0.134 with no dependence (four knots: 0.321)
+   and 0.199 on a curved relationship (four knots: 0.181), and from 400 draws the limit
+   changes nothing. Choosing among a constant, polynomials and one to four knots by
+   generalised cross-validation gives 0.070 and 0.163 at 50 draws, a mean bias of at
+   most 0.03 in every class except the curved one at 30 draws (−0.05), and the error
+   of four knots where four knots are right. This is now `SplineRegression()`. On the
+   Bd table (100 draws) the scores of the candidates differ by a few per cent, so the
+   choice is not sharp on real data of that size; the estimate records every score.
 5. **A weakness of our Gaussian process, found while writing a vignette and fixed.** On
    a five-parameter example the search for the hyperparameters settled on length scales
    shorter than the spacing of the points. Such a process is independent noise at the

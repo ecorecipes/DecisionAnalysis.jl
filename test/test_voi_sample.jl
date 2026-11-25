@@ -475,3 +475,95 @@ using GAM: GAM
         @test evppi(problem, :half, Grouping()).details.cells == 2
     end
 end
+
+@testset "SplineRegression chooses its basis from the draws" begin
+    @test SplineRegression().automatic && SplineRegression(; knots=:auto).automatic
+    @test !SplineRegression(; knots=4).automatic
+    @test_throws ArgumentError SplineRegression(; knots=:many)
+    @test_throws ArgumentError SplineRegression(; knots=-1)
+
+    value_of(G) = sum(maximum(G; dims=1)) / size(G, 2) -
+                  maximum(sum(G; dims=2)) / size(G, 2)
+    function draws(rng, n, kind; noise)
+        local x, z, Q
+        x, z = randn(rng, n), randn(rng, n)
+        signal = kind === :curved ? 0.2 .+ sin.(2 .* x) : fill(0.1, n)
+        Q = vcat(zeros(1, n), permutedims(signal .+ noise .* randn(rng, n)),
+                 permutedims(-0.1 .+ noise .* randn(rng, n)))
+        return DecisionProblem(PayoffTable(Q), SampleBelief((; x, z))), x
+    end
+
+    # A parameter the payoffs do not depend on: four knots report value that is not
+    # there, the chosen basis very little, and usually the constant, whose value is zero.
+    fixed, chosen, constant = 0.0, 0.0, 0
+    for seed in 1:100
+        problem, _ = draws(Xoshiro(seed), 100, :none; noise=2.0)
+        e = evppi(problem, :x)
+        @test e.method === :SplineRegression
+        @test e.details.degree == 0 ? iszero(e.value) : e.value >= 0
+        constant += e.details.degree == 0
+        chosen += e.value
+        fixed += evppi(problem, :x, SplineRegression(; knots=4)).value
+    end
+    @test constant >= 60
+    @test chosen < fixed / 4
+    @test fixed / 100 > 0.15
+
+    # A curved relationship with little noise: the choice keeps the curve.
+    truth = let x = randn(Xoshiro(7), 1_000_000)
+        value_of(vcat(zeros(1, length(x)), permutedims(0.2 .+ sin.(2 .* x)),
+                      fill(-0.1, 1, length(x))))
+    end
+    errors = Float64[]
+    for seed in 1:50
+        problem, _ = draws(Xoshiro(1000 + seed), 200, :curved; noise=0.5)
+        e = evppi(problem, :x)
+        @test e.details.degree == 3 && e.details.knots >= 1
+        push!(errors, e.value - truth)
+        linear = evppi(problem, :x, SplineRegression(; knots=0, degree=1))
+        @test linear.value < e.value
+    end
+    @test abs(sum(errors) / 50) < 0.02
+    @test sqrt(sum(abs2, errors) / 50) < 0.06
+
+    # The details carry every candidate, and the choice is the first smallest score.
+    problem, x = draws(Xoshiro(3), 60, :curved; noise=1.0)
+    e = evppi(problem, (:x, :z))
+    scores = e.details.gcv
+    @test [(s.degree, s.knots) for s in scores] ==
+          [(0, 0), (1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (3, 3), (3, 4)]
+    @test [s.coefficients for s in scores] == [1, 3, 5, 7, 9, 11, 13, 15]
+    best = scores[argmin([s.gcv for s in scores])]
+    @test (e.details.degree, e.details.knots) == (best.degree, best.knots)
+    fixed_basis = SplineRegression(; knots=best.knots, degree=max(best.degree, 1))
+    @test best.degree == 0 ||
+          isapprox(e.value, evppi(problem, (:x, :z), fixed_basis).value; rtol=1e-9)
+
+    # Candidates with more than one coefficient per two draws are left out.
+    small, _ = draws(Xoshiro(4), 20, :curved; noise=0.5)
+    few = evppi(small, (:x, :z)).details.gcv
+    @test all(s -> 2 * s.coefficients <= 20, few) && length(few) == 5
+
+    # A fixed basis has no choice to report; discrete columns are fitted as they are.
+    @test !haskey(evppi(problem, :x, SplineRegression(; knots=4)).details, :gcv)
+    g = repeat(1:4, 15)
+    discrete = DecisionProblem(problem.payoff, SampleBelief((; g)))
+    @test !haskey(evppi(discrete, :g, SplineRegression()).details, :gcv)
+    @test evppi(discrete, :g, SplineRegression()).value ≈
+          evppi(discrete, :g, Grouping()).value
+
+    # Draws of zero weight do not enter the choice.
+    n = 60
+    keep = [isodd(i) for i in 1:n]
+    Q = Float64.(problem.payoff.Q)
+    weighted = DecisionProblem(PayoffTable(Q), SampleBelief((; x); weights=Float64.(keep)))
+    subset = DecisionProblem(PayoffTable(Q[:, keep]), SampleBelief((; x=x[keep])))
+    a, b = evppi(weighted, :x), evppi(subset, :x)
+    @test (a.details.degree, a.details.knots) == (b.details.degree, b.details.knots)
+    @test a.value ≈ b.value atol = 1e-8
+
+    # One row (a quantity, not a decision): the score is of the row itself.
+    quantity = (x .^ 2) .+ 0.1 .* randn(Xoshiro(5), n)
+    reduction = expected_variance_reduction(SampleBelief((; x)), :x; quantity)
+    @test 0 < reduction.reduction
+end

@@ -463,7 +463,7 @@ voi_table(["EVPI, plain sample average" => plain,
 | estimate | value | standard error | act-now bias | cell-noise bias |
 |:---|---:|---:|---:|---:|
 | EVPI, plain sample average | 1.599 | 0.108 | 0 | 0.169 |
-| EVPI, all-parameter regression | 1.48 | 0.112 | 0 | \- |
+| EVPI, all-parameter regression | 1.493 | 0.112 | 0 | \- |
 
 Two things bias the pieces of this calculation, and both are instances
 of the optimiser’s curse: a maximum of estimates overstates, on average,
@@ -576,8 +576,8 @@ the table has no standard errors).
 | estimate | value | standard error | act-now bias | cell-noise bias |
 |:---|---:|---:|---:|---:|
 | EVPI | 1.59867 | 0.108259 | 0.0 | 0.168519 |
-| EVPI, all-parameter regression | 1.48048 | 0.111736 | 0.0 | \- |
-| EVPPI of contact (SplineRegression) | 1.37937 | 0.113828 | 0.0 | \- |
+| EVPI, all-parameter regression | 1.49272 | 0.11212 | 0.0 | \- |
+| EVPPI of contact (SplineRegression) | 1.40528 | 0.112442 | 0.0 | \- |
 | EVPPI of habitat (Grouping) | 0.140833 | 0.180273 | 0.0 | \- |
 
 Errors and biases are beside the values, not in them. The act-now bias

@@ -68,7 +68,7 @@ voi_table(["EVPPI of the transmission rate (the ceiling for this study)" => ceil
 
 | estimate | value | standard error | act-now bias | cell-noise bias |
 |:---|---:|---:|---:|---:|
-| EVPPI of the transmission rate (the ceiling for this study) | 1.562 | 0.089 | 0 | \- |
+| EVPPI of the transmission rate (the ceiling for this study) | 1.581 | 0.089 | 0 | \- |
 
 The model takes its parameters by name and ignores the extra
 `log_contact` column, which is there for the study. No study of the
@@ -92,11 +92,11 @@ voi_table(["n = $n trials" => e for (n, e) in by_regression])
 
 | estimate      | value | standard error | act-now bias | cell-noise bias |
 |:--------------|------:|---------------:|-------------:|----------------:|
-| n = 2 trials  | 0.937 |          0.113 |            0 |              \- |
+| n = 2 trials  | 0.938 |          0.113 |            0 |              \- |
 | n = 5 trials  | 1.222 |          0.097 |            0 |              \- |
-| n = 10 trials | 1.306 |          0.094 |            0 |              \- |
-| n = 20 trials | 1.416 |          0.089 |            0 |              \- |
-| n = 50 trials | 1.497 |          0.087 |            0 |              \- |
+| n = 10 trials | 1.281 |          0.094 |            0 |              \- |
+| n = 20 trials | 1.456 |          0.089 |            0 |              \- |
+| n = 50 trials | 1.494 |          0.088 |            0 |              \- |
 
 The summary must carry what the data say about the parameter, and there
 must be few of them: the built-in regression suits up to about four.
@@ -186,14 +186,14 @@ md_table(["trials", "EVSI", "standard error"],
 
 | trials |  EVSI | standard error |
 |:-------|------:|---------------:|
-| 1      | 0.506 |          0.041 |
-| 2      | 0.821 |          0.056 |
-| 5      | 1.167 |          0.072 |
-| 10     | 1.339 |          0.079 |
-| 20     | 1.443 |          0.083 |
-| 50     | 1.512 |          0.086 |
-| 100    | 1.536 |          0.088 |
-| 200    | 1.549 |          0.088 |
+| 1      |  0.52 |          0.041 |
+| 2      | 0.836 |          0.056 |
+| 5      | 1.184 |          0.071 |
+| 10     | 1.357 |          0.079 |
+| 20     | 1.461 |          0.083 |
+| 50     | 1.531 |          0.086 |
+| 100    | 1.555 |          0.087 |
+| 200    | 1.568 |          0.088 |
 
 One fit gives the whole curve. It rises from zero to the EVPPI of the
 parameter.
@@ -255,21 +255,21 @@ md_table(["trials", "EVSI × ponds", "cost (newts)", "net benefit (newts)", "sta
 
 | trials | EVSI × ponds | cost (newts) | net benefit (newts) | standard error |
 |:-------|-------------:|-------------:|--------------------:|---------------:|
-| 1      |        12.64 |            3 |                9.64 |           1.02 |
-| 2      |        20.52 |            6 |               14.52 |           1.41 |
-| 5      |        29.18 |           15 |               14.18 |           1.79 |
-| 10     |        33.48 |           30 |                3.48 |           1.97 |
-| 20     |        36.06 |           60 |              -23.94 |           2.09 |
-| 50     |         37.8 |          150 |              -112.2 |           2.16 |
-| 100    |        38.41 |          300 |             -261.59 |           2.19 |
-| 200    |        38.72 |          600 |             -561.28 |            2.2 |
+| 1      |        12.99 |            3 |                9.99 |           1.03 |
+| 2      |         20.9 |            6 |                14.9 |           1.41 |
+| 5      |        29.61 |           15 |               14.61 |           1.79 |
+| 10     |        33.93 |           30 |                3.93 |           1.97 |
+| 20     |        36.53 |           60 |              -23.47 |           2.09 |
+| 50     |        38.27 |          150 |             -111.73 |           2.16 |
+| 100    |        38.88 |          300 |             -261.12 |           2.19 |
+| 200    |         39.2 |          600 |              -560.8 |            2.2 |
 
 ``` julia
 best = argmax([b.value for b in net])
 (trials=sizes[best], net_benefit=net[best].value, standard_error=net[best].standard_error)
 ```
 
-    (trials = 2, net_benefit = 14.516561494296681, standard_error = 1.4058393085980168)
+    (trials = 2, net_benefit = 14.902861355693503, standard_error = 1.405480939763762)
 
 A small study pays for itself and a large one does not: the EVSI curve
 flattens while the cost keeps rising. With a single pond no study is
@@ -297,14 +297,14 @@ their standard errors are not distinguished.
 ```
 
     8-element Vector{Float64}:
-       -2.49
-       -5.18
-      -13.83
-      -28.66
-      -58.56
-     -148.49
-     -298.46
-     -598.45
+       -2.48
+       -5.16
+      -13.82
+      -28.64
+      -58.54
+     -148.47
+     -298.44
+     -598.43
 
 ## A check against closed forms
 
@@ -341,10 +341,10 @@ voi_table(rows; digits=4, truth=[0.0723251, 0.0723251, 0.0723251, 0.0821176, 0.0
 | estimate | value | standard error | act-now bias | cell-noise bias | reference |
 |:---|---:|---:|---:|---:|---:|
 | m = 10, regression on the sample mean | 0.0801 | 0.0042 | 0 | \- | 0.0723 |
-| m = 10, Gaussian approximation | 0.0796 | 0.004 | 0 | \- | 0.0723 |
+| m = 10, Gaussian approximation | 0.0778 | 0.0039 | 0 | \- | 0.0723 |
 | m = 10, importance sampling (3,000 draws) | 0.0759 | 0.0137 | 0 | \- | 0.0723 |
-| m = 100, regression on the sample mean | 0.0892 | 0.0044 | 0 | \- | 0.0821 |
-| m = 100, Gaussian approximation | 0.0902 | 0.0043 | 0 | \- | 0.0821 |
+| m = 100, regression on the sample mean | 0.088 | 0.0043 | 0 | \- | 0.0821 |
+| m = 100, Gaussian approximation | 0.0879 | 0.0042 | 0 | \- | 0.0821 |
 | m = 100, importance sampling (3,000 draws) | 0.0903 | 0.0169 | 0 | \- | 0.0821 |
 
 ## What to take away

@@ -207,34 +207,61 @@ struct Sadatsafavi <: AbstractVOIMethod
 end
 
 """
-    SplineRegression(; knots=4, degree=3, interactions=false)
+    SplineRegression(; knots=:auto, degree=3, interactions=false)
 
 The built-in regression: an additive regression spline fitted by weighted least
 squares, with no dependency beyond LinearAlgebra. Each numeric column enters through
 a truncated-power spline basis of the given `degree` with `knots` interior knots at
 weighted quantiles; a non-numeric column, or a numeric one with no more distinct
-values than the basis has functions, enters as a factor (one mean per level), so
-that the fit reproduces cell means exactly when the columns are discrete. With
+values than the largest basis has functions, enters as a factor (one mean per level),
+so that the fit reproduces cell means exactly when the columns are discrete. With
 `interactions = true` the products of the basis functions of every pair of columns
 are added (a tensor-product surface per pair), which needs many more draws.
 
-It is meant for up to about four columns. There is no penalty and no smoothing
-parameter: the flexibility is set by `knots`, and `SplineRegression(; knots=0,
-degree=1)` is the linear metamodel of Jalal, Goldhaber-Fiebert and Kuntz (2015). For
-penalised smooths use [`GAMRegression`](@ref), and for five or more columns
-[`GaussianProcessRegression`](@ref).
+There is no penalty and no smoothing parameter: the flexibility is the size of the
+basis. With the default `knots = :auto` the size is **chosen from the draws**. The
+candidates are, in order, no dependence on the columns at all (a constant, which makes
+the value of information zero), polynomials of degree 1 to `degree` without knots, and
+degree `degree` with 1 to 4 knots; candidates with more than one coefficient per two
+draws (by effective sample size) are left out. The one kept has the smallest
+generalised cross-validation score `RSS / (1 − coefficients / n)²`, the smaller basis
+on a tie, where `RSS` is the weighted residual sum of squares of the payoff
+differences from the act-now action (of the payoffs themselves when there is one row).
+A fixed basis is wrong in both directions: on noisy payoffs four knots report value
+that is not there, even with a thousand draws, and a basis small enough to avoid that
+misses a curved relationship that thirty clean draws show. The estimate's `details`
+carry the choice (`degree`, `knots`, with `degree = 0` for no dependence) and the score
+of every candidate (`gcv`); when the scores are close the choice is not sharp, and
+[`compare_regressions`](@ref) tests candidates on draws left out. Columns that all
+enter as factors leave nothing to choose and are fitted as they are. The choice is
+made again in every bootstrap resample.
+
+An integer `knots` fixes the basis: `SplineRegression(; knots=4)` is the cubic spline
+with four knots, and `SplineRegression(; knots=0, degree=1)` is the linear metamodel of
+Jalal, Goldhaber-Fiebert and Kuntz (2015). The regression is meant for up to about four
+columns. For penalised smooths use [`GAMRegression`](@ref), and for five or more
+columns [`GaussianProcessRegression`](@ref).
 """
 struct SplineRegression <: AbstractRegression
     knots::Int
     degree::Int
     interactions::Bool
-    function SplineRegression(; knots::Integer=4, degree::Integer=3,
+    automatic::Bool
+    function SplineRegression(; knots::Union{Integer,Symbol}=:auto, degree::Integer=3,
                               interactions::Bool=false)
-        knots >= 0 || throw(ArgumentError("knots must be nonnegative, got $knots"))
         degree >= 1 || throw(ArgumentError("degree must be at least 1, got $degree"))
-        return new(knots, degree, interactions)
+        if knots isa Symbol
+            knots === :auto ||
+                throw(ArgumentError("knots must be an integer or :auto, got :$knots"))
+            return new(_AUTO_KNOTS, degree, interactions, true)
+        end
+        knots >= 0 || throw(ArgumentError("knots must be nonnegative, got $knots"))
+        return new(knots, degree, interactions, false)
     end
 end
+
+# The largest number of knots that `knots = :auto` considers.
+const _AUTO_KNOTS = 4
 
 """
     GAMRegression(; k=10, tensor=false)
@@ -520,11 +547,11 @@ function _fit(method::Sadatsafavi, columns::NamedTuple, Q, w)
 end
 
 # Design matrix of the additive regression spline.
-function _spline_blocks(method::SplineRegression, columns::NamedTuple, w)
+function _spline_blocks(method::SplineRegression, columns::NamedTuple, w,
+                        size_of_basis::Integer=method.degree + method.knots)
     blocks = Matrix{Float64}[]
     for x in columns
         levels = unique(x)
-        size_of_basis = method.degree + method.knots
         if !_is_numeric(x) || length(levels) <= size_of_basis + 1
             # A factor: one indicator per level but the first.
             push!(blocks,
@@ -547,8 +574,9 @@ function _spline_blocks(method::SplineRegression, columns::NamedTuple, w)
     return blocks
 end
 
-function _design(method::SplineRegression, columns::NamedTuple, w)
-    blocks = _spline_blocks(method, columns, w)
+function _design(method::SplineRegression, columns::NamedTuple, w,
+                 size_of_basis::Integer=method.degree + method.knots)
+    blocks = _spline_blocks(method, columns, w, size_of_basis)
     n = length(first(columns))
     parts = Matrix{Float64}[ones(n, 1)]
     append!(parts, blocks)
@@ -576,15 +604,65 @@ least-squares fit with an intercept). A new regression backend subtypes
 """
 function fitted_conditional_means(method::SplineRegression, columns::NamedTuple,
                                   Q::AbstractMatrix, w::AbstractVector)
-    A = _design(method, columns, w)
-    n, p = size(A)
-    p <= n ||
-        throw(ArgumentError("the regression has $p coefficients for $n draws; use " *
-                            "fewer knots, fewer parameters or no interactions"))
+    return first(_spline_fit(method, columns, Q, w))
+end
+
+function _fit(method::SplineRegression, columns::NamedTuple, Q, w)
+    G, choice = _spline_fit(method, columns, Q, w)
+    residual = sum(Float64(w[i]) * (Float64(Q[a, i]) - G[a, i])^2
+                   for a in axes(Q, 1), i in axes(Q, 2)) / size(Q, 1)
+    return G, merge((; residual_variance=residual), choice)
+end
+
+function _least_squares(A::AbstractMatrix, Q::AbstractMatrix, w::AbstractVector)
     root = sqrt.(Float64.(w))
     F = qr(root .* A, ColumnNorm())
     coefficients = F \ (root .* permutedims(Float64.(Q)))
     return permutedims(A * coefficients)
+end
+
+# The fitted values and, for `knots = :auto`, the chosen basis with the score of every
+# candidate. Whether a column is a factor is decided once, by the largest basis, so
+# that the candidates differ only in the splines.
+function _spline_fit(method::SplineRegression, columns::NamedTuple, Q::AbstractMatrix,
+                     w::AbstractVector)
+    largest = method.degree + method.knots
+    if !method.automatic ||
+       all(x -> !_is_numeric(x) || length(unique(x)) <= largest + 1, columns)
+        A = _design(method, columns, w)
+        n, p = size(A)
+        p <= n ||
+            throw(ArgumentError("the regression has $p coefficients for $n draws; use " *
+                                "fewer knots, fewer parameters or no interactions"))
+        return _least_squares(A, Q, w), (;)
+    end
+    n = length(w)
+    wf = Float64.(w) ./ sum(Float64, w)
+    n_effective = 1 / sum(abs2, wf)
+    Qf = Float64.(Q)
+    reference = size(Q, 1) == 1 ? nothing : last(_act_now(Q, w))
+    candidates = vcat([(0, 0)], [(d, 0) for d in 1:(method.degree)],
+                      [(method.degree, k) for k in 1:(method.knots)])
+    scores = NamedTuple[]
+    best, best_score, best_G = (0, 0), Inf, Qf
+    for (degree, knots) in candidates
+        A = degree == 0 ? ones(n, 1) :
+            _design(SplineRegression(; knots, degree, interactions=method.interactions),
+                    columns, w, largest)
+        coefficients = size(A, 2)
+        (degree == 0 || 2 * coefficients <= n_effective) || continue
+        # The constant is the weighted mean itself, so that its value is exactly zero.
+        G = degree == 0 ? repeat(Qf * wf, 1, n) : _least_squares(A, Qf, wf)
+        R = Qf .- G
+        reference === nothing || (R = R .- R[reference:reference, :])
+        rss = sum(wf[i] * R[a, i]^2 for a in axes(R, 1), i in axes(R, 2))
+        gcv = rss / (1 - coefficients / n_effective)^2
+        push!(scores, (; degree, knots, coefficients, gcv))
+        if gcv < best_score
+            best, best_score, best_G = (degree, knots), gcv, G
+        end
+    end
+    return best_G, (; degree=best[1], knots=best[2], gcv=scores)
 end
 
 function fitted_conditional_means(method::GAMRegression, columns, Q, w)
@@ -604,6 +682,8 @@ function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTu
                    cells=nothing, extra=(;))
     G, info = _fit(method, columns, Q, w)
     value, v0, a = _voi_from_fit(G, Q, w)
+    # A constant fit is worth nothing; the sum above gives zero only to rounding.
+    get(info, :degree, 1) == 0 && (value = zero(value))
     rng = Xoshiro(seed)
     bias = (; act_now=_act_now_bias(Q, w, rng), cells)
     gains = _policy_gains(method, G, Q, w, a)

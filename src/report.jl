@@ -408,6 +408,13 @@ function _monte_carlo(problem::DecisionProblem, parameters, regression, seed::In
               "the same sample by more than twice its standard error. No information " *
               "is worth more than perfect information: the fit is poor (too few draws " *
               "for the regression) and that estimate should not be used.")
+    flat = [q.name for q in partial if get(q.estimate.details, :degree, 1) == 0]
+    isempty(flat) ||
+        push!(notes,
+              "For $(join(flat, "; ")) the regression chosen from the draws is a " *
+              "constant: these draws do not show that the payoffs depend on it, and " *
+              "the estimate is zero. More draws can show a dependence that these do " *
+              "not.")
     push!(notes,
           "Selection bias (the optimiser's curse) is reported, not removed. It " *
           "belongs to the best reported value and the chosen action: a maximum of " *

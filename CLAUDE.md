@@ -84,6 +84,12 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `evppi` without a method chooses by the focal parameters as `voi` does: `Grouping` when some is not
   numeric and none is floating-point, `SplineRegression` for one to four (and for a floating-point
   parameter named with a non-numeric one), `GaussianProcessRegression` from five (`_GP_FROM`).
+- **`SplineRegression()` chooses the size of its basis from the draws** (`knots = :auto`): a constant
+  (no dependence, value exactly zero), polynomials up to the degree, then one to four knots, by
+  generalised cross-validation on the payoff differences from the act-now action; an integer `knots`
+  fixes the basis. A fixed limit by draws per coefficient was tried and is wrong in both directions
+  (`validation/README.md`): the overfitting depends on the noise of the payoffs, not on the sample size
+  alone. `details.degree`, `.knots` and `.gcv` record the choice; a constant adds a note to the report.
 - **No information is worth more than perfect information, and an estimate that says otherwise is
   flagged, not capped.** Every estimate made from fitted conditional means carries
   `details.sample_evpi`, `details.policy_gain` and `details.above_sample_evpi`; the flag (value above the
