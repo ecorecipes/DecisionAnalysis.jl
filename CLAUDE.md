@@ -133,7 +133,7 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - **No monetary costs in the package's own examples.** Utility is counted in individuals; `enbs` on an
   estimate takes a cost in individuals and is for additive payoffs only. Money appears only as a published
   figure in its paper's own unit: the `voi` validation target, and the replication fixtures and vignettes
-  whose source values outcomes in money (Shea et al. 2014, Luhede et al. 2024).
+  whose source values outcomes in money (Shea et al. 2014, Luhede et al. 2024, Chadès et al. 2008).
 - **Replication fixtures are contracts with the literature.** `test/fixtures/replications/*.json` hold the
   small input tables of published analyses, the published numbers, and for each its DOI, table or figure,
   licence and how it was transcribed; `resolution` fields record why a number of ours differs from the
@@ -215,7 +215,13 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `passive` replans each period and takes the plan's first action, and `perfect` is the state seen
   every period**; a passive manager that took the best action for the current period alone could fall
   below the fixed plan, so do not define it that way. Its closures recurse, so their variables are
-  declared `local`.
+  declared `local`. Two exact methods: `:beliefs` (default, every reachable belief once) and, for two
+  states only, `:vectors` (the value function as the upper envelope of lines, one set per number of
+  periods left, returned as `value_function`; backed by `Finite/ValueVectors.lean`), which reaches long
+  horizons when the state moves. For three or more states exact pruning needs a linear programme per
+  vector and was slower than `:beliefs` on every problem tried, so it is refused, not approximated.
+  For a fixed state with repeated trials the lines are as many as the beliefs: use `:beliefs`. The
+  passive manager is always found by following its beliefs (`passive=false` skips it).
 - `src/survey.jl`: `survey_or_act` (act now or survey first, by value per unit of expected cost, after
   Raymond et al. 2020; values are gains over the baseline, the baseline costs zero, a tie means act now,
   and the survey policy is the best over all policies unless one is imposed) and `select_under_budget`
@@ -263,10 +269,10 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `compare_voi.jl`, which prints our estimates beside those of `voi`, `requirements.txt`,
   `requirements-py27.txt` and a README with the versions used and the findings. The Python environments
   are `validation/.venv` and, for `improb` (Python 2.7), `validation/.venv27` (both ignored).
-- `vignettes/NN_name/NN_name.qmd`: twenty-eight Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
+- `vignettes/NN_name/NN_name.qmd`: twenty-nine Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
-  multi-attribute utilities on the toy simulator), 25 `survey_or_act` on synthetic parcels, 26 `value_of_waiting` on an invented outbreak, 27 `adaptive_management` on an invented colony, 28 the same with a state that moves (`transitions`) on an invented reserve, and 16 to 20 and 22 to 24 the replications of published analyses
+  multi-attribute utilities on the toy simulator), 25 `survey_or_act` on synthetic parcels, 26 `value_of_waiting` on an invented outbreak, 27 `adaptive_management` on an invented colony, 28 the same with a state that moves (`transitions`) on an invented reserve, and 16 to 20, 22 to 24 and 29 the replications of published analyses
   (`NN_replication_*`: Shea et al. 2014, Runge et al. 2011, Eze et al. 2023, Li et al. 2021, Luhede et al.
   2024; `docs/make.jl` lists them under a heading of their own), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for

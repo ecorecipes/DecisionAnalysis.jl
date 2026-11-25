@@ -166,6 +166,7 @@ were written by the Julia package itself, and those for the two proposed schemas
 | `Finite/Waiting.lean` | The value of waiting to learn (`value_of_waiting`): its split into information and delay, and the bound by the EVSI of acting now |
 | `Finite/Adaptive.lean` | Sequential adaptive management (`adaptive_management`): the recursion is the best policy, and no learning ≤ passive ≤ active ≤ perfect information |
 | `Finite/AdaptiveDynamic.lean` | The same for a state that moves between periods (`transitions`): best fixed plan ≤ replanning with updating ≤ best policy ≤ the state seen before every action |
+| `Finite/ValueVectors.lean` | The value of the best policy is a maximum of finitely many linear functions of the belief, and one step of the recursion on those vectors (`method = :vectors`); a vector matched by a mixture of others is never needed |
 | `Theory/FiniteKernels.lean` | The link to `FiniteKernelsProofs` kernels at `K = ℝ` |
 | `Certificate/Check.lean` | The decision-certificate checker and its soundness |
 | `Certificate/Witness.lean` | The garbling and E-admissibility witness checkers and their soundness |

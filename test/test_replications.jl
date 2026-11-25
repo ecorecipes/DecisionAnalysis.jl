@@ -83,7 +83,7 @@ end
 @testset "replications of published analyses" begin
     @testset "every fixture states its provenance" begin
         files = filter(endswith(".json"), readdir(REPLICATIONS))
-        @test length(files) == 8
+        @test length(files) == 9
         for f in files
             fix = JSON.parse(read(joinpath(REPLICATIONS, f), String))
             for key in ("citation", "doi", "licence", "retrieved", "decision", "unit",
@@ -747,6 +747,133 @@ end
         @test all(row -> best(row, 1)[1] == [1], pilbara)
         @test [best(row, 1)[2] for row in pilbara[1:6]] == [1, 1, 1, 1, 1, 2]
         @test all(row -> best(row, 2) == ([1, 2], 1), pilbara)
+    end
+
+    @testset "Chadès et al. 2008, a cryptic tiger population" begin
+        fix = replication("chades2008_tiger")
+        actions, states = symbols(fix["actions"]), symbols(fix["states"])
+        @test contains("signal_of = :next")(fix["model"]["observation"])
+        # The model from one set of printed values; `detection` replaces the detection
+        # probability of a survey.
+        function tiger(from; detection=nothing, T=BigRat)
+            number(key) = T(exact_number(from[key]))
+            V, cm, cs = number("value"), number("cost_manage"), number("cost_survey")
+            d = detection === nothing ? number("detection_surveyed") : T(detection)
+            d0 = number("detection_not_surveyed")
+            # Reward: V while extant, less the cost of the action (the fixture's reading).
+            table = PayoffTable(actions, states, T[V 0; V-cm -cm; V-cs -cs])
+            dies(q) = T[1-q 0; q 1]                       # extinction is absorbing
+            moves = (; nothing=dies(number("extinction_unmanaged")),
+                     manage=dies(number("extinction_managed")),
+                     survey=dies(number("extinction_unmanaged")))
+            looks(q) = Experiment(T[1-q 1; q 0]; signals=symbols(fix["signals"]), states)
+            seen = (; nothing=looks(d0), manage=looks(d0), survey=looks(d))
+            return table, moves, seen
+        end
+        function solved(table, moves, seen; horizon, kwargs...)
+            T = eltype(table.Q)
+            return adaptive_management(DecisionProblem(table, T[1, 0]; baseline=:nothing),
+                                       seen; horizon, transitions=moves, signal_of=:next,
+                                       depth=0, kwargs...)
+        end
+        # What is done year by year after a sighting with `years` to go, if the species
+        # is never seen again, and the belief before each decision.
+        function unobserved(result, moves, seen, years)
+            T = eltype(first(moves))
+            belief, path, beliefs = T[1, 0], Symbol[], T[]
+            for n in years:-1:1
+                pieces = result.value_function[n]
+                a = pieces.actions[argmax(pieces.vectors * belief)]
+                push!(path, a)
+                push!(beliefs, belief[1])
+                joint = (moves[a] * belief) .* seen[a].likelihood[1, :]
+                belief = joint ./ sum(joint)
+            end
+            return path, beliefs
+        end
+        spell(path, a) = count(==(a), path)
+        # The belief at which surveying gives way to managing with n years to go: where
+        # the highest survey line meets the highest manage line.
+        function switch_to_manage(result, n)
+            pieces = result.value_function[n]
+            G = pieces.vectors
+            order = sortperm([G[i, 1] - G[i, 2] for i in axes(G, 1)])
+            i, j = only((i, j)
+                        for (i, j) in zip(order[1:(end - 1)], order[2:end])
+                        if pieces.actions[i] == :survey && pieces.actions[j] == :manage)
+            return (G[j, 2] - G[i, 2]) / ((G[i, 1] - G[i, 2]) - (G[j, 1] - G[j, 2]))
+        end
+
+        table, moves, seen = tiger(fix["table_s1"])
+        long = solved(table, moves, seen; horizon=100, method=:vectors, passive=false)
+        @test long.passive === nothing && long.value_of_probing === nothing
+        # The value function is a handful of lines, where the beliefs are beyond count.
+        @test all(size(pieces.vectors, 1) <= 20 for pieces in long.value_function)
+        path, beliefs = unobserved(long, moves, seen, 100)
+        # The published schedule: manage, then survey, then stop.
+        @test path == vcat(fill(:manage, 12), fill(:survey, 3), fill(:nothing, 85))
+        @test spell(path, :manage) == target(fix, "years_managing")["value"]
+        @test spell(path, :survey) == target(fix, "years_surveying")["value"]
+        # The value function with n years to go does not depend on the horizon, so the
+        # one run gives the schedule for every shorter horizon.
+        schedules = map(1:100) do years
+            shorter, _ = unobserved(long, moves, seen, years)
+            return (spell(shorter, :manage), spell(shorter, :survey))
+        end
+        ours = fix["ours"]
+        pair(d) = (d["managing"], d["surveying"])
+        @test schedules[30] == pair(ours["thirty_years"]) == (11, 2)
+        @test schedules[60] == pair(ours["sixty_years"])
+        @test schedules[100] == pair(ours["hundred_years"])
+        @test findfirst(h -> all(==((12, 3)), schedules[h:end]), 1:100) ==
+              ours["first_horizon_with_published_schedule"]
+        # Why 30 years gives 11: the belief after 11 unobserved years of managing lies
+        # between the switching belief with 19 years left and the long-run one.
+        thirty, thirty_beliefs = unobserved(long, moves, seen, 30)
+        @test thirty[12] == :survey
+        @test round(Float64(thirty_beliefs[12]); digits=3) == 0.501
+        @test round(Float64(switch_to_manage(long, 19)); digits=3) == 0.519
+        @test round(Float64(switch_to_manage(long, 100)); digits=3) == 0.491
+        @test switch_to_manage(long, 100) < thirty_beliefs[12] < switch_to_manage(long, 19)
+        # SI Appendix: with one year left surveying is never optimal (nor is managing).
+        @test long.value_function[1].actions == [:nothing]
+        @test all(!(:survey in long.value_function[n].actions) for n in 1:3)
+
+        # The two methods agree exactly where both can run, and the four values are in
+        # order.
+        short_beliefs = solved(table, moves, seen; horizon=8)
+        short_vectors = solved(table, moves, seen; horizon=8, method=:vectors)
+        for field in (:no_learning, :passive, :active, :perfect, :baseline, :plan,
+                      :first_action)
+            @test getfield(short_beliefs, field) == getfield(short_vectors, field)
+        end
+        full = solved(table, moves, seen; horizon=30, method=:vectors)
+        @test full.baseline < full.no_learning <= full.passive < full.active < full.perfect
+        @test full.active == long.value_function[30].vectors[1, 1] ||
+              full.active == maximum(long.value_function[30].vectors[:, 1])
+        # In floating point the schedule is the same.
+        ftable, fmoves, fseen = tiger(fix["table_s1"]; T=Float64)
+        floating = solved(ftable, fmoves, fseen; horizon=100, method=:vectors,
+                          passive=false)
+        @test first(unobserved(floating, fmoves, fseen, 100)) == path
+        @test floating.active ≈ long.active rtol = 1e-12
+
+        # The rounded values of the main text give the same schedules.
+        mtable, mmoves, mseen = tiger(fix["main_text_values"])
+        rounded = solved(mtable, mmoves, mseen; horizon=100, method=:vectors,
+                         passive=false)
+        main100, _ = unobserved(rounded, mmoves, mseen, 100)
+        main30, _ = unobserved(rounded, mmoves, mseen, 30)
+        @test (spell(main100, :manage), spell(main100, :survey)) == (12, 3)
+        @test (spell(main30, :manage), spell(main30, :survey)) == (11, 2)
+
+        # Fig. S2: with perfect detection one survey settles it.
+        ptable, pmoves, pseen = tiger(fix["table_s1"]; detection=1)
+        perfect = solved(ptable, pmoves, pseen; horizon=100, method=:vectors,
+                         passive=false)
+        sure, _ = unobserved(perfect, pmoves, pseen, 100)
+        @test spell(sure, :survey) ==
+              target(fix, "years_surveying_perfect_detection")["value"]
     end
 
     @testset "the functions added for the replications" begin

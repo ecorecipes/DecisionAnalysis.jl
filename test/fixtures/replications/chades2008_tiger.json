@@ -1,0 +1,56 @@
+{
+  "name": "chades2008_tiger",
+  "citation": "Chades I, McDonald-Madden E, McCarthy MA, Wintle B, Linkie M, Possingham HP (2008) When to stop managing or surveying cryptic threatened species. Proceedings of the National Academy of Sciences 105(37):13936-13940",
+  "doi": "10.1073/pnas.0805265105",
+  "licence": "All rights reserved (copyright 2008 by The National Academy of Sciences of the USA); only the parameter values of Table S1 and the published schedule are transcribed, as facts, with their source",
+  "retrieved": "2026-11-25, article PDF, SI Appendix PDF and supporting information PDF (Table S1, Table S2, Figs. S1 and S2) supplied by the user; Table S1 read from a text extraction of the supporting information and compared with the text of the SI Appendix, which restates the same values",
+  "decision": "In each year, whether to manage a reserve for a cryptic threatened species (the Sumatran tiger in Kerinci Seblat National Park), survey for it, or do nothing, when it is not known whether the species is still there",
+  "unit": "US dollars per year (the paper's valuation: V is the donor funding raised for tiger conservation in the park, the costs are field costs of patrols and surveys); nothing is discounted",
+  "baseline": "nothing",
+  "actions": ["nothing", "manage", "survey"],
+  "action_names": {"nothing": "do nothing (surrender)", "manage": "manage (anti-poaching patrols)", "survey": "survey"},
+  "states": ["extant", "extinct"],
+  "signals": ["absent", "present"],
+  "table_s1": {
+    "provenance": "Table S1 of the supporting information, 'Parameters for Sumatran tigers in Kerinci Seblat National Park'",
+    "extinction_unmanaged": "0.1",
+    "extinction_managed": "0.05816",
+    "detection_not_surveyed": "0.01",
+    "detection_surveyed": "0.78193",
+    "value": "175133",
+    "cost_manage": "18784",
+    "cost_survey": "10840"
+  },
+  "model": {
+    "transitions": "Extinction is absorbing (Methods: P(Extinct | Extinct, .) = 1). An extant population goes extinct in a year with probability 0.05816 if managed and 0.1 otherwise (survey or nothing).",
+    "observation": "The species is detected only if extant, with probability 0.78193 when surveyed and 0.01 when managed or left alone. The belief update of the SI Appendix (equations 3 to 5) applies the observation to the state after the year's transition, which is signal_of = :next.",
+    "reward": "Transcriber's reading: the paper prints no reward table. Methods say the reward function 'defines for each pair action-state the cost of an action and the benefits of a state (see Table S1)', and equations 1 and 2 of the SI Appendix take the reward on the current state. So the reward of a year is V if the species is extant, less the cost of the action taken, and minus that cost if it is extinct.",
+    "horizon": "30 years (caption of Fig. 2); no discount factor appears in the paper or in equations 1 and 2"
+  },
+  "main_text_values": {
+    "provenance": "Results, third paragraph of the article; these differ slightly from Table S1 and are not used",
+    "extinction_unmanaged": "0.1",
+    "extinction_managed": "0.058",
+    "detection_not_surveyed": "0.01",
+    "detection_surveyed": "0.78",
+    "value": "175134",
+    "cost_manage": "18744",
+    "cost_survey": "10870"
+  },
+  "targets": [
+    {"id": "years_managing", "value": 12, "tolerance": 0, "where": "Results and caption of Fig. 1: 'the optimal strategy is to manage it for 12 years from this time'"},
+    {"id": "years_surveying", "value": 3, "tolerance": 0, "where": "Results and caption of Fig. 1: 'unobserved for a further 3 years of dedicated surveying'"},
+    {"id": "years_surveying_perfect_detection", "value": 1, "tolerance": 0, "where": "Caption of Fig. S2: 'When detectability is perfect, we survey only once before surrendering (species absent) or managing (species present)'"}
+  ],
+  "resolution": "The published 12 and 3 are the schedule of the decision graph of Fig. 1, which is what our exact solution gives once enough years remain: 12 years of managing and 3 of surveying after a sighting for every horizon from 57 years up (checked to 100). For a sighting with exactly 30 years to go, the horizon of Fig. 2, our exact solution gives 11 years of managing and 2 of surveying, because the switching beliefs still depend on the years left: after 11 unobserved years of managing the belief is 0.501 and the switch to surveying is at 0.519 with 19 years left but 0.491 in the long run. The same holds with the rounded values of the main text.",
+  "ours": {
+    "thirty_years": {"managing": 11, "surveying": 2},
+    "sixty_years": {"managing": 12, "surveying": 3},
+    "hundred_years": {"managing": 12, "surveying": 3},
+    "first_horizon_with_published_schedule": 57
+  },
+  "not_replicated": {
+    "items": "The analytic approximations for the switching beliefs and durations (equations in Methods and the SI Appendix), the curves of Figs. 3, 4, S1 and S2, and the species of Table S2",
+    "reason": "The approximations are printed as images whose text extraction is not reliable enough to transcribe, the figures give no numbers, and Table S2 gives only ratios of value to cost for other species without their extinction or detection probabilities."
+  }
+}

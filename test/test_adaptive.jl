@@ -471,3 +471,163 @@ end
         refused(; signal_of=:later)
     end
 end
+
+# The value function as a set of lines (method = :vectors; Lean:
+# Finite/ValueVectors.lean), against the recursion over beliefs, which shares none of
+# its code beyond the one-step look-ahead.
+@testset "adaptive management by vectors" begin
+    @testset "the upper envelope" begin
+        prune(G) = DecisionAnalysis._prune_vectors(G, collect(1:size(G, 1)))
+        # A row is (value in state 1, value in state 2): a line from G[i, 1] at x = 0
+        # to G[i, 2] at x = 1, where x is the probability of state 2.
+        G = [4 0; 0 4; 3 3; 2 2; 1 1; 4 0; 3 1; 5//2 5//2]
+        kept, tags = prune(G)
+        @test tags == [1, 2, 3]                 # 4 and 5 lie below; 6 repeats 1;
+        @test kept == G[[1, 2, 3], :]           # 7 lies under the envelope; 8 under 3
+        # A line that only touches the envelope where two others cross is not needed.
+        @test last(prune([4 0; 0 4; 2 2])) == [1, 2]
+        # One that is the highest only at an end point is not needed either.
+        @test last(prune([4 0; 4 -1])) == [1]
+        @test last(prune([0 4; -1 4; 4 0])) == [1, 3]
+        @test last(prune([1 1; 1 1])) == [1]
+        @test last(prune(reshape([7, 9], 1, 2))) == [1]
+        # The maximum is unchanged at every belief of a grid.
+        rng = Random.Xoshiro(20261203)
+        for trial in 1:200
+            G = rand(rng, -5:5, rand(rng, 1:12), 2) .// 1
+            kept, tags = prune(G)
+            @test kept == G[tags, :] && issorted(tags) && allunique(tags)
+            for x in 0:(1 // 24):1
+                @test maximum(kept * [1 - x, x]) == maximum(G * [1 - x, x])
+            end
+            # Every line kept is the only maximum somewhere.
+            for i in axes(kept, 1)
+                @test any(x -> all(kept[i, :]' * [1 - x, x] > kept[j, :]' * [1 - x, x]
+                                   for j in axes(kept, 1) if j != i),
+                          0:(1 // 840):1)
+            end
+        end
+    end
+
+    @testset "against the recursion over beliefs" begin
+        rng = Random.Xoshiro(20261204)
+        many = 0
+        for trial in 1:200
+            m = rand(rng, 2:4)
+            base = exact_problem(rng, m, 2)
+            p = probabilities(base.belief)
+            Q = base.payoff.Q
+            horizon = rand(rng, 1:5)
+            discount = rand(rng, (1, 1, 9 // 10, 1 // 2, 0))
+            signal_of = rand(rng, (:current, :next))
+            Ls = [rand(rng) < 0.25 ? nothing :
+                  random_stochastic(rng, BigRat, rand(rng, 2:3), 2)
+                  for _ in 1:m]
+            given = [base.payoff.actions[a] => Experiment(Ls[a])
+                     for a in 1:m if Ls[a] !== nothing]
+            Ts = rand(rng) < 0.3 ? fill(nothing, m) :
+                 [random_stochastic(rng, BigRat, 2, 2) for _ in 1:m]
+            transitions = Ts[1] === nothing ? nothing :
+                          [base.payoff.actions[a] => Ts[a] for a in 1:m]
+            function run(; kwargs...)
+                return adaptive_management(base, given; horizon, discount,
+                                           transitions, signal_of, kwargs...)
+            end
+            slow, fast = run(), run(; method=:vectors)
+            for field in (:no_learning, :passive, :active, :perfect, :value_of_learning,
+                          :value_of_probing, :evpi, :baseline, :act_now_action,
+                          :first_action, :plan, :policy)
+                @test getfield(slow, field) == getfield(fast, field)
+            end
+            @test slow.value_function === nothing
+            @test length(fast.value_function) == horizon
+            many += size(fast.value_function[end].vectors, 1) > 2
+            # The lines for n periods left give the value at any belief, and the action
+            # of the highest line is a best first action there.
+            for n in 1:horizon
+                pieces = fast.value_function[n]
+                q = random_stochastic(rng, BigRat, 2, 1)[:, 1]
+                top, row = findmax(pieces.vectors * q)
+                @test top ==
+                      adaptive_management(DecisionProblem(base.payoff, q), given;
+                                          horizon=n, discount, transitions, signal_of,
+                                          depth=0, passive=false).active
+                a = findfirst(==(pieces.actions[row]), base.payoff.actions)
+                later = n == 1 ? 0 :
+                        sum(pz * maximum(fast.value_function[n - 1].vectors * post)
+                            for (pz, post) in oracle_moved(q, Ls[a], Ts[a], signal_of))
+                @test oracle_expected_utility(Q, q)[a] + discount * later == top
+            end
+            # Without the passive manager.
+            bare = run(; method=:vectors, passive=false)
+            @test bare.passive === nothing && bare.value_of_probing === nothing
+            @test bare.active == slow.active && bare.no_learning == slow.no_learning
+            @test run(; passive=false).passive === nothing
+            # Floating point.
+            fl = adaptive_management(DecisionProblem(PayoffTable(base.payoff.actions,
+                                                                 base.payoff.states,
+                                                                 Float64.(Q)),
+                                                     Float64.(p)),
+                                     [a => Experiment(Float64.(e.likelihood))
+                                      for (a, e) in given]; horizon,
+                                     discount=Float64(discount),
+                                     transitions=transitions === nothing ? nothing :
+                                                 [a => Float64.(T)
+                                                  for (a, T) in transitions], signal_of,
+                                     method=:vectors)
+            @test fl.active ≈ slow.active atol = 1e-9
+            @test fl.passive ≈ slow.passive atol = 1e-9
+            @test fl.no_learning ≈ slow.no_learning atol = 1e-9
+        end
+        @test many > 0
+    end
+
+    @testset "long horizons" begin
+        # A reserve that a weed can invade (vignette 28), in exact arithmetic: 60 years,
+        # far beyond what the recursion over beliefs can reach.
+        table = PayoffTable([:none, :inspect, :treat], [:clear, :infested],
+                            BigRat[50 20; 48 18; 40 10])
+        untreated = BigRat[23//25 0; 2//25 1]
+        treated = BigRat[23//25 391//500; 2//25 109//500]
+        moves = (; none=untreated, inspect=untreated, treat=treated)
+        noticed(d) = Experiment(BigRat[1 1-d; 0 d]; signals=[:not_seen, :seen])
+        seen = (; none=noticed(1 // 5), inspect=noticed(9 // 10), treat=noticed(9 // 10))
+        problem = DecisionProblem(table, BigRat[9 // 10, 1 // 10]; baseline=:none)
+        far = adaptive_management(problem, seen; horizon=60, transitions=moves, depth=2,
+                                  method=:vectors, passive=false)
+        @test far.baseline < far.no_learning < far.active < far.perfect
+        @test length(far.plan) == 60 && count(==(:treat), far.plan) > 5
+        @test !(:inspect in far.plan)                 # a fixed plan never inspects
+        @test far.first_action == :inspect
+        @test size(far.value_function[60].vectors, 1) < 200
+        # The lines for 8 years left are those of an 8-year problem.
+        eight = adaptive_management(problem, seen; horizon=8, transitions=moves, depth=0)
+        @test maximum(far.value_function[8].vectors * BigRat[9 // 10, 1 // 10]) ==
+              eight.active
+        # A fixed state with repeated trials is the case where the beliefs coincide and
+        # the lines are as many as the beliefs: the two methods agree, and the
+        # recursion over beliefs is the one to use.
+        arms = PayoffTable([:old, :new], [:worse, :better],
+                           BigRat[1//2 1//2; 3//10 7//10])
+        trial = DecisionProblem(arms, BigRat[3 // 5, 2 // 5]; baseline=:old)
+        outcome = Experiment(BigRat[7//10 3//10; 3//10 7//10];
+                             signals=[:failure, :success])
+        slow = adaptive_management(trial, (; new=outcome); horizon=16, depth=0)
+        fast = adaptive_management(trial, (; new=outcome); horizon=16, depth=0,
+                                   method=:vectors)
+        @test slow.active == fast.active && slow.passive == fast.passive
+        @test size(fast.value_function[16].vectors, 1) > 50
+    end
+
+    @testset "what is refused" begin
+        three = DecisionProblem(PayoffTable([:a, :b], [:x, :y, :z], [1 0 0; 0 1 1]),
+                                [1 // 3, 1 // 3, 1 // 3])
+        e3 = Experiment([1 0 0; 0 1 1])
+        @test_throws ArgumentError adaptive_management(three, e3; horizon=2,
+                                                       method=:vectors)
+        @test adaptive_management(three, e3; horizon=2).active == 5 // 3   # 2/3, then 1
+        two = DecisionProblem(PayoffTable([:a, :b], [:x, :y], [1 0; 0 1]), [1 // 2, 1 // 2])
+        @test_throws ArgumentError adaptive_management(two, Experiment([1 0; 0 1]);
+                                                       horizon=2, method=:grid)
+    end
+end

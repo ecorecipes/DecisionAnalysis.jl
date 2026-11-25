@@ -64,7 +64,8 @@ module DecisionAnalysis
 using JuMP: JuMP
 using FiniteKernels: FiniteKernels, FiniteKernel, FiniteSpace, axis_names, factors,
                      joint_states, kernel_matrix
-using LinearAlgebra: ColumnNorm, Symmetric, cholesky, dot, eigen, issuccess, logdet, qr, tr
+using LinearAlgebra: ColumnNorm, Diagonal, I, Symmetric, cholesky, dot, eigen, issuccess,
+                     logdet, qr, tr
 using Random: AbstractRNG, Xoshiro, randn!, shuffle!
 using Statistics: mean
 using Logging: NullLogger, with_logger

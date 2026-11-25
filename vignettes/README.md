@@ -29,6 +29,7 @@ Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTM
 | 26 | [Act now, or wait and learn?](26_value_of_waiting/26_value_of_waiting.md) | `value_of_waiting` on an invented outbreak in a herd: the value of a test result to the late decision, the cost of the delay, the best length of wait, and why EVSI with the delay ignored overstates |
 | 27 | [Learning while managing](27_adaptive_management/27_adaptive_management.md) | `adaptive_management` on an invented bird colony: no learning, passive and active adaptive management and perfect information over several years, the value of updating against the value of probing, the policy tree, and how both depend on the horizon and the prior |
 | 28 | [Managing a state that changes](28_changing_state/28_changing_state.md) | `adaptive_management` with `transitions` on an invented reserve and weed: the fixed plan as a schedule, why the passive manager must plan ahead, an inspection as an action taken only to learn, and which state the signal is about |
+| 29 | [Replication: when to stop managing or surveying a cryptic species](29_replication_chades_tiger/29_replication_chades_tiger.md) | Chadès et al. 2008, the Sumatran tiger: the published schedule (manage 12 years, survey 3, stop) reproduced exactly as the long-run solution with `adaptive_management`, `transitions` and `method=:vectors`; 11 and 2 for a strict 30-year horizon, and why |
 
 ## Replications of published analyses
 

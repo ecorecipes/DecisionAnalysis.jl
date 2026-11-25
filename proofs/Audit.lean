@@ -163,6 +163,13 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.openLoopValue_le_dynamicPolicyValue
 #print axioms DecisionAnalysisProofs.openLoopValue_le_dynamicValue
 #print axioms DecisionAnalysisProofs.dynamicValue_le_sum_observedValue
+-- The value function as a maximum of linear functions (`method = :vectors`).
+#print axioms DecisionAnalysisProofs.sum_maxOver_eq_maxOver_sum
+#print axioms DecisionAnalysisProofs.mixture_le_maxOver
+#print axioms DecisionAnalysisProofs.le_maxOver_of_le_mixture
+#print axioms DecisionAnalysisProofs.sum_mul_backupVector
+#print axioms DecisionAnalysisProofs.dynamicValue_succ_of_vectors
+#print axioms DecisionAnalysisProofs.exists_vectors_dynamicValue
 
 -- T8: minimax regret and independence of irrelevant alternatives.
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaSmall_iff

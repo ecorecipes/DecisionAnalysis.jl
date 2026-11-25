@@ -225,7 +225,23 @@ md_table(["years", "beliefs evaluated"],
 
 With a moving state the beliefs reached by different histories rarely coincide, so
 their number grows with every year. This reserve, with two signals and three actions,
-is practical to about twelve years.
+is practical to about twelve years in this way. With two states there is a second
+exact method, `method=:vectors`, which keeps the value function as a small set of
+lines and is not limited like this:
+
+```{julia}
+sixty = adaptive_management(problem, seen; horizon=60, transitions=moves, depth=0,
+                            method=:vectors, passive=false)
+md_table(["quantity, 60 years", "value"],
+         [["breeding pairs, fixed plan", sixty.no_learning],
+          ["breeding pairs, active adaptive management", sixty.active],
+          ["breeding pairs, state seen every year", sixty.perfect],
+          ["lines in the value function", size(sixty.value_function[60].vectors, 1)],
+          ["treatments in the fixed plan", count(==(:treat), sixty.plan)]]; digits=1)
+```
+
+The [next vignette](../29_replication_chades_tiger/29_replication_chades_tiger.md)
+uses it to reproduce a published 30-year analysis.
 
 ## What to take from this
 
