@@ -80,10 +80,102 @@ function bal_experiment(q, species; manage=nothing, alpha=0.0, beta=0.0)
                       states=BAL_STATES)
 end
 
+# The epidemic of Atkins et al. 2020 (fixture atkins2020_vaccination): a deterministic
+# SEIR model in which susceptibles are vaccinated at a fixed daily rate while a campaign
+# runs and the pool lasts. The state is (S, E, I, R, new infections, vaccines given).
+function atkins_rates(u, p, vaccinating)
+    S, E, I = u[1], u[2], u[3]
+    given = vaccinating && u[6] < p.pool ? min(p.per_day, max(S, 0.0)) : 0.0
+    infection = p.beta * S * I / p.N
+    return (-infection - p.efficacy * given, infection - p.sigma * E,
+            p.sigma * E - p.gamma * I, p.gamma * I + p.efficacy * given, infection, given)
+end
+function atkins_step(u, p, vaccinating, dt)
+    k1 = atkins_rates(u, p, vaccinating)
+    k2 = atkins_rates(u .+ dt / 2 .* k1, p, vaccinating)
+    k3 = atkins_rates(u .+ dt / 2 .* k2, p, vaccinating)
+    k4 = atkins_rates(u .+ dt .* k3, p, vaccinating)
+    return u .+ dt / 6 .* (k1 .+ 2 .* k2 .+ 2 .* k3 .+ k4)
+end
+# Duration, new infections and vaccines given from the day of detection (20 infected)
+# for a campaign that runs from day `from` to day `to`.
+function atkins_campaign(p, from, to; dt=0.01)
+    u = (5000.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+    while u[3] < 20
+        u = atkins_step(u, p, false, dt)
+    end
+    u, t = (u[1], u[2], u[3], u[4], 0.0, 0.0), 0.0
+    while u[2] + u[3] >= 1
+        u = atkins_step(u, p, from <= t < to, dt)
+        t += dt
+    end
+    return (; days=t, infections=u[5], vaccines=min(u[6], p.pool))
+end
+# The cost of each of the four campaigns at each efficacy, and the two-period problem:
+# a state is an efficacy together with what was done in the first week, the first
+# period pays nothing and moves the state, the second pays minus the cost of the whole
+# campaign, and vaccinating shows the successes among the monitored vaccinations.
+function atkins_problem(s; monitored=35, bins=100, decision_day=7.0)
+    number(key) = Float64(exact_number(s[key]))
+    efficacies = [(k - 0.5) / bins for k in 1:bins]
+    prior = [x^0.1 * (1 - x)^0.1 for x in efficacies]
+    prior ./= sum(prior)
+    campaigns = (vaccinate_vaccinate=(0.0, Inf), vaccinate_not=(0.0, decision_day),
+                 not_vaccinate=(decision_day, Inf), not_not=(0.0, 0.0))
+    cost = map(campaigns) do (from, to)
+        return map(efficacies) do efficacy
+            p = (; beta=number("beta"), sigma=number("sigma"), gamma=number("gamma"),
+                 N=5001.0, efficacy, per_day=100.0, pool=number("pool"))
+            run = atkins_campaign(p, from, to)
+            return number("weight_duration") * run.days +
+                   number("weight_infection") * run.infections +
+                   number("weight_vaccine") * run.vaccines +
+                   number("weight_campaign") * (to > from)
+        end
+    end
+    n = bins
+    states = vcat([Symbol(phase, k) for phase in (:start, :vaccinated, :waited)
+                   for k in 1:n])
+    Q = zeros(2, 3n)
+    Q[1, (n + 1):(2n)], Q[2, (n + 1):(2n)] = -cost.vaccinate_vaccinate, -cost.vaccinate_not
+    Q[1, (2n + 1):(3n)], Q[2, (2n + 1):(3n)] = -cost.not_vaccinate, -cost.not_not
+    vaccinating, waiting = zeros(3n, 3n), zeros(3n, 3n)
+    for k in 1:n
+        vaccinating[n + k, k] = waiting[2n + k, k] = 1
+        for later in (n + k, 2n + k)
+            vaccinating[later, later] = waiting[later, later] = 1
+        end
+    end
+    likelihood = [binomial(monitored, x) * e^x * (1 - e)^(monitored - x)
+                  for x in 0:monitored, e in repeat(efficacies, 3)]
+    seen = (;
+            vaccinate=Experiment(likelihood;
+                                 signals=[Symbol("successes", x)
+                                          for x in 0:monitored], states))
+    problem = DecisionProblem(PayoffTable([:vaccinate, :not], states, Q),
+                              vcat(prior, zeros(2n)); baseline=:not)
+    return (; problem, seen, moves=(; vaccinate=vaccinating, not=waiting), cost, prior,
+            efficacies)
+end
+function atkins_solve(m)
+    return adaptive_management(m.problem, m.seen; horizon=2, transitions=m.moves,
+                               depth=2)
+end
+# The fewest successes after which the active manager continues vaccinating.
+function atkins_successes_needed(result)
+    continued = [parse(Int, String(z)[10:end])
+                 for (z, node) in result.policy.branches
+                 if node.action == :vaccinate]
+    stopped = [parse(Int, String(z)[10:end])
+               for (z, node) in result.policy.branches
+               if node.action == :not]
+    @assert maximum(stopped) < minimum(continued)
+    return minimum(continued)
+end
 @testset "replications of published analyses" begin
     @testset "every fixture states its provenance" begin
         files = filter(endswith(".json"), readdir(REPLICATIONS))
-        @test length(files) == 10
+        @test length(files) == 11
         for f in files
             fix = JSON.parse(read(joinpath(REPLICATIONS, f), String))
             for key in ("citation", "doi", "licence", "retrieved", "decision", "unit",
@@ -981,6 +1073,78 @@ end
             end
             published = target(fix, id)["value"]
             @test !any(wins(action, c) == published for c in unique(combinations))
+        end
+    end
+
+    @testset "Atkins et al. 2020, vaccinating under unknown efficacy" begin
+        fix = replication("atkins2020_vaccination")
+        choices = fix["published_choices"]
+        expected(m, costs) = sum(m.prior .* costs)
+        crossover(m) = m.efficacies[findfirst(m.cost.vaccinate_vaccinate .<
+                                              m.cost.vaccinate_not)] - 0.005
+
+        # Scenario 1: cost in units of one infection.
+        one = atkins_problem(fix["table_a2"]["scenario1"])
+        r1 = atkins_solve(one)
+        published = choices["scenario1"]
+        # The paper's non-adaptive manager compares only the full campaign with none.
+        @test expected(one, one.cost.not_not) < expected(one, one.cost.vaccinate_vaccinate)
+        @test symbols(published["non_adaptive"]) == [:not, :not] == r1.plan
+        # Passive: on the prior, stopping is worse than continuing and a late start
+        # worse than none, so the first action is not to vaccinate, and nothing is seen.
+        @test r1.act_now_action == Symbol(published["passive_first"]) == :not
+        @test r1.passive == r1.no_learning ≈ r1.baseline
+        @test r1.first_action == Symbol(published["active_first"]) == :vaccinate
+        @test atkins_successes_needed(r1) == target(fix, "s1_successes_needed")["value"]
+        @test agrees(crossover(one), fix, "s1_crossover_efficacy")
+        @test r1.value_of_probing > 100                      # "over 100 units"
+        @test agrees(100 * r1.value_of_probing / -r1.passive, fix, "s1_gain_percent")
+        @test isapprox(r1.value_of_probing, fix["ours"]["scenario1"]["gain_units"];
+                       atol=0.5)
+        @test r1.no_learning <= r1.passive <= r1.active <= r1.perfect
+
+        # Scenario 2: days of outbreak.
+        two = atkins_problem(fix["table_a2"]["scenario2"])
+        r2 = atkins_solve(two)
+        published = choices["scenario2"]
+        @test expected(two, two.cost.vaccinate_vaccinate) < expected(two, two.cost.not_not)
+        @test symbols(published["non_adaptive"]) == [:vaccinate, :vaccinate]
+        # Passive: wait, then vaccinate from day 7. It is the best plan fixed in advance
+        # among the four campaigns, which the paper's non-adaptive manager, with two
+        # campaigns to choose from, does not find.
+        @test r2.plan ==
+              [Symbol(published["passive_first"]),
+               Symbol(published["passive_then"])] == [:not, :vaccinate]
+        @test r2.act_now_action == :not && r2.passive == r2.no_learning
+        @test -r2.no_learning < expected(two, two.cost.vaccinate_vaccinate)
+        @test r2.first_action == Symbol(published["active_first"]) == :vaccinate
+        @test atkins_successes_needed(r2) == target(fix, "s2_successes_needed")["value"]
+        @test agrees(crossover(two), fix, "s2_crossover_efficacy")
+        @test r2.no_learning <= r2.passive < r2.active < r2.perfect
+        # The published gain of the active approach is met against not vaccinating at
+        # all, not against the passive policy that the paper describes.
+        ours = fix["ours"]["scenario2"]
+        against_passive = r2.value_of_probing
+        against_none = r2.active - r2.baseline
+        @test isapprox(against_passive, ours["gain_days_against_passive"]; atol=0.1)
+        @test isapprox(against_none, ours["gain_days_against_no_vaccination"]; atol=0.1)
+        @test agrees(against_none, fix, "s2_gain_days")
+        @test agrees(100 * against_none / -r2.baseline, fix, "s2_gain_percent")
+        @test !agrees(against_passive, fix, "s2_gain_days")
+        @test !agrees(100 * against_passive / -r2.passive, fix, "s2_gain_percent")
+
+        # Section 3.4: "only one monitored vaccination" is enough to make vaccinating at
+        # once the best first action. That holds here in Scenario 1; Scenario 2 needs
+        # three (pinned in the fixture). With none, active and passive are the same.
+        fewest = fix["ours"]["fewest_monitored_for_vaccinating_first"]
+        for scenario in ("scenario1", "scenario2")
+            firsts = map(0:4) do monitored
+                r = atkins_solve(atkins_problem(fix["table_a2"][scenario]; monitored))
+                monitored == 0 && @test r.active ≈ r.passive
+                @test (r.first_action == :vaccinate) == (r.value_of_probing > 1e-9)
+                return r.first_action
+            end
+            @test findfirst(==(:vaccinate), firsts) - 1 == fewest[scenario]
         end
     end
 

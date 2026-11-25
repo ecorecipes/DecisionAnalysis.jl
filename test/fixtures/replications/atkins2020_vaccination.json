@@ -1,0 +1,142 @@
+{
+ "name": "atkins2020_vaccination",
+ "citation": "Atkins BD, Jewell CP, Runge MC, Ferrari MJ, Shea K, Probert WJM, Tildesley MJ (2020) Anticipating future learning affects current control decisions: A comparison between passive and active adaptive management in an epidemiological setting. Journal of Theoretical Biology 506:110380",
+ "doi": "10.1016/j.jtbi.2020.110380",
+ "licence": "CC BY 4.0",
+ "retrieved": "2026-11-25, full text XML from Europe PMC (PMC7511697); Table A.2 and Appendix A read from the XML",
+ "decision": "Whether to vaccinate at the detection of an epidemic and, seven days later, whether to continue (or start) or to stop, when the efficacy of the vaccine is unknown",
+ "unit": "Scenario 1: cost in the paper's units, one unit per infection (0.6 per vaccine given, 350 for running a campaign); Scenario 2: days of outbreak. Both are minimised, so payoffs are minus the cost",
+ "baseline": "not",
+ "actions": [
+  "vaccinate",
+  "not"
+ ],
+ "model": {
+  "provenance": "Section 2.2 and Appendix A.2 to A.5",
+  "population": "5000 susceptible and 1 infected; the epidemic is detected when 20 are infected, which is day 0",
+  "outbreak_ends": "when exposed plus infected fall below 1",
+  "decision_day": "7",
+  "monitored_share": "0.05",
+  "vaccinations_per_day": "100",
+  "prior": "Beta(x0 + 1, y0 + 1) with x0 = y0 = 0.1, that is Beta(1.1, 1.1); expectations by binning efficacy into 1% intervals",
+  "monitored_by_decision_day": 35
+ },
+ "table_a2": {
+  "provenance": "Table A.2, 'Summary of parameters and notation used'",
+  "scenario1": {
+   "beta": "0.23",
+   "sigma": "0.5",
+   "gamma": "0.14",
+   "pool": "2500",
+   "weight_duration": "0",
+   "weight_infection": "1",
+   "weight_vaccine": "0.6",
+   "weight_campaign": "350"
+  },
+  "scenario2": {
+   "beta": "0.2",
+   "sigma": "0.2",
+   "gamma": "0.1",
+   "pool": "4500",
+   "weight_duration": "1",
+   "weight_infection": "0",
+   "weight_vaccine": "0",
+   "weight_campaign": "0"
+  }
+ },
+ "readings": {
+  "transmission": "Equation A.1 prints the force of infection as beta S I; with R0 = 1.6 and 2 quoted for the two scenarios it is beta S I / N, with N = 5001.",
+  "infections": "Equation A.3 prints the infection term of the cost as the integral of I(s) ds, which is person-days of infection. The text calls it 'the number of infections caused by the outbreak', and only that reading, new infections from the day of detection, reproduces the published results; with the integral as printed the cost is about four times larger and vaccinating at once is best under every approach.",
+  "bins": "Efficacy at the midpoints 0.005, 0.015, ..., 0.995 with weights proportional to the Beta density there.",
+  "integration": "Classical Runge-Kutta with a step of 0.01 day (the paper does not name its solver)."
+ },
+ "targets": [
+  {
+   "id": "s1_successes_needed",
+   "value": 14,
+   "tolerance": 0,
+   "where": "Section 3.1: 'If at least 14 of these result in immunity, we would continue vaccination'"
+  },
+  {
+   "id": "s1_crossover_efficacy",
+   "value": 0.4,
+   "tolerance": 0.02,
+   "where": "Section 3.1: continue if the success rate is 'larger than approximately 40%'"
+  },
+  {
+   "id": "s1_gain_percent",
+   "value": 3,
+   "tolerance": 0.6,
+   "where": "Section 3.1: active AM 'would reduce the expected cost of the outbreak by over 100 units (approximately 3%)'"
+  },
+  {
+   "id": "s2_successes_needed",
+   "value": 21,
+   "tolerance": 0,
+   "where": "Section 3.2: 'at least 21 successes from the 35 monitored vaccinations'"
+  },
+  {
+   "id": "s2_crossover_efficacy",
+   "value": 0.6,
+   "tolerance": 0.02,
+   "where": "Section 3.2: 'at efficacies below approximately 60%, it is more effective to stop vaccination'"
+  },
+  {
+   "id": "s2_gain_days",
+   "value": 30,
+   "tolerance": 1.0,
+   "where": "Section 3.2: 'an expected duration that is almost 30 days shorter than if we followed a passive AM approach'",
+   "resolution": "Against the passive policy that the paper itself describes (wait, then vaccinate from day 7; 234.7 days here) our active policy is 14.4 days shorter. Against not vaccinating at all (249.6 days) it is 29.3 days shorter, which is the published figure. So the published difference appears to have been taken from the no-vaccination duration."
+  },
+  {
+   "id": "s2_gain_percent",
+   "value": 12,
+   "tolerance": 0.5,
+   "where": "Section 3.2: 'a decrease of approximately 12%'",
+   "resolution": "6.1% against the passive policy described; 11.7% against not vaccinating. See s2_gain_days."
+  }
+ ],
+ "published_choices": {
+  "provenance": "Sections 3.1 and 3.2",
+  "scenario1": {
+   "non_adaptive": [
+    "not",
+    "not"
+   ],
+   "passive_first": "not",
+   "passive_then": "not",
+   "active_first": "vaccinate"
+  },
+  "scenario2": {
+   "non_adaptive": [
+    "vaccinate",
+    "vaccinate"
+   ],
+   "passive_first": "not",
+   "passive_then": "vaccinate",
+   "active_first": "vaccinate"
+  },
+  "one_monitored_vaccination": "Section 3.4: 'We require only one monitored vaccination to make learning about vaccine efficacy worthwhile, allowing an initial decision to vaccinate to become the optimal decision'"
+ },
+ "ours": {
+  "scenario1": {
+   "gain_units": 115.0,
+   "gain_percent": 3.5
+  },
+  "scenario2": {
+   "gain_days_against_passive": 14.4,
+   "gain_percent_against_passive": 6.1,
+   "gain_days_against_no_vaccination": 29.3,
+   "gain_percent_against_no_vaccination": 11.7
+  },
+  "fewest_monitored_for_vaccinating_first": {
+   "scenario1": 1,
+   "scenario2": 3,
+   "note": "The paper's remark that one monitored vaccination is enough is reproduced in Scenario 1. In Scenario 2 the rebuilt model needs three: with one or two, no result changes the decision to continue, so nothing is gained. The paper's remark sits in a paragraph on both scenarios and its Fig. 11 is not tabulated, so it is not known whether it was meant for Scenario 2."
+  }
+ },
+ "not_replicated": {
+  "items": "The sensitivity analyses of Sections 3.3 to 3.7 (Figs. 6 to 15 and B.16 to B.25) and the absolute expected costs, which appear only in figures",
+  "reason": "No table of outcomes is printed and no code is cited; the model was rebuilt from Appendix A, so only the thresholds, the choices and the quoted differences can be compared."
+ }
+}
