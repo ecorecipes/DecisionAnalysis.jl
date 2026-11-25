@@ -33,9 +33,9 @@ signal of probability zero contributes zero and needs no special case.
   the state from the start. Backs `active ≤ perfect`, that is, the value of learning is at
   most the EVPI of one period times the discounted number of periods.
 
-Not claimed: rewards or experiments that change from period to period, a state that changes
-over time (the recursion is for a fixed unknown state), or anything about how the recursion is
-memoised in the package.
+Not claimed: rewards or experiments that change from period to period, or anything about how
+the recursion is memoised in the package. A state that changes over time is treated in
+`AdaptiveDynamic.lean`; the recursion here is for a fixed unknown state.
 -/
 
 set_option autoImplicit false

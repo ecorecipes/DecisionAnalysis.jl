@@ -20,6 +20,7 @@ import DecisionAnalysisProofs.Finite.Dilation
 import DecisionAnalysisProofs.Finite.SurveyOrAct
 import DecisionAnalysisProofs.Finite.Waiting
 import DecisionAnalysisProofs.Finite.Adaptive
+import DecisionAnalysisProofs.Finite.AdaptiveDynamic
 import DecisionAnalysisProofs.Theory.FiniteKernels
 import DecisionAnalysisProofs.Certificate.Check
 import DecisionAnalysisProofs.Certificate.Witness

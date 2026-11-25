@@ -49,6 +49,7 @@ end
             @test r.evpi == horizon // 2
             @test r.baseline == 0
             @test r.act_now_action == :safe
+            @test r.plan == fill(:safe, horizon)
             @test r.first_action == (horizon == 1 ? :safe : :risky)
         end
         r = adaptive_management(problem, (; risky=shows); horizon=3)
@@ -218,5 +219,255 @@ end
                                                             horizon=2)
         credal = DecisionProblem(table, CredalSet([:bad, :good], [[0.5, 0.5], [0.4, 0.6]]))
         @test_throws BeliefFormError adaptive_management(credal, shows; horizon=2)
+    end
+end
+
+# A state that moves (Lean: Finite/AdaptiveDynamic.lean). Oracles on normalised beliefs,
+# with no memory; the fixed plan is found by listing every sequence of actions.
+function oracle_moved(b, L, T, signal_of)
+    step(x) = T === nothing ? x : T * x
+    L === nothing && return [(one(eltype(b)), step(b))]
+    out = []
+    for z in axes(L, 1)
+        joint = signal_of === :next ? step(b) .* L[z, :] : step(b .* L[z, :])
+        pz = sum(joint)
+        iszero(pz) || push!(out, (pz, joint ./ pz))
+    end
+    return out
+end
+function oracle_moving_active(Q, Ls, Ts, signal_of, discount, n, b)
+    n == 0 && return zero(eltype(b)) * zero(eltype(Q))
+    return maximum(axes(Q, 1)) do a
+        later = sum(pz * oracle_moving_active(Q, Ls, Ts, signal_of, discount, n - 1, post)
+                    for (pz, post) in oracle_moved(b, Ls[a], Ts[a], signal_of))
+        return oracle_expected_utility(Q, b)[a] + discount * later
+    end
+end
+function oracle_plan_value(Q, Ts, discount, plan, b)
+    total = zero(eltype(b)) * zero(eltype(Q))
+    for (t, a) in enumerate(plan)
+        total += discount^(t - 1) * oracle_expected_utility(Q, b)[a]
+        b = Ts[a] === nothing ? b : Ts[a] * b
+    end
+    return total
+end
+# The best fixed plan over n periods: its value and its first action (the first in
+# lexicographic order among the best).
+function oracle_fixed_plan(Q, Ts, discount, n, b)
+    plans = vec(collect(Iterators.product(ntuple(_ -> axes(Q, 1), n)...)))
+    values = [oracle_plan_value(Q, Ts, discount, reverse(plan), b) for plan in plans]
+    top = maximum(values)
+    return top, minimum(last(plan) for (plan, v) in zip(plans, values) if v == top)
+end
+function oracle_replanning(Q, Ls, Ts, signal_of, discount, n, b)
+    n == 0 && return zero(eltype(b)) * zero(eltype(Q))
+    a = last(oracle_fixed_plan(Q, Ts, discount, n, b))
+    later = sum(pz * oracle_replanning(Q, Ls, Ts, signal_of, discount, n - 1, post)
+                for (pz, post) in oracle_moved(b, Ls[a], Ts[a], signal_of))
+    return oracle_expected_utility(Q, b)[a] + discount * later
+end
+function oracle_state_seen(Q, Ts, discount, n, t)
+    n == 0 && return zero(eltype(Q))
+    return maximum(axes(Q, 1)) do a
+        later = Ts[a] === nothing ? oracle_state_seen(Q, Ts, discount, n - 1, t) :
+                sum(Ts[a][s, t] * oracle_state_seen(Q, Ts, discount, n - 1, s)
+                    for s in axes(Q, 2))
+        return Q[a, t] + discount * later
+    end
+end
+
+@testset "adaptive management, a state that moves" begin
+    @testset "by hand" begin
+        # The state alternates for certain, and each action pays 1 in its own state.
+        match = PayoffTable([:for_a, :for_b], [:a, :b], [1 0; 0 1])
+        swap = [0 1; 1 0]
+        nothing_seen = Pair{Symbol,Experiment}[]
+        # Known at the start, so known for ever: the fixed plan alternates.
+        known = DecisionProblem(match, [1, 0]; baseline=:for_a)
+        for horizon in 1:5
+            r = adaptive_management(known, nothing_seen; horizon, transitions=swap)
+            @test r.no_learning == r.passive == r.active == r.perfect == horizon
+            @test r.baseline == cld(horizon, 2)      # :for_a is right every other period
+            @test r.act_now_action == :for_a
+        end
+        # Unknown at the start: without a signal, half of each period; told after the
+        # first period, right from the second on.
+        unknown = DecisionProblem(match, [1 // 2, 1 // 2])
+        tells = Experiment([1 0; 0 1]; signals=[:saw_a, :saw_b])
+        for signal_of in (:current, :next), horizon in 1:5
+            blind = adaptive_management(unknown, nothing_seen; horizon, transitions=swap,
+                                        signal_of)
+            @test blind.no_learning == blind.passive == blind.active == horizon // 2
+            @test blind.perfect == horizon
+            told = adaptive_management(unknown, tells; horizon, transitions=swap,
+                                       signal_of)
+            @test told.no_learning == horizon // 2
+            @test told.passive == told.active == 1 // 2 + (horizon - 1)
+        end
+        # The two conventions name the branch differently: after :saw_a of the current
+        # state the next state is b; after :saw_a of the next state it is a.
+        current = adaptive_management(unknown, tells; horizon=2, transitions=swap)
+        next = adaptive_management(unknown, tells; horizon=2, transitions=swap,
+                                   signal_of=:next)
+        @test Dict(current.policy.branches)[:saw_a].belief == [0, 1]
+        @test Dict(current.policy.branches)[:saw_a].action == :for_b
+        @test Dict(next.policy.branches)[:saw_a].belief == [1, 0]
+        @test Dict(next.policy.branches)[:saw_a].action == :for_a
+    end
+
+    @testset "planning ahead" begin
+        # Sowing pays nothing now and makes the field ready; harvesting pays 3 from a
+        # ready field and empties it. The best action for one period is never to sow.
+        field = PayoffTable([:wait, :sow, :harvest], [:empty, :ready], [0 0; -1 -1; 0 3])
+        problem = DecisionProblem(field, [1, 0]; baseline=:wait)
+        moves = (; wait=[1 0; 0 1], sow=[0 0; 1 1], harvest=[1 1; 0 0])
+        r = adaptive_management(problem, Pair{Symbol,Experiment}[]; horizon=4,
+                                transitions=moves)
+        @test r.no_learning == r.passive == r.active == r.perfect == 4   # sow, harvest ×2
+        @test r.act_now_action == r.first_action == :sow
+        @test r.plan == [:sow, :harvest, :sow, :harvest]
+        @test r.baseline == 0
+    end
+
+    @testset "limits" begin
+        rng = Random.Xoshiro(20261201)
+        for trial in 1:40
+            m, n, nz = rand(rng, 2:3), rand(rng, 2:3), rand(rng, 2:3)
+            base = exact_problem(rng, m, n)
+            p = probabilities(base.belief)
+            Q = base.payoff.Q
+            horizon = rand(rng, 1:4)
+            e = Experiment(random_stochastic(rng, BigRat, nz, n))
+            given = [base.payoff.actions[1] => e]
+            signal_of = rand(rng, (:current, :next))
+            # A state that stays where it is.
+            still = adaptive_management(base, given; horizon,
+                                        transitions=BigRat[i == j for i in 1:n, j in 1:n],
+                                        signal_of)
+            fixed = adaptive_management(base, given; horizon)
+            for field in (:no_learning, :passive, :active, :perfect, :act_now_action,
+                          :first_action)
+                @test getfield(still, field) == getfield(fixed, field)
+            end
+            # A state drawn afresh each period, whatever it was: what is seen of this
+            # period says nothing about the next.
+            fresh = random_stochastic(rng, BigRat, n, 1)[:, 1]
+            mixing = adaptive_management(base, given; horizon,
+                                         transitions=repeat(fresh, 1, n))
+            V0(q) = maximum(oracle_expected_utility(Q, q))
+            @test mixing.active == mixing.passive == mixing.no_learning ==
+                  V0(p) + (horizon - 1) * V0(fresh)
+            @test mixing.perfect ==
+                  V0(p) + oracle_evpi(Q, p) +
+                  (horizon - 1) * (V0(fresh) + oracle_evpi(Q, fresh))
+            # The next state shown after every period, whatever is done.
+            T = random_stochastic(rng, BigRat, n, n)
+            shown = adaptive_management(base,
+                                        Experiment(BigRat[i == j
+                                                          for i in 1:n, j in 1:n]);
+                                        horizon, transitions=T, signal_of=:next)
+            q, total = p, V0(p)
+            for _ in 2:horizon
+                q = T * q
+                total += V0(q) + oracle_evpi(Q, q)
+            end
+            @test shown.active == shown.passive == total
+        end
+    end
+
+    @testset "against the definitions, and the order of the four values" begin
+        rng = Random.Xoshiro(20261202)
+        probes, learns, replans = 0, 0, 0
+        for trial in 1:150
+            m, n = rand(rng, 2:3), rand(rng, 2:3)
+            plain = exact_problem(rng, m, n)
+            base = rand(rng, Bool) ? plain :
+                   DecisionProblem(plain.payoff, plain.belief;
+                                   baseline=plain.payoff.actions[rand(rng, 1:m)])
+            p = probabilities(base.belief)
+            Q = base.payoff.Q
+            horizon = rand(rng, 1:4)
+            discount = rand(rng, (1, 1, 9 // 10, 1 // 2))
+            signal_of = rand(rng, (:current, :next))
+            Ls = [rand(rng) < 0.25 ? nothing :
+                  random_stochastic(rng, BigRat, rand(rng, 2:3), n)
+                  for _ in 1:m]
+            given = [base.payoff.actions[a] => Experiment(Ls[a])
+                     for a in 1:m if Ls[a] !== nothing]
+            shared = rand(rng, Bool)
+            Ts = shared ? fill(random_stochastic(rng, BigRat, n, n), m) :
+                 [random_stochastic(rng, BigRat, n, n) for _ in 1:m]
+            transitions = shared ? Ts[1] : [base.payoff.actions[a] => Ts[a] for a in 1:m]
+            r = adaptive_management(base, given; horizon, discount, transitions,
+                                    signal_of)
+            @test r.active ==
+                  oracle_moving_active(Q, Ls, Ts, signal_of, discount, horizon, p)
+            plan_value, plan_first = oracle_fixed_plan(Q, Ts, discount, horizon, p)
+            @test r.no_learning == plan_value
+            @test r.act_now_action == base.payoff.actions[plan_first] == first(r.plan)
+            @test oracle_plan_value(Q, Ts, discount,
+                                    indexin(r.plan, base.payoff.actions), p) == plan_value
+            @test r.passive ==
+                  oracle_replanning(Q, Ls, Ts, signal_of, discount, horizon, p)
+            @test r.perfect ==
+                  sum(p[t] * oracle_state_seen(Q, Ts, discount, horizon, t) for t in 1:n)
+            # Lean: openLoopValue_le_dynamicPolicyValue, dynamicPolicyValue_le_dynamicValue,
+            # dynamicValue_le_sum_observedValue.
+            @test r.no_learning <= r.passive <= r.active <= r.perfect
+            if base.baseline === nothing
+                @test r.baseline === nothing
+            else
+                b = findfirst(==(base.baseline), base.payoff.actions)
+                @test r.baseline ==
+                      oracle_plan_value(Q, Ts, discount, fill(b, horizon), p)
+                @test r.baseline <= r.no_learning
+            end
+            probes += r.active > r.passive
+            learns += r.passive > r.no_learning
+            # The fixed plan is not one action repeated.
+            replans += r.no_learning >
+                       maximum(oracle_plan_value(Q, Ts, discount, fill(a, horizon), p)
+                               for a in 1:m)
+            node = r.policy
+            @test node.value == r.active && node.belief == p
+            if !isempty(node.branches)
+                @test sum(b.probability for (_, b) in node.branches) == node.probability
+                @test all(sum(b.belief) == 1 for (_, b) in node.branches)
+            end
+            fl = adaptive_management(DecisionProblem(PayoffTable(base.payoff.actions,
+                                                                 base.payoff.states,
+                                                                 Float64.(Q)),
+                                                     Float64.(p)),
+                                     [a => Experiment(Float64.(e.likelihood))
+                                      for (a, e) in given]; horizon,
+                                     discount=Float64(discount),
+                                     transitions=shared ? Float64.(Ts[1]) :
+                                                 [a => Float64.(T)
+                                                  for (a, T) in transitions], signal_of)
+            @test fl.active ≈ r.active atol = 1e-9
+            @test fl.passive ≈ r.passive atol = 1e-9
+            @test fl.no_learning ≈ r.no_learning atol = 1e-9
+            @test fl.perfect ≈ r.perfect atol = 1e-9
+        end
+        @test probes > 0 && learns > 0 && replans > 0
+    end
+
+    @testset "what is refused" begin
+        table = PayoffTable([:safe, :risky], [:bad, :good], [0 0; -3//2 1])
+        problem = DecisionProblem(table, [1 // 2, 1 // 2]; baseline=:safe)
+        shows = Experiment([1 0; 0 1]; signals=[:failed, :worked])
+        refused(; kwargs...) = @test_throws ArgumentError adaptive_management(problem,
+                                                                              shows;
+                                                                              horizon=2,
+                                                                              kwargs...)
+        refused(; transitions=[1 0 0; 0 1 0; 0 0 1])          # wrong size
+        refused(; transitions=[1 1; 1 0])                     # a column sums to 2
+        refused(; transitions=[1//2 1; 1//2 1])               # rows, not columns, sum to 1
+        refused(; transitions=[3//2 0; -1//2 1])              # a negative entry
+        refused(; transitions=(; risky=[1 0; 0 1]))           # :safe has no matrix
+        refused(; transitions=(; safe=[1 0; 0 1], risky=[1 0; 0 1], other=[1 0; 0 1]))
+        refused(; transitions=(; safe=[1 0; 0 1], risky=:stay))
+        refused(; transitions=[1 0; 0 1], signal_of=:before)
+        refused(; signal_of=:later)
     end
 end

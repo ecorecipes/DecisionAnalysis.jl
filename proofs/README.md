@@ -165,6 +165,7 @@ were written by the Julia package itself, and those for the two proposed schemas
 | `Finite/SurveyOrAct.lean` | The arithmetic of `survey_or_act`: the survey-first threshold and the stopping test of the policy search |
 | `Finite/Waiting.lean` | The value of waiting to learn (`value_of_waiting`): its split into information and delay, and the bound by the EVSI of acting now |
 | `Finite/Adaptive.lean` | Sequential adaptive management (`adaptive_management`): the recursion is the best policy, and no learning ≤ passive ≤ active ≤ perfect information |
+| `Finite/AdaptiveDynamic.lean` | The same for a state that moves between periods (`transitions`): best fixed plan ≤ replanning with updating ≤ best policy ≤ the state seen before every action |
 | `Theory/FiniteKernels.lean` | The link to `FiniteKernelsProofs` kernels at `K = ℝ` |
 | `Certificate/Check.lean` | The decision-certificate checker and its soundness |
 | `Certificate/Witness.lean` | The garbling and E-admissibility witness checkers and their soundness |

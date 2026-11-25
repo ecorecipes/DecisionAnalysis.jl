@@ -155,6 +155,14 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.horizonWeight_mul_actNowValue_le_policyValue
 #print axioms DecisionAnalysisProofs.horizonWeight_mul_actNowValue_le_adaptiveValue
 #print axioms DecisionAnalysisProofs.adaptiveValue_le_horizonWeight_mul_perfectValue
+-- The same with a state that moves (`transitions`).
+#print axioms DecisionAnalysisProofs.sum_signalThenMove
+#print axioms DecisionAnalysisProofs.sum_moveThenSignal
+#print axioms DecisionAnalysisProofs.dynamicPolicyValue_le_dynamicValue
+#print axioms DecisionAnalysisProofs.openLoopValue_sum_le
+#print axioms DecisionAnalysisProofs.openLoopValue_le_dynamicPolicyValue
+#print axioms DecisionAnalysisProofs.openLoopValue_le_dynamicValue
+#print axioms DecisionAnalysisProofs.dynamicValue_le_sum_observedValue
 
 -- T8: minimax regret and independence of irrelevant alternatives.
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaSmall_iff
