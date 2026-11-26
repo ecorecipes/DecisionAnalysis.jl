@@ -176,9 +176,7 @@ function expected_variance_reduction(problem::DecisionProblem,
         throw(ArgumentError("`quantity` must be the name of a numeric parameter of the " *
                             "draws or a vector with one number per draw"))
     columns = _focal_columns(belief, focal)
-    fit = method === nothing ? _default_method(columns) : method
-    fit isa SampleAverage &&
-        throw(ArgumentError("SampleAverage cannot fit conditional means"))
+    fit = _require_fit(_method_for(method, columns))
     wf = Float64.(w)
     gf = Float64.(g)
     G, _ = _fit(fit, columns, reshape(gf, 1, :), w)
@@ -307,7 +305,7 @@ function _check_delayed(problem::DecisionProblem, delayed::PayoffTable)
     delayed.states == problem.payoff.states ||
         throw(LabelMismatchError("states of the delayed payoff table",
                                  problem.payoff.states, delayed.states))
-    return delayed.Q[problem.feasible, :]
+    return _feasible_rows(problem, delayed.Q)
 end
 
 """
@@ -386,17 +384,12 @@ function value_of_waiting(problem::DecisionProblem, delayed::PayoffTable,
             late_action=actions[argmax(late_now)], policy)
 end
 
-_waiting_options(options::AbstractVector{<:Pair}) = options
-_waiting_options(options) = collect(pairs(options))
-
 function value_of_waiting(problem::DecisionProblem, options)
-    named = [Symbol(name) => option for (name, option) in _waiting_options(options)]
+    named = _named_items(options, Tuple{PayoffTable,Experiment},
+                         "options for waiting, each a tuple (delayed payoff table, " *
+                         "experiment)")
     isempty(named) && throw(ArgumentError("no option for waiting was given"))
     results = map(named) do (name, option)
-        (option isa Tuple && length(option) == 2 && option[1] isa PayoffTable &&
-         option[2] isa Experiment) ||
-            throw(ArgumentError("the option $name must be a tuple (delayed payoff " *
-                                "table, experiment)"))
         return value_of_waiting(problem, option[1], option[2])
     end
     values = [r.value for r in results]

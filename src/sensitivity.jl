@@ -39,7 +39,7 @@ function policy_regions(base::DecisionProblem, direction::PayoffTable; from::Rea
     _check_same_labels(base.payoff, direction)
     p = _prior(base, :policy_regions)
     α = _feasible_Q(base) * p
-    β = direction.Q[base.feasible, :] * p
+    β = _feasible_rows(base, direction.Q) * p
     actions = feasible_actions(base)
     T = typeof((one(eltype(α)) + one(eltype(β)) * from) / one(eltype(β)))
     function tol(t)

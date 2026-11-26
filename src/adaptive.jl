@@ -11,15 +11,11 @@ function _action_experiments(problem::DecisionProblem, experiment::Experiment)
     return Union{Nothing,Experiment}[experiment for _ in feasible_actions(problem)]
 end
 function _action_experiments(problem::DecisionProblem, experiments)
-    named = Dict{Symbol,Any}(Symbol(k) => v
-                             for (k, v) in (experiments isa AbstractVector{<:Pair} ?
-                                            experiments : pairs(experiments)))
+    named = Dict(_named_items(experiments, Experiment, "experiments"))
     for (a, e) in named
         a in problem.payoff.actions ||
             throw(ArgumentError("experiments names $a, which is not an action of the " *
                                 "payoff table"))
-        e isa Experiment ||
-            throw(ArgumentError("the entry of experiments for $a is not an Experiment"))
         _check_states(e, problem.payoff.states, "payoff table")
     end
     return Union{Nothing,Experiment}[get(named, a, nothing)
@@ -51,9 +47,7 @@ function _action_transitions(problem::DecisionProblem, T::AbstractMatrix)
     return [checked for _ in feasible_actions(problem)]
 end
 function _action_transitions(problem::DecisionProblem, transitions)
-    named = Dict{Symbol,Any}(Symbol(k) => v
-                             for (k, v) in (transitions isa AbstractVector{<:Pair} ?
-                                            transitions : pairs(transitions)))
+    named = Dict(_named_items(transitions, Any, "transition matrices"))
     for a in keys(named)
         a in problem.payoff.actions ||
             throw(ArgumentError("transitions names $a, which is not an action of the " *

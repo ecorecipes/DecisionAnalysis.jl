@@ -14,8 +14,15 @@
 # The joint form has no division, so a signal of probability zero contributes zero and
 # needs no special case.
 
-function _feasible_Q(problem::DecisionProblem)
-    return problem.payoff.Q[problem.feasible, :]
+# The rows of the feasible actions of a matrix with one row for each action: the
+# matrix itself, uncopied, when every action is feasible. Callers only read it.
+function _feasible_rows(problem::DecisionProblem, M::AbstractMatrix)
+    return all(problem.feasible) ? M : M[problem.feasible, :]
+end
+_feasible_Q(problem::DecisionProblem) = _feasible_rows(problem, problem.payoff.Q)
+# The gains of the feasible actions over the action in row `row`, state by state.
+function _gains_over(problem::DecisionProblem, row::Integer)
+    return _feasible_Q(problem) .- view(problem.payoff.Q, row:row, :)
 end
 
 """

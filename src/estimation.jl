@@ -62,9 +62,7 @@ function expected_variance_reduction(belief::SampleBelief,
                                      method::Union{Nothing,AbstractVOIMethod}=nothing)
     g = _estimation_quantity(belief, quantity)
     columns = _focal_columns(belief, focal)
-    fit = method === nothing ? _default_method(columns) : method
-    fit isa SampleAverage &&
-        throw(ArgumentError("SampleAverage cannot fit conditional means"))
+    fit = _require_fit(_method_for(method, columns))
     return _variance_split(_explained_variance(fit, columns, g, belief.weights)...)
 end
 
@@ -84,7 +82,7 @@ function expected_variance_reduction(source::Union{SampleBelief,DecisionProblem}
     belief = _estimation_belief(source)
     g = _estimation_quantity(belief, quantity)
     columns = _focal_columns(belief, study.focal)
-    method = study.regression === nothing ? _default_method(columns) : study.regression
+    method = _method_for(study.regression, columns)
     total, between = _explained_variance(method, columns, g, belief.weights)
     one(n) = _variance_split(total, between * n / (study.n0 + n))
     return study.n isa Real ? one(study.n) : [one(n) for n in study.n]
@@ -100,22 +98,13 @@ function expected_variance_reduction(source::Union{SampleBelief,DecisionProblem}
         throw(ArgumentError("the log-likelihood matrix has $n columns for $(length(g)) " *
                             "draws"))
     wf = Float64.(belief.weights)
-    study.weights === nothing && K != n &&
-        throw(ArgumentError("with weights = nothing there must be one data set per " *
-                            "draw ($n), got $K; pass weights = :equal or a vector"))
-    v = study.weights === nothing ? wf :
-        study.weights === :equal ? fill(1 / K, K) :
-        Float64.(_normalise_weights(collect(study.weights)))
+    v = _dataset_weights(study, wf, K)
     centre = dot(wf, g)
     total = sum(wf .* (g .- centre) .^ 2)
     remaining = 0.0
     posterior = zeros(n)
     for k in 1:K
-        top = maximum(view(L, k, :))
-        isfinite(top) ||
-            throw(ArgumentError("data set $k has zero likelihood under every draw"))
-        posterior .= wf .* exp.(view(L, k, :) .- top)
-        posterior ./= sum(posterior)
+        _posterior!(posterior, L, k, wf)
         m = dot(posterior, g)
         remaining += v[k] * sum(posterior .* (g .- m) .^ 2)
     end

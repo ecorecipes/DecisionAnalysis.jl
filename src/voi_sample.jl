@@ -406,7 +406,7 @@ end
 
 function _feasible_se(problem::DecisionProblem)
     se = problem.payoff.standard_errors
-    return se === nothing ? nothing : se[problem.feasible, :]
+    return se === nothing ? nothing : _feasible_rows(problem, se)
 end
 
 # Standard deviation of `estimate(idx)` over `B` resamples of the draws.
@@ -845,6 +845,42 @@ function _default_method(columns::NamedTuple)
     return length(columns) < _GP_FROM ? SplineRegression() : GaussianProcessRegression()
 end
 
+# The method that fits conditional means on `columns`: the one given, or the default
+# for those columns.
+_method_for(method, columns) = method === nothing ? _default_method(columns) : method
+
+# `SampleAverage` has no conditional means to fit.
+function _require_fit(method)
+    method isa SampleAverage &&
+        throw(ArgumentError("SampleAverage cannot fit conditional means"))
+    return method
+end
+
+# The weights of the simulated data sets of an importance-sampling study: those of the
+# draws (`wf`) when there is one data set for each draw, equal weights, or the vector
+# given.
+function _dataset_weights(study, wf::AbstractVector, K::Integer)
+    n = length(wf)
+    study.weights === nothing && K != n &&
+        throw(ArgumentError("with weights = nothing there must be one data set per " *
+                            "draw ($n), got $K; pass weights = :equal or a vector"))
+    return study.weights === nothing ? wf :
+           study.weights === :equal ? fill(1 / K, K) :
+           Float64.(_normalise_weights(collect(study.weights)))
+end
+
+# The posterior weights of the draws given data set `k` of the log-likelihood matrix
+# `L`, written into `posterior`.
+function _posterior!(posterior::AbstractVector, L::AbstractMatrix, k::Integer,
+                     wf::AbstractVector)
+    top = maximum(view(L, k, :))
+    isfinite(top) ||
+        throw(ArgumentError("data set $k has zero likelihood under every draw"))
+    posterior .= wf .* exp.(view(L, k, :) .- top)
+    posterior ./= sum(posterior)
+    return posterior
+end
+
 """
     evppi(problem::DecisionProblem, focal, method; bootstrap=0, seed=1) -> VOIEstimate
     evppi(problem::DecisionProblem, focal::Union{Symbol,Tuple}; kw...) -> VOIEstimate
@@ -1101,8 +1137,7 @@ struct GaussianApproximation{N,M}
         n0 > 0 || throw(ArgumentError("the prior effective sample size n0 must be " *
                                       "positive, got $n0"))
         all(>=(0), n) || throw(ArgumentError("sample sizes must be nonnegative"))
-        regression isa SampleAverage &&
-            throw(ArgumentError("SampleAverage cannot fit conditional means"))
+        _require_fit(regression)
         names = _focal_names(focal)
         return new{typeof(n),typeof(regression)}(names, Float64(n0), n, regression)
     end
@@ -1150,14 +1185,9 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
     n == length(w) ||
         throw(ArgumentError("the log-likelihood matrix has $n columns for " *
                             "$(length(w)) draws"))
-    study.weights === nothing && K != n &&
-        throw(ArgumentError("with weights = nothing there must be one data set per " *
-                            "draw ($n), got $K; pass weights = :equal or a vector"))
-    v = study.weights === nothing ? Float64.(w) :
-        study.weights === :equal ? fill(1 / K, K) :
-        Float64.(_normalise_weights(collect(study.weights)))
-    v0, a = _act_now(Q, w)
     wf = Float64.(w)
+    v = _dataset_weights(study, wf, K)
+    v0, a = _act_now(Q, w)
     Qf = Float64.(Q)
     gains = zeros(K)
     informed = zeros(K)
@@ -1167,11 +1197,7 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
     # data sets, from the linearisation of each self-normalised posterior mean.
     influence = zeros(n)
     for k in 1:K
-        top = maximum(view(L, k, :))
-        isfinite(top) ||
-            throw(ArgumentError("data set $k has zero likelihood under every draw"))
-        posterior .= wf .* exp.(view(L, k, :) .- top)
-        posterior ./= sum(posterior)
+        _posterior!(posterior, L, k, wf)
         m = Qf * posterior
         b = argmax(m)
         informed[k] = m[b]
@@ -1199,7 +1225,7 @@ function evsi(problem::DecisionProblem, study::GaussianApproximation; bootstrap:
               seed::Integer=1)
     Q, w = _sample_problem(problem, :evsi)
     columns = _focal_columns(problem.belief, study.focal)
-    method = study.regression === nothing ? _default_method(columns) : study.regression
+    method = _method_for(study.regression, columns)
     function one_size(n)
         return _estimate(:evsi, _Shrunk(method, sqrt(n / (study.n0 + n))), columns, Q,
                          w; bootstrap, seed,
@@ -1302,7 +1328,7 @@ accounted for. Throws [`MissingBaselineError`](@ref) without a baseline.
 function expected_gain_estimates(problem::DecisionProblem)
     _, w = _sample_problem(problem, :expected_gain_estimates)
     row = _baseline_row(problem, :expected_gain_estimates)
-    G = problem.payoff.Q[problem.feasible, :] .- problem.payoff.Q[row:row, :]
+    G = _gains_over(problem, row)
     return map(enumerate(feasible_actions(problem))) do (a, action)
         g = view(G, a, :)
         return (; action, value=dot(w, g), standard_error=_weighted_mean_se(g, w))

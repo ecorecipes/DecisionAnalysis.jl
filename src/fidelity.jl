@@ -72,7 +72,7 @@ function decision_loss_bound(B::Real, ε::Real)
 end
 
 _constant_matrix(t::PayoffTable) = t.Q
-_constant_matrix(p::DecisionProblem) = p.payoff.Q[p.feasible, :]
+_constant_matrix(p::DecisionProblem) = _feasible_Q(p)
 
 """
     payoff_range(x)

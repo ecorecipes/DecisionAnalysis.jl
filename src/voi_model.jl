@@ -169,8 +169,7 @@ struct MomentMatching{P,S,A,M}
     function MomentMatching(focal; payoffs, simulate_data, posterior, nested::Integer=30,
                             regression::Union{Nothing,AbstractVOIMethod}=nothing)
         nested >= 3 || throw(ArgumentError("nested must be at least 3, got $nested"))
-        regression isa SampleAverage &&
-            throw(ArgumentError("SampleAverage cannot fit conditional means"))
+        _require_fit(regression)
         names = _focal_names(focal)
         return new{typeof(payoffs),typeof(simulate_data),typeof(posterior),
                    typeof(regression)}(names, payoffs, simulate_data, posterior,
@@ -240,7 +239,7 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     Q, w = _sample_problem(problem, :evsi)
     belief = problem.belief
     columns = _focal_columns(belief, study.focal)
-    method = study.regression === nothing ? _default_method(columns) : study.regression
+    method = _method_for(study.regression, columns)
     G, info = _fit(method, columns, Q, w)
     wf = Float64.(w)
     Qf = Float64.(Q)

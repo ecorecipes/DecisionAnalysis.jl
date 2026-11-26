@@ -256,7 +256,7 @@ julia> expected_gain_over_baseline(DecisionProblem(t, credal; baseline=:wait))
 """
 function expected_gain_over_baseline(p::DecisionProblem)
     row = _baseline_row(p, :expected_gain_over_baseline)
-    G = p.payoff.Q[p.feasible, :] .- p.payoff.Q[row:row, :]
+    G = _gains_over(p, row)
     return _expected_gain(p.belief, p, G)
 end
 
@@ -284,13 +284,13 @@ struct _View{M<:AbstractMatrix,P}
 end
 
 function _view(p::DecisionProblem{T,<:FiniteBelief}) where {T}
-    return _View(p.payoff.Q[p.feasible, :], [p.belief.probabilities], :FiniteBelief)
+    return _View(_feasible_Q(p), [p.belief.probabilities], :FiniteBelief)
 end
 function _view(p::DecisionProblem{T,<:SampleBelief}) where {T}
-    return _View(p.payoff.Q[p.feasible, :], [p.belief.weights], :SampleBelief)
+    return _View(_feasible_Q(p), [p.belief.weights], :SampleBelief)
 end
 function _view(p::DecisionProblem{T,<:CredalSet}) where {T}
-    return _View(p.payoff.Q[p.feasible, :], p.belief.points, :CredalSet)
+    return _View(_feasible_Q(p), p.belief.points, :CredalSet)
 end
 function _view(p::DecisionProblem{T,ScenarioSet}) where {T}
     cols = findall(in(p.belief.states), p.payoff.states)

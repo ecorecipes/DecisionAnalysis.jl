@@ -15,7 +15,7 @@ function _action_costs(problem::DecisionProblem, costs::AbstractVector{<:Real})
 end
 function _action_costs(problem::DecisionProblem, costs)
     actions = problem.payoff.actions
-    given = Dict{Symbol,Any}(Symbol(k) => v for (k, v) in pairs(costs))
+    given = Dict(_named_items(costs, Real, "action costs"))
     for a in keys(given)
         a in actions || throw(ArgumentError("action_costs names $a, which is not an " *
                                             "action of the payoff table"))
@@ -25,15 +25,12 @@ function _action_costs(problem::DecisionProblem, costs)
     end
     return [given[a] for a in actions]
 end
-function _action_costs(problem::DecisionProblem, costs::AbstractVector{<:Pair})
-    return _action_costs(problem, Dict(costs))
-end
 
 function _imposed_policy(policy, signals::Vector{Symbol}, actions::Vector{Symbol})
-    given = Dict{Symbol,Symbol}(Symbol(k) => Symbol(v)
-                                for (k, v) in
-                                    (policy isa AbstractVector{<:Pair} ? policy :
-                                     pairs(policy)))
+    given = Dict(name => Symbol(action)
+                 for (name, action) in
+                     _named_items(policy, Union{Symbol,AbstractString},
+                                  "actions of a policy"))
     return map(signals) do z
         haskey(given, z) || throw(ArgumentError("policy has no action for the signal $z"))
         a = findfirst(==(given[z]), actions)
