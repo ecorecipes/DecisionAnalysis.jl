@@ -31,18 +31,42 @@
     "theta18": 0,
     "theta19": 0
   },
+  "evppi_single_reml": {
+    "theta1": 0.1123808359828,
+    "theta2": 0.1449730962486,
+    "theta3": 0,
+    "theta4": 0,
+    "theta5": 77.573931026403,
+    "theta6": 1232.852091261845,
+    "theta7": 7.7124340476,
+    "theta8": 0,
+    "theta9": 0,
+    "theta10": 14.025902871011,
+    "theta11": 0,
+    "theta12": 0,
+    "theta13": 0.4780308718307,
+    "theta14": 449.592614366359,
+    "theta15": 520.963329522908,
+    "theta16": 924.907565972894,
+    "theta17": 0,
+    "theta18": 0,
+    "theta19": 0
+  },
   "evppi_groups": [
     {
       "parameters": ["theta5", "theta14"],
-      "evppi": 493.720941881751
+      "evppi": 493.720941881751,
+      "evppi_reml": 470.27213714194
     },
     {
       "parameters": ["theta6", "theta15"],
-      "evppi": 1507.973139175982
+      "evppi": 1507.973139175982,
+      "evppi_reml": 1492.926821917537
     },
     {
       "parameters": ["theta7", "theta16"],
-      "evppi": 1100.300058692996
+      "evppi": 1100.300058692996,
+      "evppi_reml": 1107.425641884001
     }
   ]
 }

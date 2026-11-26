@@ -118,9 +118,11 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - **`GAMRegression` is held to parity with `mgcv`, not to agreement within error.** It fits the first
   action as it is and every other action through its difference from the first, with smoothing by GCV, as
   `voi` and SAVI do; fitting each payoff separately with REML was up to 2.2 off `voi` on the chemotherapy
-  example. Tests hold it to 1e-6 on `voi`'s normal model and four figures on SAVI's data. The one gap left
-  (tensor product of `theta7` and `theta16`, 0.7%) is a shortfall of GAM.jl's GCV search and is a
-  `@test_broken`: fix it in GAM.jl, do not loosen the test.
+  example. Tests hold it to 1e-6 on `voi`'s normal model and four figures on SAVI's data. GAM.jl computes the same GCV and
+  REML scores as `mgcv`; what differs is its search: for tensor products it can end in the worse of two
+  local minima (two `@test_broken`, each under 1%: fix in GAM.jl, do not loosen the tests), and its default
+  REML tolerance stops early on a flat score, so the extension runs it at `epsilon = 1e-11` and the REML
+  reference is `mgcv` at `conv.tol = 1e-12` (`validation/README.md`, finding 3).
 - **A model-based estimator needs the function the table was made from.** `MomentMatching` and
   `evppi_nested` take `payoffs(θ)`; for `MomentMatching` it must return the payoffs of the feasible actions
   in the problem's order and reproduce the payoff table, and the non-focal parameters are drawn from the

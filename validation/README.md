@@ -345,10 +345,25 @@ What the comparisons found:
    error) off on the chemotherapy example. `voi` and SAVI fit each action's **difference**
    from the first, with `mgcv`'s default GCV; doing the same gives 1e-11 on the normal
    model, at most 0.19 on the chemotherapy example, and four significant figures on
-   SAVI's data. One gap is left and is GAM.jl's, not ours: for the tensor product of
-   `theta7` and `theta16` of SAVI's data its search stops at a GCV score 0.017% above
-   the one `mgcv` reaches, and the estimate is 0.7% higher (a `@test_broken` in
-   `test/test_savi.jl` keeps it visible); our Gaussian process against `voi`'s within 1.3%
+   SAVI's data. What is left is in GAM.jl's search for the smoothing parameters, not
+   in its criteria: at the same smoothing parameters GAM.jl and `mgcv` give the same
+   GCV score and the same REML score to nine digits.
+   - *Two basins for tensor products.* For `te(theta7, theta16)` the GCV score has two
+     local minima, at log smoothing parameters (4.5, 1.6) and (19.2, −1.1), with
+     scores 2.985406e7 and 2.984914e7. GAM.jl's Nelder–Mead search (one start, initial
+     step 1) ends in the first and `mgcv` in the second; the estimate is 1107.84
+     against 1100.30. The same routine started with step 4, or from (−2, −2), (8, 0)
+     or (12, 12), reaches the second. Under REML the same happens for
+     `te(theta6, theta15)`: 9825.7864 at (9.0, 7.1) against 9825.7469 at (2.6, 23.9),
+     estimates 1480.03 against 1492.93. Both are `@test_broken` in `test/test_savi.jl`.
+   - *REML stops early at the default tolerance.* The REML score is very flat: for
+     `s(theta5)` it is 10229.00750 at smoothing parameter 59.8 and 10229.00231 at 118,
+     while the EVPPI is 72.8 at the first and 77.6 at the second. GAM.jl's default
+     tolerance (1e-7, relative change of the score) stops at 59.8 and `mgcv`'s default
+     at 109 (77.1); run to 1e-12 `mgcv` gives 77.57, and GAM.jl at 1e-11 gives 77.44.
+     Our extension therefore runs GAM.jl at 1e-11, and the REML reference in
+     `savi_reference.json` is `mgcv` at 1e-12: the single parameters then agree within
+     0.2% and two of the three pairs within 0.1%; our Gaussian process against `voi`'s within 1.3%
    and within 0.1 of a standard error. No change was needed.
 4. **EVSI** estimates differ by Monte Carlo error only: each side simulates its own
    data. All are within about one standard error of each other and of the closed forms.

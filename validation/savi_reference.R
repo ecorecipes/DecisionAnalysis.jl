@@ -22,10 +22,21 @@ single <- sapply(names(params), function(p) {
   if (var(x) == 0) return(0)
   value(fitted(gam(inb ~ s(x))))
 })
+# The same with smoothing by REML. The REML score is very flat in the smoothing
+# parameter (for theta5 it changes in the ninth digit between sp = 60 and sp = 109
+# while the EVPPI moves by 6%), so the search is run to a tight tolerance: at mgcv's
+# default tolerance the value is where the search happened to stop.
+tight <- gam.control(newton = list(conv.tol = 1e-12))
+single_reml <- sapply(names(params), function(p) {
+  x <- params[[p]]
+  if (var(x) == 0) return(0)
+  value(fitted(gam(inb ~ s(x), method = "REML", control = tight)))
+})
 groups <- list(c("theta5", "theta14"), c("theta6", "theta15"), c("theta7", "theta16"))
 grouped <- lapply(groups, function(g) {
   f <- as.formula(paste0("inb ~ te(", paste(g, collapse = ", "), ")"))
-  list(parameters = g, evppi = value(fitted(gam(f, data = params))))
+  list(parameters = g, evppi = value(fitted(gam(f, data = params))),
+       evppi_reml = value(fitted(gam(f, data = params, method = "REML", control = tight))))
 })
 out <- list(
   source = "SAVI test_data/brennan1000 (costs.csv, effects.csv, parameters.csv), BSD 3-clause, copyright 2014 The University of Sheffield",
@@ -37,6 +48,7 @@ out <- list(
   evpi = mean(pmax(nb[, 1], nb[, 2])) - max(colMeans(nb)),
   probability_best = c(mean(nb[, 1] >= nb[, 2]), mean(nb[, 2] >= nb[, 1])),
   evppi_single = as.list(single),
+  evppi_single_reml = as.list(single_reml),
   evppi_groups = grouped
 )
 writeLines(toJSON(out, auto_unbox = TRUE, digits = 12, pretty = TRUE),

@@ -10,6 +10,13 @@ module DecisionAnalysisGAMExt
 using DecisionAnalysis: DecisionAnalysis, GAMRegression, _is_numeric
 using GAM: GAM
 
+# The REML score is very flat in the smoothing parameters, and the value of
+# information is not: at GAM.jl's default tolerance (1e-7, on the relative change of
+# the score) the search stops where an estimate can still be 6% from the one at the
+# optimum. The tolerance here is where the estimates stop moving; the fits are of a
+# linear model, so the extra iterations cost little.
+const _CONTROL = GAM.gam_control(; epsilon=1e-11, outer_maxit=2000)
+
 # The formula `y ~ ...` and the data columns, with safe names. The formula is built
 # from terms, not parsed from text: nothing is evaluated at run time, so the same
 # formula is not compiled again for every action and every bootstrap resample.
@@ -53,7 +60,8 @@ function DecisionAnalysis.fitted_conditional_means(method::GAMRegression,
     # conditional mean: there is nothing to fit, and a fit would not converge.
     function fitted(y)
         allequal(y) && return y
-        return GAM.gam(formula, (; y, data...); weights, method=method.smoothing).fitted_values
+        return GAM.gam(formula, (; y, data...); weights, method=method.smoothing,
+                       control=_CONTROL).fitted_values
     end
     first_row = Float64.(view(Q, 1, :))
     G[1, :] .= fitted(first_row)

@@ -2,7 +2,6 @@
 # 1000 draws of a two-option model with 19 parameters, copied unchanged with its
 # licence into test/fixtures/savi/. The reference values are written by
 # validation/savi_reference.R with mgcv, fitting the regressions that SAVI fits.
-# (The REML value for theta16 below, 924.9076, is mgcv's with method = "REML".)
 
 function savi_columns(file)
     lines = readlines(joinpath(@__DIR__, "fixtures", "savi", file))
@@ -58,12 +57,28 @@ end
     targets = [group["evppi"] for group in ref["evppi_groups"]]
     @test pairs_gam[1] ≈ targets[1] rtol = 1e-4
     @test pairs_gam[2] ≈ targets[2] rtol = 1e-4
-    # For theta7 with theta16 GAM.jl stops at a GCV score 0.017% above the one mgcv
-    # reaches (smoothing parameters 90 and 5.1 against 2e8 and 0.32), and the estimate
-    # is 0.7% higher: a shortfall of GAM.jl's search, kept visible here.
+    # For theta7 with theta16 the GCV score has two local minima. GAM.jl's simplex
+    # search ends in the worse one (score 0.017% higher; smoothing parameters 90 and
+    # 5.1 against mgcv's 2e8 and 0.32) and the estimate is 0.7% higher. GAM.jl computes
+    # the same score as mgcv at both points: only its search differs.
     @test pairs_gam[3] ≈ targets[3] rtol = 0.01
     @test_broken pairs_gam[3] ≈ targets[3] rtol = 1e-3
-    @test evppi(problem, :theta16, GAMRegression(; smoothing=:REML)).value ≈ 924.9076 rtol = 1e-3
+    # Smoothing by REML, against mgcv run to a tight tolerance (the score is flat in
+    # the smoothing parameter and the estimate is not; see validation/README.md).
+    for (name, target) in ref["evppi_single_reml"]
+        @test evppi(problem, Symbol(name), GAMRegression(; smoothing=:REML)).value ≈
+              target rtol = 2e-3 atol = 0.02
+    end
+    pairs_reml = [evppi(problem, Tuple(Symbol.(group["parameters"])),
+                        GAMRegression(; tensor=true, smoothing=:REML)).value
+                  for group in ref["evppi_groups"]]
+    targets_reml = [group["evppi_reml"] for group in ref["evppi_groups"]]
+    @test pairs_reml[1] ≈ targets_reml[1] rtol = 1e-3
+    @test pairs_reml[3] ≈ targets_reml[3] rtol = 1e-3
+    # For theta6 with theta15 GAM.jl ends in another basin of the REML score
+    # (9825.7864 against mgcv's 9825.7469) and the estimate is 0.9% lower.
+    @test pairs_reml[2] ≈ targets_reml[2] rtol = 0.01
+    @test_broken pairs_reml[2] ≈ targets_reml[2] rtol = 1e-3
     @test_throws ArgumentError GAMRegression(; smoothing=:ML)
 end
 

@@ -283,7 +283,12 @@ is, and every other action through its **difference** from the first (the estima
 depends only on the differences, and a difference is smoother than either payoff);
 and the smoothing parameters are chosen by generalised cross-validation
 (`smoothing = :GCV`, the default of `mgcv::gam`). `smoothing = :REML` chooses them by
-restricted maximum likelihood, which smooths a little more.
+restricted maximum likelihood, which smooths a little more. The REML score is nearly
+flat in the smoothing parameters where the estimate is not, so the search is run to a
+tight tolerance; `mgcv` at its default tolerance stops earlier and can differ by a
+few tenths of a percent. For a tensor product either score can have two local minima,
+and GAM.jl and `mgcv` do not always end in the same one (differences of under 1% were
+seen).
 
 The method lives in a weak-dependency extension: load GAM.jl (`using GAM`) before
 using it, otherwise [`MissingExtensionError`](@ref) is thrown. GAM.jl is not a
