@@ -23,7 +23,8 @@ payoff table of any problem the experiment is used with; without it only the num
 of states is checked. `cost` is the price of running the experiment, in payoff units;
 it is used only by [`enbs`](@ref).
 
-The second form takes a kernel of FiniteKernels from states to signals; its
+The second form is available when FiniteKernels is loaded (`using FiniteKernels`); it
+takes a kernel of that package from states to signals; its
 `kernel_matrix` is already laid out signals-by-states. Several-axis spaces are
 labelled as in [`FiniteBelief`](@ref).
 
@@ -124,19 +125,6 @@ function gaussian_experiment(means::AbstractVector{<:Real}, sd::Real; states=not
     L = [exp(-abs2((x - mu) / sd) / 2) for x in mids, mu in means]
     L ./= sum(L; dims=1)
     return Experiment(L; signals=_default_labels("bin", bins), states, cost)
-end
-
-function _space_labels(X::FiniteSpace)
-    return ndims(X) == 1 ? copy(only(factors(X)).labels) :
-           [Symbol(join(s, "_")) for s in joint_states(X)]
-end
-
-function Experiment(k::FiniteKernel; cost::Real=0, kw...)
-    (ndims(k.dom) >= 1 && ndims(k.codom) >= 1) ||
-        throw(ArgumentError("an experiment needs a kernel from a state space to a " *
-                            "signal space, both non-empty"))
-    return Experiment(kernel_matrix(k); signals=_space_labels(k.codom),
-                      states=_space_labels(k.dom), cost, kw...)
 end
 
 Base.eltype(::Type{<:Experiment{T}}) where {T} = T

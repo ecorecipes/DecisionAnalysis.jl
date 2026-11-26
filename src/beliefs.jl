@@ -74,8 +74,8 @@ nonnegative and sum to one, exactly for `Rational` or integer entries and within
 thrown. Without `states` the labels are `:s1, :s2, ...`, which are also the default
 state labels of a [`PayoffTable`](@ref).
 
-The third form takes a state of FiniteKernels (a `FiniteKernel` with an empty
-domain). A one-axis space keeps its labels; the joint states of a several-axis space
+The third form is available when FiniteKernels is loaded (`using FiniteKernels`); it
+takes a state of that package (a `FiniteKernel` with an empty domain). A one-axis space keeps its labels; the joint states of a several-axis space
 are labelled by joining the axis labels with `_`, in `joint_states` order.
 
 ```jldoctest
@@ -110,16 +110,6 @@ end
 
 function FiniteBelief(probabilities::AbstractVector{<:Real}; kw...)
     return FiniteBelief(_default_labels("s", length(probabilities)), probabilities; kw...)
-end
-
-function FiniteBelief(k::FiniteKernel; kw...)
-    ndims(k.dom) == 0 ||
-        throw(ArgumentError("a FiniteBelief needs a state (a kernel with an empty " *
-                            "domain), got a kernel with domain axes $(axis_names(k.dom))"))
-    X = k.codom
-    states = ndims(X) == 1 ? copy(only(factors(X)).labels) :
-             [Symbol(join(s, "_")) for s in joint_states(X)]
-    return FiniteBelief(states, vec(k.table); kw...)
 end
 
 """

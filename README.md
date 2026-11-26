@@ -10,9 +10,10 @@ problems are exact: give the package `Rational` inputs and every number it retur
 output held as draws and simulator runs is analysed by sample-based estimators of the same quantities,
 each reported with its Monte Carlo standard error in a separate field.
 
-The package depends on [FiniteKernels.jl](https://github.com/ecorecipes/FiniteKernels.jl),
-[JuMP](https://jump.dev) (to state its linear programmes; no solver is a dependency), `LinearAlgebra`,
-`Random`, `Statistics` and `Tables`, and on no Catlab, GATlab or ACSets. [GAM.jl](https://github.com/ecorecipes/GAM.jl)
+The package depends on [JuMP](https://jump.dev) (to state its linear programmes; no solver is a dependency), `LinearAlgebra`,
+`Random`, `SpecialFunctions`, `Statistics` and `Tables`, and on no Catlab, GATlab or ACSets.
+[FiniteKernels.jl](https://github.com/ecorecipes/FiniteKernels.jl) is optional: with `using FiniteKernels`,
+a `FiniteBelief` is built from one of its states and an `Experiment` from one of its kernels. [GAM.jl](https://github.com/ecorecipes/GAM.jl)
 is an optional regression backend and [InfluenceDiagrams.jl](https://github.com/ecorecipes/InfluenceDiagrams.jl)
 an optional source of problems, each loaded as a weak-dependency extension.
 
@@ -20,7 +21,7 @@ an optional source of problems, each loaded as a weak-dependency extension.
 
 - **Payoff tables and beliefs.** `PayoffTable` holds the conditional expected utility `Q[a, θ]` (rows =
   actions, columns = states) with any real element type. A belief is a `PointBelief`, a `FiniteBelief` (a
-  probability vector, also built from a FiniteKernels state), a `CredalSet` (the convex hull of a list of
+  probability vector, also built from a FiniteKernels state when that package is loaded), a `CredalSet` (the convex hull of a list of
   priors) or a `ScenarioSet` (possible states, no probabilities). `DecisionProblem(payoff, belief)` pairs
   them, with an optional feasibility filter on the actions and an optional `baseline` action.
 - **Utilities counted in individuals.** Tables with the same labels add, subtract and scale (`+`, `-`,

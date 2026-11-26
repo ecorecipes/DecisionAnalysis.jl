@@ -338,16 +338,18 @@ uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
 version = "1.16.2+0"
 
 [[deps.DecisionAnalysis]]
-deps = ["FiniteKernels", "JuMP", "LinearAlgebra", "Logging", "Random", "SpecialFunctions", "Statistics", "Tables"]
+deps = ["JuMP", "LinearAlgebra", "Logging", "Random", "SpecialFunctions", "Statistics", "Tables"]
 path = ".."
 uuid = "6a9d793e-d09c-4461-8cb4-55c12d181024"
 version = "0.1.1"
 
     [deps.DecisionAnalysis.extensions]
+    DecisionAnalysisFiniteKernelsExt = "FiniteKernels"
     DecisionAnalysisGAMExt = "GAM"
     DecisionAnalysisInfluenceDiagramsExt = "InfluenceDiagrams"
 
     [deps.DecisionAnalysis.weakdeps]
+    FiniteKernels = "2ee73795-50db-4096-9573-22982ed4949b"
     GAM = "f5b95e24-6450-466f-92b1-fee0c65c0d6b"
     InfluenceDiagrams = "cd3dbe2d-275d-4a8e-841a-d44f7f7abf07"
 

@@ -54,8 +54,9 @@ folded together. [`policy_regions`](@ref), [`weight_sweep`](@ref) and
 
 Finite problems are exact; sample-based results are estimates of the same quantities.
 The package depends
-on FiniteKernels for kernels and states, on JuMP for stating linear programmes (and on
-no solver), and never on Catlab, GATlab or ACSets. GAM.jl is an optional regression
+on JuMP for stating linear programmes (and on no solver), and never on Catlab, GATlab
+or ACSets. FiniteKernels is optional: when it is loaded, a [`FiniteBelief`](@ref) can be
+built from one of its states and an [`Experiment`](@ref) from one of its kernels. GAM.jl is an optional regression
 backend through a weak-dependency extension ([`GAMRegression`](@ref)). It
 defines none of `compose`, `otimes`, `id`, `mcopy`, `delete`, `braid`, `dom`, `codom`,
 and exports no `regret` or `regrets`.
@@ -63,8 +64,6 @@ and exports no `regret` or `regrets`.
 module DecisionAnalysis
 
 using JuMP: JuMP
-using FiniteKernels: FiniteKernels, FiniteKernel, FiniteSpace, axis_names, factors,
-                     joint_states, kernel_matrix
 using LinearAlgebra: ColumnNorm, Diagonal, I, Symmetric, cholesky, dot, eigen, issuccess,
                      logdet, qr, tr
 using Random: AbstractRNG, Xoshiro, randn!, shuffle!

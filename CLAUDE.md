@@ -6,14 +6,17 @@ simulator runs. The Catlab-free core of the decision layer of the ecorecipes eco
 
 ## Place in the ecosystem
 
-Model packages produce outcomes; this package analyses the payoff table they give. It depends on
-FiniteKernels (finite spaces, kernels and states) through a `[sources]` URL
-(the Lean project in `proofs/` still path-requires the sibling clone `../FiniteKernels.jl`), on `JuMP` (to state linear programmes; never on a solver), on `SpecialFunctions` (the normal
+Model packages produce outcomes; this package analyses the payoff table they give. It depends on `JuMP` (to state linear programmes; never on a solver), on `SpecialFunctions` (the normal
 distribution function; already installed with JuMP), and on `LinearAlgebra`,
-`Logging`, `Random`, `Statistics` and `Tables`. FiniteKernels brings
+`Logging`, `Random`, `Statistics` and `Tables`: every hard dependency is registered or a standard library.
+FiniteKernels (finite spaces, kernels and states) is a **weak dependency**, by `[sources]` URL, and a test
+dependency: `ext/DecisionAnalysisFiniteKernelsExt.jl` holds `FiniteBelief(k::FiniteKernel)` and
+`Experiment(k::FiniteKernel)`, which exist only after `using FiniteKernels` (there is no stub that throws
+`MissingExtensionError`: whoever holds a `FiniteKernel` has loaded the package, so the extension is
+loaded). Do not move it back to `[deps]`. The Lean project in `proofs/` still path-requires the sibling
+clone `../FiniteKernels.jl`. FiniteKernels brings
 ResilienceCore and StructuredPopulationCore through its own `[sources]`; Pkg follows the sources of a URL
-dependency from Julia 1.13, which is why 1.13 is the minimum and why neither is listed here (on 1.12 both
-had to be, and installing this package by URL failed).
+dependency from Julia 1.13, which is why 1.13 is the minimum and why neither is listed here.
 Keep every `[sources]` entry a URL, in this file and in the docs, vignette and test environments. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
 generics, forwards to this package and re-exports its names (ADR 0009). No model package depends on this
 one: a model package writes a table of runs (or the user gives methods to the adapter verbs). An adapter
@@ -249,6 +252,7 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `scenario_forecast` and `decision_robustness`.
 - `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `weight_sweep`, `rank_reversals`.
 - `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
+- `ext/DecisionAnalysisFiniteKernelsExt.jl`: `FiniteBelief` and `Experiment` from FiniteKernels objects.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
   `largest_action_range`, `largest_regret` with `deficiency_value_bound`.
 - `src/report.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives), its
