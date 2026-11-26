@@ -423,6 +423,6 @@ md_table(["rule", "strategies kept"],
 ## Next
 
 [ICU beds before a pandemic
-wave](../28_epidemiology_eze_icu/28_epidemiology_eze_icu.md) takes up
+wave](../29_epidemiology_eze_icu/29_epidemiology_eze_icu.md) takes up
 the difference between the value of testing a hypothesis and the value
 of learning a parameter.

@@ -1,0 +1,197 @@
+{
+ "name": "regan2006_eradication",
+ "citation": "Regan TJ, McCarthy MA, Baxter PWJ, Panetta FD, Possingham HP (2006) Optimal eradication: when to stop looking for an invasive plant. Ecology Letters 9(7):759-766. With: Rout TM, Thompson CJ, McCarthy MA (2009) Robust decisions for declaring eradication of invasive species. Journal of Applied Ecology 46(4):782-786",
+ "doi": "10.1111/j.1461-0248.2006.00920.x",
+ "second_doi": "10.1111/j.1365-2664.2009.01678.x",
+ "licence": "All rights reserved (the authors and Blackwell Publishing; the British Ecological Society for the second paper); only formulas, parameter values and printed results are transcribed, as facts, with their source",
+ "retrieved": "2026-11-25, both article PDFs and the two appendices of the second paper (Word files) supplied by the user; formulas and Table 1 read from text extractions of the PDFs",
+ "decision": "After an invasive plant has gone unseen in an annual survey: survey again next year, or stop and declare it eradicated",
+ "unit": "cost in units of one annual survey (the papers work with the ratio of the survey cost Cs to the expected cost Ce of escape and damage; for the case study Ce is the authors' valuation of damage to the dairy industry of south-east Queensland)",
+ "baseline": "stop",
+ "actions": [
+  "stop",
+  "survey"
+ ],
+ "states": [
+  "present",
+  "absent"
+ ],
+ "model": {
+  "provenance": "Regan et al. 2006, Methods: equations 3, 4 and 7 to 11",
+  "rule_of_thumb": "NEC(n) = (n - 1) Cs + Ce r^n with r = p (1 - q); n* = ln(-Cs / (Ce ln r)) / ln r (equation 4)",
+  "dynamic_programme": "With w the probability that the plant was present last year: stopping costs w p Ce; surveying costs Cs, finds the plant with probability w p q, after which w = 1, and otherwise w becomes w p (1 - q) / (1 - w p q). At the last year a survey costs Cs and nothing follows.",
+  "as_two_states": "Here the state is the plant's status this year before the survey. Stopping pays Ce if it is present and ends the matter (the state goes to absent, where stopping costs nothing). The time horizon of the paper's dynamic programme is not stated; 300 years are used here. For the case study and for persistence up to 0.98, 600 years give the same answers; at a persistence of 0.99 the answer depends on the horizon (see 'ours')."
+ },
+ "table1": {
+  "provenance": "Regan et al. 2006, Table 1, 'The range of parameter values used in the H. amarum model' (best estimate in parentheses in the paper)",
+  "detection": {
+   "lower": "0.59",
+   "best": "0.83",
+   "upper": "0.95"
+  },
+  "persistence": {
+   "lower": "0.50",
+   "best": "0.8",
+   "upper": "0.90"
+  },
+  "cost_ratio": {
+   "lower": "197",
+   "best": "354",
+   "upper": "1317"
+  }
+ },
+ "targets": [
+  {
+   "id": "rule_1to100_r01",
+   "value": 2,
+   "tolerance": 0,
+   "where": "Regan et al., Results: 'optimal stopping time ranges between 2 and 22 years for a cost ratio of 1 : 100'"
+  },
+  {
+   "id": "rule_1to100_r09",
+   "value": 22,
+   "tolerance": 0,
+   "where": "the same sentence"
+  },
+  {
+   "id": "rule_1to1000_r01",
+   "value": 3,
+   "tolerance": 0,
+   "where": "Results: '3-44 years for a cost ratio of 1 : 1000'"
+  },
+  {
+   "id": "rule_1to1000_r09",
+   "value": 44,
+   "tolerance": 0,
+   "where": "the same sentence"
+  },
+  {
+   "id": "rule_1to1000_r099",
+   "value": 230,
+   "tolerance": 0,
+   "where": "Results: 'if r is reduced to 0.99 then the optimal solution is 230 consecutive zero surveys'"
+  },
+  {
+   "id": "zero_crossing_1to1000",
+   "value": 0.999,
+   "tolerance": 0.0005,
+   "where": "Results: 'the point at which the optimal solution declines to zero is at a value of r = 0.999'"
+  },
+  {
+   "id": "zero_crossing_1to2",
+   "value": 0.7,
+   "tolerance": 0.1,
+   "where": "Results: 'For a cost ratio of 1 : 2, the optimal solution is not to continue surveying if r is > 0.7'",
+   "resolution": "Equation 4 reaches zero at r = exp(-Cs / Ce), which is 0.607 for a ratio of 1 : 2; the paper's 0.7 is read from its Fig. 3, which is drawn at steps of 0.1."
+  },
+  {
+   "id": "helenium_best",
+   "value": 3,
+   "tolerance": 0,
+   "where": "Results: 'with a best estimate of 3 years'"
+  },
+  {
+   "id": "helenium_at_least",
+   "value": 2,
+   "tolerance": 0,
+   "where": "Results: 'at least 2 years'"
+  },
+  {
+   "id": "helenium_no_more_than",
+   "value": 5,
+   "tolerance": 0,
+   "where": "Results: 'and no more than 5 years'",
+   "resolution": "Not reproduced. With the least detectable, most persistent plant and the highest cost ratio of Table 1 (q = 0.59, p = 0.90, 1 : 1317) equation 4 gives 7.2, so 7 surveys. Five is obtained with q = 0.59 and the lowest persistence (p = 0.50) at 1 : 1317. Which combination the paper's 'upper' is, is not stated."
+  },
+  {
+   "id": "discounted_1to100_r09",
+   "value": 5,
+   "tolerance": 0,
+   "where": "Results: with a 5% discount rate 'between 2 and 5 years for a cost ratio of 1 : 100'",
+   "resolution": "Not reproduced. With equations 5 and 6 as printed (both the surveys and the escape cost discounted at 5%) the minimum is at 26 surveys for r = 0.9, later than without discounting, not earlier: discounting makes a survey next year cheaper and the escape cost smaller by the same factor each year. How the paper obtained shorter times is not determined."
+  },
+  {
+   "id": "discounted_1to1000_r09",
+   "value": 15,
+   "tolerance": 0,
+   "where": "Results: '2-15 years for a cost ratio of 1 : 1000'",
+   "resolution": "Not reproduced: 48 with equations 5 and 6 as printed. See discounted_1to100_r09."
+  },
+  {
+   "id": "rout_optimal_surveys",
+   "value": 3.29,
+   "tolerance": 0.005,
+   "where": "Rout et al. 2009, Results: 'The optimal solution for H. amarum (eqn 6) is to stop surveying after 3.29 absent surveys'"
+  },
+  {
+   "id": "rout_relative_cost_at_optimum",
+   "value": 2.79,
+   "tolerance": 0.005,
+   "where": "Rout et al. 2009, Results: 'at a total cost (relative to the cost of surveying, NEC/Cs) of 2.79'"
+  },
+  {
+   "id": "rout_r",
+   "value": 0.136,
+   "tolerance": 0.0005,
+   "where": "Rout et al. 2009, Results: 'the parameter r is 0.136 and the cost ratio Cs/Ce is 1/354.55'"
+  },
+  {
+   "id": "rout_one_over_log_r",
+   "value": -0.5,
+   "tolerance": 0.005,
+   "where": "Rout et al. 2009, Results: 'as 1/ln r = -0.5 is small enough to be ignored'"
+  }
+ ],
+ "rout": {
+  "provenance": "Rout et al. 2009, equations 4 and 5 and Appendix S1",
+  "cost_ratio": "354.55",
+  "robustness": "alpha(d, Nc) = (Nc - (d - 1) Cs) / (p(d) Ce) - 1 with p(d) = r^d: the largest proportional error in the probability of presence at which the expected cost stays within Nc",
+  "robust_optimal": "d = Nc / Cs + 1 / ln r + 1 (equation 5), which does not depend on Ce and is at least the optimal solution"
+ },
+ "dynamic_programme_claims": {
+  "provenance": "Regan et al. 2006, Results and Fig. 2, cost ratio 1 : 100",
+  "high_detection": "'When persistence is high (> 0.8), the rule of thumb underestimates the optimal number of surveys by one or two surveys if the probability of detection is high (q = 0.95)'",
+  "low_detection": "'and about five surveys if the probability of detection is very low (q = 0.05)'",
+  "stop_at_once": "'there is a point at which the optimal solution is to discontinue surveying if r is too large ... These results were also evident using the SDP although only for very high values of p and 1 - q'"
+ },
+ "ours": {
+  "helenium_upper_rule": 7,
+  "discounted_1to100_r09": 26,
+  "discounted_1to1000_r09": 48,
+  "helenium_dynamic_programme": {
+   "lower": 2,
+   "best": 4,
+   "upper": 9
+  },
+  "dynamic_programme_minus_rule_1to100": {
+   "q_0.95": {
+    "0.8": 0,
+    "0.9": 1,
+    "0.95": 1,
+    "0.98": 1
+   },
+   "q_0.05": {
+    "0.8": 0,
+    "0.9": 0,
+    "0.95": 2,
+    "0.98": 1
+   },
+   "note": "The first claim is reproduced (one survey more than the rule for persistence above 0.8 at q = 0.95). The second is not: at q = 0.05 the dynamic programme asks for at most two surveys more than the rule here, not about five. The paper does not state its time horizon or how it counts the first survey, either of which could account for part of the difference."
+  },
+  "persistence_0.99_1to100": {
+   "q_0.05": {
+    "300_years": 0,
+    "600_years": 0
+   },
+   "q_0.95": {
+    "300_years": 2,
+    "600_years": 0
+   },
+   "note": "A plant that almost never dies out is not worth searching for: the best course is to stop at once and bear the cost of escape, as the paper says of very high persistence. With good detection (q = 0.95) that holds over 600 years but not over 300, where two surveys are still worth making, so the answer depends on a horizon that the paper does not state."
+  }
+ },
+ "not_replicated": {
+  "items": "Regan et al.: the curves of Figs. 1 to 4 beyond the numbers quoted in the text. Rout et al.: Figs. 1 and 2 and the alternative uncertainty models of Appendix S2",
+  "reason": "The figures give no numbers; Appendix S2's equations are embedded objects in a Word file."
+ }
+}

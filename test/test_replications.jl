@@ -193,7 +193,7 @@ end
 @testset "replications of published analyses" begin
     @testset "every fixture states its provenance" begin
         files = filter(endswith(".json"), readdir(REPLICATIONS))
-        @test length(files) == 13
+        @test length(files) == 14
         for f in files
             fix = JSON.parse(read(joinpath(REPLICATIONS, f), String))
             for key in ("citation", "doi", "licence", "retrieved", "decision", "unit",
@@ -1342,6 +1342,135 @@ end
         @test choices == [:closed, Symbol("5percent"), :open, :open]
         @test evpi(tradeoff(3)) > 5 * evpi(tradeoff(0))
         @test evpi(tradeoff(100)) < 1e-6
+    end
+
+    @testset "Regan et al. 2006 and Rout et al. 2009, when to stop looking" begin
+        fix = replication("regan2006_eradication")
+        # The rule of thumb: the cost of stopping after n absent surveys, in survey
+        # costs, and the n that minimises it (equation 3) or solves equation 4.
+        nec(n, r, ratio) = (n - 1) + ratio * r^n
+        rule(r, ratio) = argmin(n -> nec(n, r, ratio), 1:3000)
+        formula(r, ratio) = log(-1 / (ratio * log(r))) / log(r)
+        @test rule(0.1, 100) == target(fix, "rule_1to100_r01")["value"]
+        @test rule(0.9, 100) == target(fix, "rule_1to100_r09")["value"]
+        @test rule(0.1, 1000) == target(fix, "rule_1to1000_r01")["value"]
+        @test rule(0.9, 1000) == target(fix, "rule_1to1000_r09")["value"]
+        @test rule(0.99, 1000) == target(fix, "rule_1to1000_r099")["value"]
+        @test issorted([rule(r, 100) for r in 0.1:0.1:0.9])
+        # The formula is the integer rule to within one survey.
+        @test all(abs(formula(r, c) - rule(r, c)) < 1
+                  for r in 0.1:0.1:0.9, c in (100, 1000))
+        # Where equation 4 reaches zero: r = exp(-Cs / Ce).
+        crossing(ratio) = exp(-1 / ratio)
+        @test abs(formula(crossing(1000), 1000)) < 1e-9
+        @test agrees(crossing(1000), fix, "zero_crossing_1to1000")
+        @test agrees(crossing(2), fix, "zero_crossing_1to2")
+        @test round(crossing(2); digits=3) == 0.607
+
+        # Helenium amarum, Table 1.
+        t1 = fix["table1"]
+        value(key, which) = Float64(exact_number(t1[key][which]))
+        r_of(q, p) = value("persistence", p) * (1 - value("detection", q))
+        @test rule(r_of("best", "best"), value("cost_ratio", "best")) ==
+              target(fix, "helenium_best")["value"]
+        @test rule(r_of("upper", "lower"), value("cost_ratio", "lower")) ==
+              target(fix, "helenium_at_least")["value"]
+        # The longest of the eight extreme combinations is 7, not the published 5.
+        longest = maximum(rule(r_of(q, p), value("cost_ratio", c))
+                          for q in ("lower", "upper"), p in ("lower", "upper"),
+                              c in ("lower", "upper"))
+        @test longest == fix["ours"]["helenium_upper_rule"] == 7
+        @test longest == rule(r_of("lower", "upper"), value("cost_ratio", "upper"))
+        @test rule(r_of("lower", "lower"), value("cost_ratio", "upper")) ==
+              target(fix, "helenium_no_more_than")["value"]
+
+        # Discounting by equations 5 and 6 as printed lengthens the search; the paper
+        # reports that it shortens it.
+        discounted(n, r, ratio, d) = (1 - (1 + d)^-(n - 1)) / d + ratio * r^n / (1 + d)^n
+        for (ratio, id) in
+            ((100, "discounted_1to100_r09"), (1000, "discounted_1to1000_r09"))
+            ours = argmin(n -> discounted(n, 0.9, ratio, 0.05), 1:3000)
+            @test ours == fix["ours"][id]
+            @test ours > rule(0.9, ratio) > target(fix, id)["value"]
+        end
+
+        # Rout et al. 2009: the optimum as a real number, its cost, and robustness.
+        ratio = Float64(exact_number(fix["rout"]["cost_ratio"]))
+        r = 0.8 * (1 - 0.83)
+        @test agrees(r, fix, "rout_r")
+        optimum = formula(r, ratio)
+        @test agrees(optimum, fix, "rout_optimal_surveys")
+        @test agrees(nec(optimum, r, ratio), fix, "rout_relative_cost_at_optimum")
+        @test agrees(1 / log(r), fix, "rout_one_over_log_r")
+        # Robustness: the largest proportional error in the probability of presence at
+        # which stopping after d surveys still costs no more than `limit` surveys.
+        robustness(d, limit) = (limit - (d - 1)) / (ratio * r^d) - 1
+        robust_optimal(limit) = limit + 1 / log(r) + 1                  # equation 5
+        for limit in (3.0, 4.0, 6.0, 10.0)
+            d = robust_optimal(limit)
+            @test all(robustness(d, limit) >= robustness(d + step, limit)
+                      for step in (-0.5, -0.01, 0.01, 0.5))
+            @test d >= optimum                 # at least the cost-minimising number
+            @test robustness(d, limit) > 0
+        end
+        # At the lowest admissible limit the two coincide and nothing is to spare.
+        least = nec(optimum, r, ratio)
+        @test robust_optimal(least) ≈ optimum
+        @test abs(robustness(optimum, least)) < 1e-9
+
+        # The dynamic programme, as adaptive_management with two states. The state is
+        # the plant's status this year before the survey; stopping pays the escape cost
+        # if it is present and ends the matter.
+        function stops_after(p, q, cost_ratio; years=300)
+            table = PayoffTable([:stop, :survey], [:present, :absent],
+                                BigRat[-cost_ratio 0; -1 -1])
+            moves = (; stop=BigRat[0 0; 1 1], survey=BigRat[p 0; 1-p 1])
+            seen = (; survey=Experiment(BigRat[1-q 1; q 0]; signals=[:not_seen, :seen]))
+            start = BigRat[p, 1 - p]           # seen last year
+            solved = adaptive_management(DecisionProblem(table, start; baseline=:stop),
+                                         seen; horizon=years, transitions=moves, depth=0,
+                                         passive=false, method=:vectors)
+            belief, surveys = start, 0
+            for left in years:-1:1
+                pieces = solved.value_function[left]
+                pieces.actions[argmax(pieces.vectors * belief)] == :stop && return surveys
+                surveys += 1
+                unseen = moves.survey * (belief .* BigRat[1 - q, 1])
+                belief = unseen ./ sum(unseen)
+            end
+            return surveys
+        end
+        ours = fix["ours"]
+        exact(key, which) = exact_number(t1[key][which])
+        for (which, q, p, c) in (("best", "best", "best", "best"),
+                                 ("lower", "upper", "lower", "lower"),
+                                 ("upper", "lower", "upper", "upper"))
+            @test stops_after(exact("persistence", p), exact("detection", q),
+                              exact("cost_ratio", c)) ==
+                  ours["helenium_dynamic_programme"][which]
+        end
+        # Against the rule at a cost ratio of 1 : 100 (the paper's Fig. 2).
+        gaps = ours["dynamic_programme_minus_rule_1to100"]
+        for (key, q) in (("q_0.95", 95 // 100), ("q_0.05", 5 // 100))
+            for (persistence, gap) in gaps[key]
+                p = exact_number(persistence)
+                @test stops_after(p, q, 100) - rule(Float64(p * (1 - q)), 100) == gap
+            end
+        end
+        @test all(==(1), [gaps["q_0.95"][p] for p in ("0.9", "0.95", "0.98")])
+        @test maximum(values(gaps["q_0.05"])) == 2          # the paper: "about five"
+        # With a plant that almost never dies out, the best course is to stop at once;
+        # with good detection that depends on the horizon, which the paper does not
+        # state.
+        stubborn = ours["persistence_0.99_1to100"]
+        for (key, q) in (("q_0.95", 95 // 100), ("q_0.05", 5 // 100)),
+            (years, label) in ((300, "300_years"), (600, "600_years"))
+
+            @test stops_after(99 // 100, q, 100; years) == stubborn[key][label]
+        end
+        @test stubborn["q_0.05"]["300_years"] == 0 == stubborn["q_0.95"]["600_years"]
+        # A longer horizon changes nothing.
+        @test stops_after(8 // 10, 83 // 100, 354; years=600) == 4
     end
 
     @testset "the functions added for the replications" begin
