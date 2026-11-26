@@ -275,13 +275,13 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `compare_voi.jl`, which prints our estimates beside those of `voi`, `requirements.txt`,
   `requirements-py27.txt` and a README with the versions used and the findings. The Python environments
   are `validation/.venv` and, for `improb` (Python 2.7), `validation/.venv27` (both ignored).
-- `vignettes/NN_name/NN_name.qmd`: thirty-three Quarto vignettes (Julia engine; 21 is the ecological example of the methods that follow `voi` and of scenario designs, a stage-structured frog population), 1 to 15 basic to advanced (1 to 10 the
+- `vignettes/NN_name/NN_name.qmd`: thirty-three Quarto vignettes (Julia engine): tutorials 1 to 20, case studies in ecology 21 to 27 and in human epidemiology 28 to 33, so that each group is a contiguous block (a new tutorial or ecology case study means renumbering what follows). Tutorials 1 to 15 run basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
-  multi-attribute utilities on the toy simulator), 25 `survey_or_act` on synthetic parcels, 26 `value_of_waiting` on an invented outbreak, 27 `adaptive_management` on an invented colony, 28 the same with a state that moves (`transitions`) on an invented reserve, and thirteen case studies, each a replication of a published analysis, grouped by field in the
-  directory name (`NN_ecology_*`, which includes diseases of animals: 16 Shea et al. 2014, 17 Runge et al.
-  2011, 19 Li et al. 2021, 20 Luhede et al. 2024, 23 Christensen et al. 2026, 24 Bal et al. 2018, 29 Chadès
-  et al. 2008; `NN_epidemiology_*`, human: 18 Eze et al. 2023, 22 Kim et al. 2017, 30 Li et al. 2019, which reads its 999-state table from the test fixture by a line pattern, so keep one row per line there; 31 Atkins et al. 2020, whose epidemic model is rebuilt in the vignette and in `test/test_replications.jl`; 32 de Vries et al. 2021; 33 Shea et al. 2023, which also reads its table from the fixture line by line, and whose value-of-information part is ours, not the paper's). Their titles do not
+  multi-attribute utilities on the toy simulator), 16 is the ecological example of the methods that follow `voi` and of scenario designs (a stage-structured frog population), 17 `survey_or_act` on synthetic parcels, 18 `value_of_waiting` on an invented outbreak, 19 `adaptive_management` on an invented colony, 20 the same with a state that moves (`transitions`, and the `:vectors` and `:points` methods) on an invented reserve, and thirteen case studies, each a replication of a published analysis, grouped by field in the
+  directory name (`NN_ecology_*`, which includes diseases of animals: 21 Shea et al. 2014, 22 Runge et al.
+  2011, 23 Li et al. 2021, 24 Luhede et al. 2024, 25 Christensen et al. 2026, 26 Bal et al. 2018, 27 Chadès
+  et al. 2008; `NN_epidemiology_*`, human: 28 Eze et al. 2023, 29 Kim et al. 2017, 30 Li et al. 2019, which reads its 999-state table from the test fixture by a line pattern, so keep one row per line there; 31 Atkins et al. 2020, whose epidemic model is rebuilt in the vignette and in `test/test_replications.jl`; 32 de Vries et al. 2021; 33 Shea et al. 2023, which also reads its table from the fixture line by line, and whose value-of-information part is ours, not the paper's). Their titles do not
   say "replication"; the opening section "About this case study" does. `docs/make.jl` lists them under
   "Case studies", by field, from the directory name), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for

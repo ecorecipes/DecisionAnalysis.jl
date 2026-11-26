@@ -583,7 +583,7 @@ end
     end
 
     @testset "long horizons" begin
-        # A reserve that a weed can invade (vignette 28), in exact arithmetic: 60 years,
+        # A reserve that a weed can invade (vignette 20), in exact arithmetic: 60 years,
         # far beyond what the recursion over beliefs can reach.
         table = PayoffTable([:none, :inspect, :treat], [:clear, :infested],
                             BigRat[50 20; 48 18; 40 10])
