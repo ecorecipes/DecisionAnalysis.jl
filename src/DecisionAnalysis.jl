@@ -68,6 +68,7 @@ using FiniteKernels: FiniteKernels, FiniteKernel, FiniteSpace, axis_names, facto
 using LinearAlgebra: ColumnNorm, Diagonal, I, Symmetric, cholesky, dot, eigen, issuccess,
                      logdet, qr, tr
 using Random: AbstractRNG, Xoshiro, randn!, shuffle!
+using SpecialFunctions: erfc
 using Statistics: mean
 using Logging: NullLogger, with_logger
 using Tables: Tables

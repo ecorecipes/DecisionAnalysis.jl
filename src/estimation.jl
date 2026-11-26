@@ -231,16 +231,7 @@ function _cost(c, what::AbstractString)
     return (Float64(centre), (upper - lower) / 4)
 end
 
-function _normal_cdf(x::Real)
-    # Abramowitz and Stegun 26.2.17, absolute error below 7.5e-8.
-    t = 1 / (1 + 0.2316419 * abs(x))
-    tail = exp(-x^2 / 2) / sqrt(2π) *
-           t *
-           (0.319381530 +
-            t * (-0.356563782 + t * (1.781477937 +
-                                     t * (-1.821255978 + t * 1.330274429))))
-    return x >= 0 ? 1 - tail : tail
-end
+_normal_cdf(x::Real) = erfc(-x / sqrt(2)) / 2
 
 """
     enbs_curve(estimates; n, setup_cost=0, per_sample_cost=0, population=1,

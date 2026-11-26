@@ -8,7 +8,8 @@ simulator runs. The Catlab-free core of the decision layer of the ecorecipes eco
 
 Model packages produce outcomes; this package analyses the payoff table they give. It depends on
 FiniteKernels (finite spaces, kernels and states) through a `[sources]` URL
-(the Lean project in `proofs/` still path-requires the sibling clone `../FiniteKernels.jl`), on `JuMP` (to state linear programmes; never on a solver), and on `LinearAlgebra`,
+(the Lean project in `proofs/` still path-requires the sibling clone `../FiniteKernels.jl`), on `JuMP` (to state linear programmes; never on a solver), on `SpecialFunctions` (the normal
+distribution function; already installed with JuMP), and on `LinearAlgebra`,
 `Logging`, `Random`, `Statistics` and `Tables`. FiniteKernels brings
 ResilienceCore and StructuredPopulationCore through its own `[sources]`; Pkg follows the sources of a URL
 dependency from Julia 1.13, which is why 1.13 is the minimum and why neither is listed here (on 1.12 both
