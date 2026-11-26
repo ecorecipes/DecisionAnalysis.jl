@@ -31,7 +31,8 @@ tables with matching labels).
 
 Every linear programme is stated once as a JuMP model by an exported builder
 ([`eadmissibility_model`](@ref), [`garbling_model`](@ref), [`deficiency_model`](@ref),
-[`evpi_envelope_model`](@ref)) and solved by [`solve_program`](@ref): by default with
+[`evpi_envelope_model`](@ref), [`mixed_dominance_model`](@ref),
+[`separating_payoff_model`](@ref)) and solved by [`solve_program`](@ref): by default with
 the built-in exact simplex, otherwise with the `optimizer` given, exact or floating
 point. No solver is trusted: witnesses are verified in exact arithmetic before they
 are returned.

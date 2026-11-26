@@ -214,10 +214,10 @@ end
 # The values of the model's variables in the shape of the programme's `variables`.
 function _shape_values(prog::DecisionProgram, data, x::AbstractVector)
     lookup = Dict(zip(data.variables, x))
-    read(v::JuMP.AbstractVariableRef) = lookup[v]
-    read(v::AbstractArray) = map(read, v)
-    return map(read, prog.variables)
+    return map(v -> _value_of(lookup, v), prog.variables)
 end
+_value_of(lookup::AbstractDict, v::JuMP.AbstractVariableRef) = lookup[v]
+_value_of(lookup::AbstractDict, v::AbstractArray) = map(x -> _value_of(lookup, x), v)
 
 function _failed(prog::DecisionProgram{T}, status::Symbol, route::Symbol,
                  exact::Bool) where {T}
@@ -237,8 +237,8 @@ end
         -> ProgramSolution
 
 Solve a programme built by [`eadmissibility_model`](@ref), [`garbling_model`](@ref),
-[`deficiency_model`](@ref) or [`evpi_envelope_model`](@ref). There are three routes
-to the same model.
+[`deficiency_model`](@ref), [`evpi_envelope_model`](@ref), [`mixed_dominance_model`](@ref)
+or [`separating_payoff_model`](@ref). There are three routes to the same model.
 
 - **`optimizer = nothing` (the default): the built-in exact simplex.** The matrix
   form of the model is read with `JuMP.lp_matrix_data` and solved in

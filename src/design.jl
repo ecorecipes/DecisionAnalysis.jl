@@ -53,9 +53,6 @@ function voi_profile(problem::DecisionProblem, experiment::Experiment; atol::Rea
     a0 = argmax(Q * p)
     T = promote_type(eltype(Q), eltype(p), eltype(L))
     V = Base.promote_op(/, T, T)
-    total = zero(V)
-    second = zero(V)
-    unchanged = zero(promote_type(eltype(p), eltype(L)))
     outcomes = map(axes(L, 1)) do z
         joint = p .* view(L, z, :)
         pz = sum(joint)
@@ -67,12 +64,13 @@ function voi_profile(problem::DecisionProblem, experiment::Experiment; atol::Rea
         best = _select(Optimize(), scores, :max, _tolerance(scores, atol, rtol))
         stays = a0 in best
         value = stays ? zero(V) : (maximum(scores) - scores[a0]) / pz
-        total += pz * value
-        second += pz * value^2
-        stays && (unchanged += pz)
         return (; signal, probability=pz, best=actions[best],
                 posterior_value=maximum(scores) / pz, value, changes_decision=!stays)
     end
+    total = sum(o.probability * o.value for o in outcomes; init=zero(V))
+    second = sum(o.probability * o.value^2 for o in outcomes; init=zero(V))
+    unchanged = sum(o.probability for o in outcomes if !o.changes_decision;
+                    init=zero(promote_type(eltype(p), eltype(L))))
     variance = second - total^2
     return (; act_now_action=actions[a0], outcomes, evsi=total, variance,
             standard_deviation=sqrt(max(Float64(variance), 0.0)),

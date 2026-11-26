@@ -7,12 +7,6 @@
 _labels(v) = Symbol[Symbol(x) for x in v]
 _default_labels(prefix::AbstractString, n::Integer) = [Symbol(prefix, i) for i in 1:n]
 
-function _unique_labels(v, what::AbstractString)
-    out = _labels(v)
-    allunique(out) || throw(ArgumentError("$what labels must be distinct, got $out"))
-    return out
-end
-
 # Arithmetic
 # ----------
 
@@ -320,6 +314,14 @@ function _column_table(table)
     return map(collect, columns)
 end
 
+# The column `name` of a table of draws and the table without it.
+function _take_column(columns::NamedTuple, name::Symbol, what::AbstractString)
+    haskey(columns, name) ||
+        throw(ArgumentError("the draws have no column $name to use as $what; " *
+                            "columns: $(collect(keys(columns)))"))
+    return columns[name], Base.structdiff(columns, NamedTuple{(name,)})
+end
+
 """
     SampleBelief(draws; weights=nothing, labels=nothing)
     SampleBelief(n::Integer; weights=nothing, labels=nothing)
@@ -395,17 +397,12 @@ struct SampleBelief{T<:Real,C<:NamedTuple} <: AbstractBelief
 end
 
 function SampleBelief(draws; weights=nothing, labels=nothing)
-    columns = _column_table(draws)
-    function take(name::Symbol, what)
-        haskey(columns, name) ||
-            throw(ArgumentError("the draws have no column $name to use as $what; " *
-                                "columns: $(collect(keys(columns)))"))
-        column = columns[name]
-        columns = Base.structdiff(columns, NamedTuple{(name,)})
-        return column
-    end
-    w = weights isa Symbol ? take(weights, "weights") : weights
-    l = labels isa Symbol ? take(labels, "labels") : labels
+    all_columns = _column_table(draws)
+    w, without_weights = weights isa Symbol ?
+                         _take_column(all_columns, weights, "weights") :
+                         (weights, all_columns)
+    l, columns = labels isa Symbol ? _take_column(without_weights, labels, "labels") :
+                 (labels, without_weights)
     n = w !== nothing ? length(w) :
         l !== nothing ? length(l) :
         isempty(columns) ?

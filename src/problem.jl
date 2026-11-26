@@ -58,6 +58,14 @@ struct DecisionProblem{T<:Real,B<:AbstractBelief,S}
     end
 end
 
+function Base.:(==)(a::DecisionProblem, b::DecisionProblem)
+    return a.payoff == b.payoff && a.belief == b.belief && a.feasible == b.feasible &&
+           a.baseline == b.baseline
+end
+function Base.hash(p::DecisionProblem, h::UInt)
+    return hash(p.baseline, hash(p.feasible, hash(p.belief, hash(p.payoff, hash(:DP, h)))))
+end
+
 function DecisionProblem(payoff::PayoffTable, belief::AbstractBelief; feasible=nothing,
                          baseline::Union{Nothing,Symbol,AbstractString}=nothing)
     return DecisionProblem(payoff, belief, _feasibility_mask(payoff, feasible),

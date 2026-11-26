@@ -177,8 +177,8 @@ function _mars(method::MARSRegression, columns::NamedTuple, Q::AbstractMatrix,
     penalty = method.penalty === nothing ? (method.degree == 1 ? 2.0 : 3.0) :
               method.penalty
     function rss(S)
-        coefficients = qr(gram[S, S], ColumnNorm()) \ cross[S, :]
-        return max(total - sum(cross[S, :] .* coefficients), 0.0)
+        fit = qr(gram[S, S], ColumnNorm()) \ cross[S, :]
+        return max(total - sum(cross[S, :] .* fit), 0.0)
     end
     function score(S)
         cost = length(S) + penalty * (length(S) - 1) / 2

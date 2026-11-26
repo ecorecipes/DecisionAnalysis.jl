@@ -93,7 +93,9 @@ function evppi_nested(payoffs, sample_focal, sample_rest; outer::Integer, inner:
     end
     w = fill(1 / outer, outer)
     v0, a = _act_now(means, w)
-    gains = [maximum(view(means, :, r)) - means[a, r] for r in 1:outer]
+    gains = let means = means
+        [maximum(view(means, :, r)) - means[a, r] for r in 1:outer]
+    end
     value = sum(gains) / outer
     bias = (; act_now=_act_now_bias(means, w, rng), cells=max(inflation / outer, 0.0))
     details = (; act_now_value=v0, act_now_index=a, outer=Int(outer), inner=Int(inner),

@@ -101,3 +101,13 @@
         @test size(random_payoff_table(Random.Xoshiro(7), 2, 5)) == (2, 5)
     end
 end
+
+@testset "problems are compared by value" begin
+    table = PayoffTable([:a, :b], [:x, :y], [1 0; 0 1])
+    make() = DecisionProblem(table, [1 // 2, 1 // 2]; baseline=:a)
+    @test make() == make() && hash(make()) == hash(make())
+    @test make() != DecisionProblem(table, [1 // 3, 2 // 3]; baseline=:a)
+    @test make() != DecisionProblem(table, [1 // 2, 1 // 2])
+    @test make() != DecisionProblem(table, [1 // 2, 1 // 2]; baseline=:a, feasible=[:a])
+    @test length(unique([make(), make()])) == 1
+end

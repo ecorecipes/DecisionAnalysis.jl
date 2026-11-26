@@ -405,11 +405,11 @@ _tolerance(x, atol::Real, rtol::Real) = max(atol, rtol * maximum(abs, x; init=ze
 
 function _select(::Optimize, scores::AbstractVector, sense::Symbol, tol::Real)
     if sense === :max
-        best = maximum(scores)
-        return findall(s -> s >= best - tol, scores)
+        top = maximum(scores)
+        return findall(>=(top - tol), scores)
     end
-    best = minimum(scores)
-    return findall(s -> s <= best + tol, scores)
+    bottom = minimum(scores)
+    return findall(<=(bottom + tol), scores)
 end
 function _select(sel::Threshold, scores::AbstractVector, sense::Symbol, ::Real)
     return sense === :max ? findall(>=(sel.level), scores) :
@@ -418,11 +418,18 @@ end
 
 """
     decide(problem::DecisionProblem, rule; atol=0, rtol) -> DecisionResult
-    decide(problems::AbstractVector{<:DecisionProblem}, rule::ParetoFront; atol=0, rtol)
+    decide(problem, rule::EAdmissible; atol=0, rtol, optimizer=nothing, rounding_tol)
+    decide(problems::AbstractVector{<:DecisionProblem}, rule::ParetoFront; objectives, atol=0, rtol)
     decide(tables, belief, rule::ParetoFront; feasible=nothing, baseline=nothing, atol=0, rtol)
 
 Apply `rule` to `problem` and return a [`DecisionResult`](@ref) holding the score of
 every feasible action, the chosen actions and the rule.
+
+For [`EAdmissible`](@ref), `optimizer` and `rounding_tol` are passed to
+[`solve_program`](@ref). For [`ParetoFront`](@ref) the objectives are several problems
+over the same actions, or `tables` (named payoff tables: a named tuple, a dictionary or
+`name => table` pairs) with one `belief`; `objectives` names the problems of the
+vector form, and the names are returned in `details.objectives`.
 
 **Ties.** Every action whose score is within `max(atol, rtol · max|score|)` of the
 best is chosen. `rtol` defaults to zero for `Rational` and integer problems, where
@@ -497,7 +504,7 @@ function decide(problem::DecisionProblem, rule::IntervalDominance; atol::Real=0,
     lower = vec(minimum(E; dims=2))
     upper = vec(maximum(E; dims=2))
     tol = _tolerance(E, atol, rtol)
-    idx = findall(u -> u >= maximum(lower) - tol, upper)
+    idx = findall(>=(maximum(lower) - tol), upper)
     actions = feasible_actions(problem)
     return DecisionResult(rule, actions, nothing, actions[idx], :max, (; lower, upper))
 end

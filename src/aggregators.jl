@@ -32,8 +32,8 @@ abstract type AbstractAggregator end
 """
     Expectation()
 
-Expected payoff under the single prior of a [`FiniteBelief`](@ref):
-`Σ_θ p(θ) Q[a, θ]`.
+Expected payoff under a single prior (a [`FiniteBelief`](@ref), a
+[`SampleBelief`](@ref) or a [`PointBelief`](@ref)): `Σ_θ p(θ) Q[a, θ]`.
 """
 struct Expectation <: AbstractAggregator end
 

@@ -108,8 +108,8 @@ end
 
 The expected regret (expected opportunity loss) of every feasible action under the
 single prior of the problem, `Σ_θ p(θ) R[a, θ]`. Its minimum equals [`evpi`](@ref)
-and is attained exactly at the actions that maximise expected utility. Needs a
-[`FiniteBelief`](@ref) or a [`PointBelief`](@ref).
+and is attained exactly at the actions that maximise expected utility. Needs a single
+prior: a [`FiniteBelief`](@ref), a [`SampleBelief`](@ref) or a [`PointBelief`](@ref).
 """
 function expected_regret(problem::DecisionProblem)
     v = _view(problem)

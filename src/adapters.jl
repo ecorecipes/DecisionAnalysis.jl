@@ -1,7 +1,7 @@
 # The verbs a model package implements so that its simulator can be driven by
 # `outcomes`. They are declared here with no methods for foreign types: a model package
 # never depends on DecisionAnalysis, so the methods live in a weak-dependency extension
-# on this side (or in the user's script).
+# inside the model package, triggered by this one (or in the user's script).
 
 """
     with_parameters(prob, θ)

@@ -222,13 +222,13 @@ julia> payoff_table(t, InfectionUtility(; weight=1); baseline=:none).Q
 ```
 """
 function payoff_table(t::OutcomeTable, u::AbstractUtility; baseline=nothing)
-    U, ok = _run_utilities(t, u)
-    if baseline !== nothing
-        b = findfirst(==(Symbol(baseline)), t.actions)
-        b === nothing && throw(InvalidBaselineError(Symbol(baseline), t.actions))
-        ok = ok .& view(ok, b:b, :, :)
-        U = U .- view(U, b:b, :, :)
-    end
+    raw, usable = _run_utilities(t, u)
+    b = baseline === nothing ? nothing : findfirst(==(Symbol(baseline)), t.actions)
+    baseline !== nothing && b === nothing &&
+        throw(InvalidBaselineError(Symbol(baseline), t.actions))
+    # Relative to the baseline: differences within a run, where both runs are usable.
+    U = b === nothing ? raw : raw .- view(raw, b:b, :, :)
+    ok = b === nothing ? usable : usable .& view(usable, b:b, :, :)
     na, nd = length(t.actions), length(t.draws)
     counts = [count(view(ok, a, d, :)) for a in 1:na, d in 1:nd]
     i = findfirst(iszero, counts)

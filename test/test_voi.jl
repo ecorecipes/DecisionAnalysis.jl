@@ -374,3 +374,22 @@
         end
     end
 end
+
+@testset "cells of a partition in any order and with any labels" begin
+    rng = Random.Xoshiro(20261206)
+    for trial in 1:50
+        m, n = rand(rng, 2:4), rand(rng, 2:9)
+        problem = exact_problem(rng, m, n)
+        p, Q = probabilities(problem.belief), problem.payoff.Q
+        partition = rand(rng, [:low, "mid", 3, (1, 2)], n)        # mixed labels, unsorted
+        cells = unique(partition)
+        slow = sum(maximum(sum(p[j] * Q[:, j] for j in 1:n if partition[j] == c))
+                   for c in cells) - maximum(Q * p)
+        @test evppi(problem, partition) == slow
+        @test DecisionAnalysis._cell_columns(partition) ==
+              [findall(==(c), partition) for c in cells]
+        # One cell for each state is perfect information; one cell for all is none.
+        @test evppi(problem, collect(1:n)) == evpi(problem)
+        @test evppi(problem, fill(:all, n)) == 0
+    end
+end

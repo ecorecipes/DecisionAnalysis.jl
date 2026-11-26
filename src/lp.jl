@@ -97,7 +97,7 @@ function _simplex(c::Vector{_BigRat}, A::Matrix{_BigRat}, b::Vector{_BigRat})
             _pivot!(T, z, basis, i, j)
         end
     end
-    T = T[keep, vcat(1:n, n + m + 1)]
+    tableau = T[keep, vcat(1:n, n + m + 1)]
     basis = basis[keep]
     # Phase 2.
     z = zeros(_BigRat, n + 1)
@@ -108,14 +108,14 @@ function _simplex(c::Vector{_BigRat}, A::Matrix{_BigRat}, b::Vector{_BigRat})
         cb = c[bi]
         iszero(cb) && continue
         for j in 1:(n + 1)
-            z[j] -= cb * T[i, j]
+            z[j] -= cb * tableau[i, j]
         end
     end
-    status = _iterate!(T, z, basis, n)
+    status = _iterate!(tableau, z, basis, n)
     status === :optimal || return _LPSolution(status, _BigRat[], zero(_BigRat))
     x = zeros(_BigRat, n)
     for (i, bi) in enumerate(basis)
-        x[bi] = T[i, end]
+        x[bi] = tableau[i, end]
     end
     return _LPSolution(:optimal, x, -z[end])
 end

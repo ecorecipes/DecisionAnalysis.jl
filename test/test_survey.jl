@@ -315,4 +315,15 @@ plain_unit(value, cost) = (; choice=:act_now, value, cost, largest_cost=cost)
         @test_throws ArgumentError select_under_budget(units, 1; passes=0)
         @test_throws ArgumentError select_under_budget(units, 1; option=:best)
     end
+
+    @testset "an imposed policy as a named tuple, a dictionary or pairs" begin
+        table = PayoffTable([:none, :protect], [:absent, :present], [0 0; 0 10])
+        problem = DecisionProblem(table, [1 // 2, 1 // 2]; baseline=:none)
+        found = Experiment([1 1//2; 0 1//2]; signals=[:not_found, :found])
+        run(policy) = survey_or_act(problem, found; action_costs=(; none=0, protect=4),
+                                    survey_cost=1, policy)
+        named = run((; not_found=:none, found=:protect))
+        @test named == run(Dict(:not_found => :none, :found => :protect))
+        @test named == run([:not_found => :none, :found => :protect])
+    end
 end

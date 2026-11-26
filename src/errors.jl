@@ -189,7 +189,8 @@ end
 Thrown when a linear programme that is feasible and bounded by construction is
 reported otherwise by the solver that was used (the built-in simplex or the
 `optimizer` that was passed). `problem` names the programme (`:e_admissibility`,
-`:deficiency`, `:evpi_envelope`) and `status` is `:infeasible`, `:unbounded`, or the
+`:garbling`, `:deficiency`, `:evpi_envelope`, `:mixed_dominance` or
+`:separating_payoff`) and `status` is `:infeasible`, `:unbounded`, or the
 lower-case name of another termination status of the optimiser (for example
 `:time_limit`). With the built-in solver this error means a bug, not bad input; with
 an external optimiser it may mean that the optimiser failed.
@@ -212,7 +213,7 @@ problem and its answer, rounded to rationals, did not pass the exact check that 
 answer must pass before it is returned: a witness that is not exactly a witness, or
 an optimal value that the rounded primal and dual solutions do not certify. `problem`
 names the programme (`:e_admissibility`, `:garbling`, `:deficiency`,
-`:evpi_envelope`) and `msg` says which check failed. Nothing unverified is returned in
+`:evpi_envelope`, `:mixed_dominance` or `:separating_payoff`) and `msg` says which check failed. Nothing unverified is returned in
 its place. The default route (`optimizer = nothing`) and an exact optimiser do not
 round and do not throw this error; a different `rounding_tol` may also help.
 """

@@ -278,10 +278,10 @@ function DecisionProblem(design::ScenarioDesign, table::OutcomeTable, utility;
         throw(ArgumentError("the design is a fraction that leaves some action without " *
                             "some state, so it has no payoff table"))
     payoff = payoff_table(table, utility)
-    belief = design_belief(design)
-    order = [findfirst(==(s), state_labels(belief)) for s in payoff.states]
-    belief = belief isa ScenarioSet ? ScenarioSet(payoff.states) :
-             FiniteBelief(payoff.states, belief.probabilities[order])
+    designed = design_belief(design)
+    order = [findfirst(==(s), state_labels(designed)) for s in payoff.states]
+    belief = designed isa ScenarioSet ? ScenarioSet(payoff.states) :
+             FiniteBelief(payoff.states, designed.probabilities[order])
     return DecisionProblem(payoff, belief; baseline)
 end
 

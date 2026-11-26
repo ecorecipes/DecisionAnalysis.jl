@@ -23,7 +23,7 @@ end
 
 The value of deciding now, with no further information: the largest expected utility,
 `V0 = max_a Σ_θ p(θ) Q[a, θ]`, over the feasible actions. Needs a single prior
-([`FiniteBelief`](@ref) or [`PointBelief`](@ref)).
+([`FiniteBelief`](@ref), [`SampleBelief`](@ref) or [`PointBelief`](@ref)).
 """
 function act_now_value(problem::DecisionProblem)
     return maximum(_feasible_Q(problem) * _prior(problem, :act_now_value))
@@ -161,6 +161,21 @@ function evpi(problem::DecisionProblem)
     return dot(p, best) - maximum(Q * p)
 end
 
+# The columns of each cell of a partition of the states, cells in order of first
+# appearance: one pass, where a `findall` for each cell would be quadratic.
+function _cell_columns(partition::AbstractVector)
+    place = Dict{eltype(partition),Int}()
+    columns = Vector{Int}[]
+    for (j, cell) in enumerate(partition)
+        k = get!(place, cell) do
+            push!(columns, Int[])
+            return length(columns)
+        end
+        push!(columns[k], j)
+    end
+    return columns
+end
+
 """
     evppi(problem::DecisionProblem, partition::AbstractVector)
 
@@ -190,10 +205,8 @@ function evppi(problem::DecisionProblem, partition::AbstractVector)
                             "$n states of the payoff table"))
     p = _prior(problem, :evppi)
     Q = _feasible_Q(problem)
-    informed = sum(unique(partition)) do cell
-        cols = findall(isequal(cell), partition)
-        return maximum(view(Q, :, cols) * view(p, cols))
-    end
+    informed = sum(cols -> maximum(view(Q, :, cols) * view(p, cols)),
+                   _cell_columns(partition))
     return informed - maximum(Q * p)
 end
 
@@ -290,7 +303,7 @@ function two_stage_value(problem::DecisionProblem, first_stage::AbstractVector;
     p = _prior(problem, :two_stage_value)
     Q = problem.payoff.Q
     stages = unique(first_stage[problem.feasible])
-    columns = [findall(isequal(c), cells) for c in unique(cells)]
+    columns = _cell_columns(cells)
     values = map(stages) do g
         rows = findall(i -> problem.feasible[i] && isequal(first_stage[i], g), 1:m)
         return sum(maximum(view(Q, rows, cols) * view(p, cols)) for cols in columns)

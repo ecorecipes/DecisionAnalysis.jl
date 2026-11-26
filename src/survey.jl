@@ -30,7 +30,10 @@ function _action_costs(problem::DecisionProblem, costs::AbstractVector{<:Pair})
 end
 
 function _imposed_policy(policy, signals::Vector{Symbol}, actions::Vector{Symbol})
-    given = Dict{Symbol,Symbol}(Symbol(k) => Symbol(v) for (k, v) in pairs(Dict(policy)))
+    given = Dict{Symbol,Symbol}(Symbol(k) => Symbol(v)
+                                for (k, v) in
+                                    (policy isa AbstractVector{<:Pair} ? policy :
+                                     pairs(policy)))
     return map(signals) do z
         haskey(given, z) || throw(ArgumentError("policy has no action for the signal $z"))
         a = findfirst(==(given[z]), actions)
@@ -54,14 +57,15 @@ function _cost_effective_policy(G, K, survey_cost, base::Int)
     cost(policy) = survey_cost + sum(K[policy[z], z] for z in 1:nz)
     ratio = value(current) / cost(current)
     while true
-        candidate = map(1:nz) do z
+        candidate = copy(current)
+        for z in 1:nz
             best = current[z]
             score = G[best, z] - ratio * K[best, z]
             for a in axes(G, 1)
                 s = G[a, z] - ratio * K[a, z]
                 s > score && ((best, score) = (a, s))
             end
-            return best
+            candidate[z] = best
         end
         candidate == current && return current
         r = value(candidate) / cost(candidate)
@@ -254,7 +258,9 @@ function select_under_budget(units::AbstractVector, budget::Real; option::Symbol
     while !isempty(left) && (passes === nothing || made < passes)
         made += 1
         if made > 1
-            filter!(i -> picks[i].cost <= remaining, left)
+            let limit = remaining
+                filter!(i -> picks[i].cost <= limit, left)
+            end
             sort!(left; by=i -> (-ratio(i), picks[i].cost), alg=MergeSort)
         end
         taken = 0

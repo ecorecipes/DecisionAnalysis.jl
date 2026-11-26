@@ -103,7 +103,7 @@ Supertype of the methods that estimate a value of information from a
 [`SampleBelief`](@ref): [`SampleAverage`](@ref), [`Grouping`](@ref),
 [`StrongOakley`](@ref), [`Sadatsafavi`](@ref) and the regressions
 ([`AbstractRegression`](@ref): [`SplineRegression`](@ref), [`GAMRegression`](@ref),
-[`GaussianProcessRegression`](@ref)).
+[`GaussianProcessRegression`](@ref), [`MARSRegression`](@ref)).
 """
 abstract type AbstractVOIMethod end
 
@@ -113,8 +113,9 @@ abstract type AbstractVOIMethod end
 Supertype of the regression methods, which estimate the conditional mean of every
 action's payoff given some columns (parameters or summary statistics) by regressing
 the payoffs on them: [`SplineRegression`](@ref) (built in),
-[`GAMRegression`](@ref) (extension, needs GAM.jl) and
-[`GaussianProcessRegression`](@ref) (built in, for five or more columns). A regression smooths over the
+[`GAMRegression`](@ref) (extension, needs GAM.jl),
+[`GaussianProcessRegression`](@ref) (built in, for five or more columns) and
+[`MARSRegression`](@ref) (built in, adaptive regression splines). A regression smooths over the
 simulation noise of the cells, so it is the estimator to use when cells are noisy.
 """
 abstract type AbstractRegression <: AbstractVOIMethod end
@@ -653,8 +654,9 @@ function _spline_fit(method::SplineRegression, columns::NamedTuple, Q::AbstractM
         (degree == 0 || 2 * coefficients <= n_effective) || continue
         # The constant is the weighted mean itself, so that its value is exactly zero.
         G = degree == 0 ? repeat(Qf * wf, 1, n) : _least_squares(A, Qf, wf)
-        R = Qf .- G
-        reference === nothing || (R = R .- R[reference:reference, :])
+        residual = Qf .- G
+        R = reference === nothing ? residual :
+            residual .- residual[reference:reference, :]
         rss = sum(wf[i] * R[a, i]^2 for a in axes(R, 1), i in axes(R, 2))
         gcv = rss / (1 - coefficients / n_effective)^2
         push!(scores, (; degree, knots, coefficients, gcv))
@@ -743,7 +745,8 @@ with its standard error and biases kept apart ([`VOIEstimate`](@ref)).
   common random numbers**, where the noise is shared between actions; pass the
   achieved correlation, [`crn_correlation`](@ref)`(outcomes, utility)`.
 - A regression ([`SplineRegression`](@ref), [`GAMRegression`](@ref),
-  [`GaussianProcessRegression`](@ref) when the draws carry many parameters): the
+  [`MARSRegression`](@ref), or [`GaussianProcessRegression`](@ref) when the draws
+  carry many parameters): the
   **all-parameter regression estimate**. Each action's payoff is regressed on all the
   parameters of the draws and the fitted values replace the noisy cells, so the
   simulation noise is smoothed out instead of being maximised over. This is the
@@ -844,11 +847,12 @@ end
 
 """
     evppi(problem::DecisionProblem, focal, method; bootstrap=0, seed=1) -> VOIEstimate
-    evppi(problem::DecisionProblem, focal::Symbol; kw...) -> VOIEstimate
+    evppi(problem::DecisionProblem, focal::Union{Symbol,Tuple}; kw...) -> VOIEstimate
 
 The expected value of partial perfect information about the named parameters of a
-[`SampleBelief`](@ref): the value of learning `focal` (a parameter name, or a tuple or
-vector of names, columns of the draws) exactly and nothing else. An estimate of the
+[`SampleBelief`](@ref): the value of learning `focal` (a parameter name or a tuple of names, columns of the
+draws; a vector of names is accepted only together with a `method`, since without one a
+vector is read as a partition of the states) exactly and nothing else. An estimate of the
 EVPPI defined for [`evppi`](@ref)`(problem, partition)`, returned with its standard
 error and biases ([`VOIEstimate`](@ref)). Methods:
 
@@ -860,6 +864,7 @@ error and biases ([`VOIEstimate`](@ref)). Methods:
 | [`SplineRegression`](@ref) | up to about four | additive regression spline, built in |
 | [`GAMRegression`](@ref) | up to about four | penalised smooths, needs GAM.jl |
 | [`GaussianProcessRegression`](@ref) | five or more | Gaussian process, built in |
+| [`MARSRegression`](@ref) | any number, numeric | adaptive regression splines, built in |
 
 **Without a method, the method is chosen by the focal parameters**, by the rule of
 the R package `voi`: a regression with smooths for up to four parameters and a
@@ -1311,7 +1316,7 @@ The sample problem collapsed onto a discrete parameter: a finite problem whose s
 are the cells of `focal` (a parameter name, or several, of the draws of a
 [`SampleBelief`](@ref); one cell per combination of values, in sorted order when the
 values can be sorted and otherwise in order of first appearance), whose payoffs are the
-weighted mean payoffs of the feasible actions within each cell, and whose belief is
+weighted mean payoffs of every action within each cell, and whose belief is
 the [`FiniteBelief`](@ref) of the cells' total weights. Feasibility and baseline
 carry over.
 
@@ -1339,19 +1344,25 @@ function conditional_problem(problem::DecisionProblem, focal)
     w = problem.belief.weights
     columns = _focal_columns(problem.belief, focal)
     cell, ncells = _cells(columns)
-    representative = [findfirst(==(c), cell) for c in 1:ncells]
+    # The first draw of each cell and the weight of the cell, in one pass.
+    first_draw = zeros(Int, ncells)
+    weight = zeros(eltype(w), ncells)
+    for i in eachindex(cell)
+        first_draw[cell[i]] == 0 && (first_draw[cell[i]] = i)
+        weight[cell[i]] += w[i]
+    end
     # Cells in sorted order of their values when these can be sorted, otherwise in
     # order of first appearance.
-    keys = [Tuple(column[i] for column in columns) for i in representative]
+    cell_values = [Tuple(column[i] for column in columns) for i in first_draw]
     order = try
-        sortperm(keys)
+        sortperm(cell_values)
     catch err
         err isa MethodError || rethrow()
         collect(1:ncells)
     end
-    representative = representative[order]
+    representative = first_draw[order]
     G = _cell_means(problem.payoff.Q, w, cell, ncells)
-    mass = [sum(w[i] for i in eachindex(w) if cell[i] == cell[r]) for r in representative]
+    mass = weight[order]
     labels = [Symbol(join((string(column[i]) for column in columns), "_"))
               for i in representative]
     payoff = PayoffTable(problem.payoff.actions, labels, G[:, representative])

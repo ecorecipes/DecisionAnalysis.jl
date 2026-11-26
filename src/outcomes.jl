@@ -5,6 +5,22 @@
 const _OK = "ok"
 const _ABSENT = "absent"
 
+# The distinct labels of a column in order of first appearance, and the position of each
+# of its `n` entries among them.
+function _index_labels(col, n::Integer)
+    labels = Symbol[]
+    seen = Dict{Symbol,Int}()
+    idx = Vector{Int}(undef, n)
+    for i in 1:n
+        l = _label(col[i])
+        idx[i] = get!(seen, l) do
+            push!(labels, l)
+            return length(labels)
+        end
+    end
+    return labels, idx
+end
+
 """
     OutcomeTable(runs; draw=:draw, action=:action, replicate=:replicate, outcomes,
                  status=nothing, ok=("ok",), parameters=nothing, key=draw,
@@ -125,22 +141,9 @@ function OutcomeTable(runs; draw=:draw, action=:action, replicate=:replicate, ou
     n = length(dcol)
     n >= 1 || throw(InvalidOutcomeError("the table of runs is empty"))
 
-    function index(col)
-        labels = Symbol[]
-        position = Dict{Symbol,Int}()
-        idx = Vector{Int}(undef, n)
-        for i in 1:n
-            l = _label(col[i])
-            idx[i] = get!(position, l) do
-                push!(labels, l)
-                return length(labels)
-            end
-        end
-        return labels, idx
-    end
-    dlabels, di = index(dcol)
-    alabels, ai = index(acol)
-    rlabels, ri = index(rcol)
+    dlabels, di = _index_labels(dcol, n)
+    alabels, ai = _index_labels(acol, n)
+    rlabels, ri = _index_labels(rcol, n)
 
     if actions !== nothing
         order = _labels(actions)
@@ -182,8 +185,8 @@ function OutcomeTable(runs; draw=:draw, action=:action, replicate=:replicate, ou
         isempty(missing_draws) ||
             throw(InvalidOutcomeError("draws $(missing_draws) of the runs are not in the " *
                                       "parameter table"))
-        position = Dict(l => k for (k, l) in enumerate(plabels))
-        di = [position[dlabels[k]] for k in di]
+        place = Dict(l => k for (k, l) in enumerate(plabels))
+        di = getindex.(Ref(place), dlabels[di])
         dlabels = plabels
         pars = Base.structdiff(ptable, NamedTuple{(Symbol(key),)})
         if weights isa Symbol
@@ -336,11 +339,8 @@ julia> action_labels(t), run_counts(t).ok
 ```
 """
 function combine_actions(first::OutcomeTable, rest::OutcomeTable...)
-    values, status, actions = first.values, first.status, copy(first.actions)
-    names = copy(first.outcomes)
-    for t in rest
-        names = [o for o in names if o in t.outcomes]
-    end
+    status, actions = first.status, copy(first.actions)
+    names = filter(o -> all(t -> o in t.outcomes, rest), first.outcomes)
     isempty(names) && throw(ArgumentError("the tables record no outcome in common"))
     pick(t) = t.values[:, :, :, [findfirst(==(o), t.outcomes) for o in names]]
     values = pick(first)

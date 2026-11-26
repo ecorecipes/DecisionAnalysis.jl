@@ -218,12 +218,12 @@ function fitted_conditional_means(method::GaussianProcessRegression, columns::Na
                   [(log(method.min_nugget), 6.0)])
     start = vcat(fill(max(log(sqrt(p)), floor_δ + log(2.0)), p), log(0.1))
     for a in axes(Qf, 1)
-        y = Qf[a, fit]
-        centre = sum(y) / length(y)
-        scale = sqrt(sum(abs2, y .- centre) / length(y))
+        raw = Qf[a, fit]
+        centre = sum(raw) / length(raw)
+        scale = sqrt(sum(abs2, raw .- centre) / length(raw))
         # A row that does not vary (the payoff of a reference action, say) is its mean.
         scale > 1e-12 * max(1.0, abs(centre)) || continue
-        y = (y .- centre) ./ scale
+        y = (raw .- centre) ./ scale
         function objective(θ)
             return _gp_log_likelihood(view(Xf, hyper, :), view(Hf, hyper, :),
                                       view(y, hyper), view(noise, hyper), θ, bounds)

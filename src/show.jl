@@ -399,10 +399,10 @@ function _blocks(r::DecisionReport)
 
     mc = r.monte_carlo
     if mc !== nothing
-        header = ["action", "expected utility", "standard error", "simulation only"]
+        mc_header = ["action", "expected utility", "standard error", "simulation only"]
         mc.expected_gain === nothing ||
-            push!(header, "gain over baseline", "standard error of gain")
-        rows = map(eachindex(actions)) do i
+            push!(mc_header, "gain over baseline", "standard error of gain")
+        mc_rows = map(eachindex(actions)) do i
             e = mc.expected_utility[i]
             row = [labels[i], _cell(e.value), _cell(e.standard_error),
                    _cell(e.simulation_error)]
@@ -413,7 +413,7 @@ function _blocks(r::DecisionReport)
         end
         push!(blocks,
               _Title("Monte Carlo standard errors (shown beside the values, never " *
-                     "folded into them)"), _Grid(header, rows),
+                     "folded into them)"), _Grid(mc_header, mc_rows),
               _Para("Standard error: the draws taken as a random sample of the " *
                     "belief. Simulation only: the simulator's noise with the draws " *
                     "held fixed (- when the table has no standard errors)."))
@@ -446,10 +446,10 @@ function _blocks(r::DecisionReport)
                       _cell(r.gain_range.upper[i])] for i in eachindex(actions)]))
     end
 
-    header = ["action", "max regret"]
-    r.expected_regret === nothing || push!(header, "expected regret")
+    regret_header = ["action", "max regret"]
+    r.expected_regret === nothing || push!(regret_header, "expected regret")
     push!(blocks, _Title("Regret profile"),
-          _Grid(header,
+          _Grid(regret_header,
                 [vcat(labels[i], _cell(r.max_regret[i]),
                       r.expected_regret === nothing ? String[] :
                       [_cell(r.expected_regret[i])]) for i in eachindex(actions)]))
