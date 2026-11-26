@@ -1,6 +1,6 @@
 # Experiments and exact value of information
 
-The definitions on finite problems. The same functions, called with a method or a study, estimate these quantities from a sample: see [Sample-based analysis](samples.md).
+The definitions on finite problems. The same functions, called with a method or a study, estimate these quantities from a sample: see [Sample-based analysis](samples.md). Designs, waiting and decisions repeated over time are in [Designs, waiting and sequential decisions](sequential.md).
 
 ## Experiments
 
@@ -33,18 +33,6 @@ information_can_change_decision
 robust_evpi
 robust_evsi
 RobustVOI
-```
-
-## Outcomes, estimation and design
-
-```@docs
-voi_profile
-expected_variance_reduction
-optimal_design
-value_of_waiting
-adaptive_management
-survey_or_act
-select_under_budget
 ```
 
 ## Influence diagrams
