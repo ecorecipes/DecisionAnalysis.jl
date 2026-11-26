@@ -7,52 +7,56 @@ DecisionAnalysis and GAM are.
 """
 module DecisionAnalysisGAMExt
 
-using DecisionAnalysis: DecisionAnalysis, GAMRegression
+using DecisionAnalysis: DecisionAnalysis, GAMRegression, _is_numeric
 using GAM: GAM
 
-_numeric(column::AbstractVector) = eltype(column) <: Real && !(eltype(column) <: Bool)
-
-# The right-hand side of the formula and the data columns, with safe names.
-function _terms(method::GAMRegression, columns::NamedTuple)
+# The formula `y ~ ...` and the data columns, with safe names. The formula is built
+# from terms, not parsed from text: nothing is evaluated at run time, so the same
+# formula is not compiled again for every action and every bootstrap resample.
+function _formula(method::GAMRegression, columns::NamedTuple)
     data = Pair{Symbol,Any}[]
     smooth = Symbol[]
     basis = Int[]
-    terms = String[]
+    terms = GAM.StatsModels.AbstractTerm[]
     for (j, column) in enumerate(columns)
         name = Symbol(:x, j)
         distinct = length(unique(column))
-        if _numeric(column) && distinct > 3
+        if _is_numeric(column) && distinct > 3
             push!(data, name => Float64.(column))
             push!(smooth, name)
             push!(basis, min(method.k, distinct - 1))
         else
             push!(data, name => string.(column))
-            distinct > 1 && push!(terms, String(name))
+            distinct > 1 && push!(terms, GAM.term(name))
         end
     end
     if method.tensor && length(smooth) > 1
         k = max(3, min(minimum(basis), 5))
-        push!(terms, "te(" * join(smooth, ", ") * ", k = $k)")
+        push!(terms, GAM.SmoothTerm(GAM.te(smooth...; k)))
     else
         for (name, k) in zip(smooth, basis)
-            push!(terms, "s($name, k = $k)")
+            push!(terms, GAM.SmoothTerm(GAM.s(name; k)))
         end
     end
-    return isempty(terms) ? "1" : join(terms, " + "), data
+    isempty(terms) && push!(terms, GAM.term(1))
+    return (GAM.term(:y) ~ reduce(+, terms)), data
 end
 
 function DecisionAnalysis.fitted_conditional_means(method::GAMRegression,
                                                    columns::NamedTuple, Q::AbstractMatrix,
                                                    w::AbstractVector)
-    rhs, data = _terms(method, columns)
-    formula = Core.eval(@__MODULE__, :(GAM.@formula($(Meta.parse("y ~ " * rhs)))))
+    formula, data = _formula(method, columns)
     weights = Float64.(w) .* length(w)
     G = zeros(Float64, size(Q))
     for a in axes(Q, 1)
         y = Float64.(view(Q, a, :))
-        table = (; y, data...)
-        model = Base.invokelatest(GAM.gam, formula, table; weights)
-        G[a, :] .= model.fitted_values
+        # A payoff that does not vary (that of a reference action, say) is its own
+        # conditional mean: there is nothing to fit, and a fit would not converge.
+        if allequal(y)
+            G[a, :] .= y
+        else
+            G[a, :] .= GAM.gam(formula, (; y, data...); weights).fitted_values
+        end
     end
     return G
 end
