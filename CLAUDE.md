@@ -215,8 +215,11 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   state, `Finite/AdaptiveDynamic.lean`. **With a moving state `no_learning` is the best fixed plan,
   `passive` replans each period and takes the plan's first action, and `perfect` is the state seen
   every period**; a passive manager that took the best action for the current period alone could fall
-  below the fixed plan, so do not define it that way. Its closures recurse, so their variables are
-  declared `local`. Two exact methods: `:beliefs` (default, every reachable belief once) and, for two
+  below the fixed plan, so do not define it that way. The file is built from top-level functions over
+  a small model type (`_Sequential`), one way of holding the value for each method (`_ByBeliefs`,
+  `_BySets`) and one for each way of finding the fixed plan; **do not go back to nested closures**: an
+  inner function that assigns a name also used by the enclosing function writes to the outer variable,
+  which gave wrong values here once and in `evsi(::MomentMatching)` once. Two exact methods: `:beliefs` (default, every reachable belief once) and, for two
   states only, `:vectors` (the value function as the upper envelope of lines, one set per number of
   periods left, returned as `value_function`; backed by `Finite/ValueVectors.lean`), which reaches long
   horizons when the state moves. For three or more states exact pruning needs a linear programme per

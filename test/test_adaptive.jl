@@ -477,7 +477,7 @@ end
 # its code beyond the one-step look-ahead.
 @testset "adaptive management by vectors" begin
     @testset "the upper envelope" begin
-        prune(G) = DecisionAnalysis._prune_vectors(G, collect(1:size(G, 1)))
+        prune(G) = (keep = DecisionAnalysis._envelope(G); (G[keep, :], keep))
         # A row is (value in state 1, value in state 2): a line from G[i, 1] at x = 0
         # to G[i, 2] at x = 1, where x is the probability of state 2.
         G = [4 0; 0 4; 3 3; 2 2; 1 1; 4 0; 3 1; 5//2 5//2]

@@ -74,22 +74,248 @@ function _horizon_weight(discount, horizon::Integer)
     return sum(discount^k for k in 0:(horizon - 1))
 end
 
-# Value functions as sets of vectors (`method=:vectors`). A set is a matrix whose rows
-# are vectors over the states; its value at the weights `w` is `maximum(G * w)`. The
-# step and the pruning are those of `proofs/DecisionAnalysisProofs/Finite/ValueVectors.lean`.
-# Only two states are supported: there the vectors that matter are an upper envelope of
-# lines, found exactly by sorting. With more states the pruning needs a linear programme
-# for each vector and, in exact arithmetic, was slower than the recursion over beliefs
-# on every problem tried.
+# The model: for each feasible action, its payoffs, what it shows (or `nothing`) and
+# how it moves the state (or `nothing`), with the discount and the state that a signal
+# is about. Everything below takes it as an argument; nothing is a closure, so no
+# function can write to another's variables.
+struct _Sequential{T}
+    Q::Matrix{T}
+    likelihoods::Vector{Union{Nothing,Matrix{T}}}
+    moves::Vector{Union{Nothing,Matrix{T}}}
+    discount::T
+    signal_next::Bool
+end
 
-# The rows of `G` that are needed for the maximum at some nonnegative weights over two
-# states, with their tags: the rows on the upper envelope of the lines
+# The weights moved to the next period under action `a`, no signal used.
+function _push_forward(m::_Sequential, w::AbstractVector, a::Integer)
+    M = m.moves[a]
+    return M === nothing ? w : M * w
+end
+
+# The weights of the next period after each signal of positive probability under
+# action `a`, as `(signal index, weights)`; the index is 0 where nothing is shown.
+function _updates(m::_Sequential{T}, w::Vector{T}, a::Integer) where {T}
+    L = m.likelihoods[a]
+    L === nothing && return [(0, _push_forward(m, w, a))]
+    out = Tuple{Int,Vector{T}}[]
+    before = m.signal_next ? _push_forward(m, w, a) : w
+    for z in axes(L, 1)
+        seen = before .* view(L, z, :)
+        next = m.signal_next ? seen : _push_forward(m, seen, a)
+        iszero(sum(next)) || push!(out, (z, next))
+    end
+    return out
+end
+
+# The value of the best policy
+# ----------------------------
+#
+# Two ways of holding the value of `n` periods from the weights `w`: a table of the
+# beliefs met so far (`method=:beliefs`), or one set of vectors for each `n`
+# (`:vectors`, `:points`). `_best` is the same look-ahead for both.
+
+struct _ByBeliefs{T}
+    memo::Dict{Tuple{Int,Vector{T}},Tuple{T,Int}}
+end
+struct _BySets{T}
+    sets::Vector{Tuple{Matrix{T},Vector{Int}}}
+end
+
+_later(c::_ByBeliefs, m::_Sequential, n::Integer, w) = first(_best(c, m, n, w))
+function _later(c::_BySets{T}, ::_Sequential, n::Integer, w) where {T}
+    return n == 0 ? zero(T) : maximum(first(c.sets[n]) * w)
+end
+
+# The best first action for `n` periods from `w` and its value: this period's
+# expected payoff plus the discounted value of what follows each signal. Ties go to
+# the first action.
+function _look_ahead(c, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
+    scores = m.Q * w
+    value, choice = zero(T), 0
+    for a in axes(m.Q, 1)
+        v = scores[a]
+        if n > 1
+            for (_, next) in _updates(m, w, a)
+                v += m.discount * _later(c, m, n - 1, next)
+            end
+        end
+        (choice == 0 || v > value) && ((value, choice) = (v, a))
+    end
+    return value, choice
+end
+
+function _best(c::_ByBeliefs{T}, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
+    n == 0 && return (zero(T), 0)
+    key = (Int(n), _weights_key(w))
+    found = get(c.memo, key, nothing)
+    found === nothing || return found
+    result = _look_ahead(c, m, n, w)
+    c.memo[key] = result
+    return result
+end
+function _best(c::_BySets{T}, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
+    return n == 0 ? (zero(T), 0) : _look_ahead(c, m, n, w)
+end
+
+# The fixed plan
+# --------------
+#
+# The best plan fixed in advance for `n` periods from `w`, and its first action:
+# `_plan(p, m, n, w)`, with one method for each way of finding it.
+
+# The state stays put: the best action for `w`, repeated.
+struct _RepeatPlan end
+# The state moves in the same way whatever is done: the best action for the weights
+# of each period in turn.
+struct _SharedPlan end
+struct _PlanByBeliefs{T}
+    memo::Dict{Tuple{Int,Vector{T}},Tuple{T,Int}}
+end
+struct _PlanBySets{T}
+    sets::Vector{Tuple{Matrix{T},Vector{Int}}}
+end
+
+function _plan(::_RepeatPlan, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
+    n == 0 && return (zero(T), 0)
+    scores = m.Q * w
+    a = argmax(scores)
+    return (_horizon_weight(m.discount, n) * scores[a], a)
+end
+function _plan(::_SharedPlan, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
+    n == 0 && return (zero(T), 0)
+    scores = m.Q * w
+    total, moved = maximum(scores), w
+    for t in 1:(n - 1)
+        moved = _push_forward(m, moved, 1)
+        total += m.discount^t * maximum(m.Q * moved)
+    end
+    return (total, argmax(scores))
+end
+_plan_later(p::_PlanByBeliefs, m, n, w) = first(_plan(p, m, n, w))
+function _plan_later(p::_PlanBySets{T}, ::_Sequential, n::Integer, w) where {T}
+    return n == 0 ? zero(T) : maximum(first(p.sets[n]) * w)
+end
+function _plan_look_ahead(p, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
+    scores = m.Q * w
+    value, choice = zero(T), 0
+    for a in axes(m.Q, 1)
+        v = scores[a]
+        n > 1 && (v += m.discount * _plan_later(p, m, n - 1, _push_forward(m, w, a)))
+        (choice == 0 || v > value) && ((value, choice) = (v, a))
+    end
+    return value, choice
+end
+function _plan(p::_PlanByBeliefs{T}, m::_Sequential{T}, n::Integer,
+               w::Vector{T}) where {T}
+    n == 0 && return (zero(T), 0)
+    key = (Int(n), _weights_key(w))
+    found = get(p.memo, key, nothing)
+    found === nothing || return found
+    result = _plan_look_ahead(p, m, n, w)
+    p.memo[key] = result
+    return result
+end
+function _plan(p::_PlanBySets{T}, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
+    return n == 0 ? (zero(T), 0) : _plan_look_ahead(p, m, n, w)
+end
+
+# The passive manager: in each period the first action of the fixed plan for the
+# weights of that period, updated on what is seen. Its value is not a maximum of
+# linear functions, so it is always found by following its beliefs.
+function _replanned!(memo::Dict{Tuple{Int,Vector{T}},T}, p, m::_Sequential{T},
+                     n::Integer, w::Vector{T}) where {T}
+    n == 0 && return zero(T)
+    key = (Int(n), _weights_key(w))
+    found = get(memo, key, nothing)
+    found === nothing || return found
+    a = last(_plan(p, m, n, w))
+    v = (m.Q * w)[a]
+    if n > 1
+        for (_, next) in _updates(m, w, a)
+            v += m.discount * _replanned!(memo, p, m, n - 1, next)
+        end
+    end
+    memo[key] = v
+    return v
+end
+
+# The state seen before every action: backward induction on the states.
+function _seen_value(m::_Sequential{T}, horizon::Integer, w0::Vector{T}) where {T}
+    states = eachindex(w0)
+    value = zeros(T, length(w0))
+    for _ in 1:horizon
+        previous = value
+        value = [maximum(m.Q[a, t] +
+                         m.discount * (m.moves[a] === nothing ? previous[t] :
+                                       sum(m.moves[a][s, t] * previous[s] for s in states))
+                         for a in axes(m.Q, 1)) for t in states]
+    end
+    return sum(w0 .* value)
+end
+
+# One action in every period.
+function _repeated_value(m::_Sequential{T}, a::Integer, horizon::Integer,
+                         w0::Vector{T}) where {T}
+    total, w = zero(T), w0
+    for t in 1:horizon
+        total += m.discount^(t - 1) * sum(view(m.Q, a, :) .* w)
+        w = _push_forward(m, w, a)
+    end
+    return total
+end
+
+# The active policy as a tree to `levels` periods. `signals[a]` labels what action `a`
+# shows.
+function _policy_node(c, m::_Sequential{T}, signals, actions::Vector{Symbol},
+                      horizon::Integer, n::Integer, w::Vector{T},
+                      levels::Integer) where {T}
+    value, a = _best(c, m, n, w)
+    total = sum(w)
+    branches = Pair{Symbol,Any}[]
+    if levels > 1 && n > 1 && m.likelihoods[a] !== nothing
+        for (z, next) in _updates(m, w, a)
+            push!(branches,
+                  signals[a][z] => _policy_node(c, m, signals, actions, horizon, n - 1,
+                                                next, levels - 1))
+        end
+    end
+    return (; period=horizon - n + 1, probability=total, belief=w ./ total,
+            action=actions[a], value=value / total, branches)
+end
+
+# Value functions as sets of vectors
+# ----------------------------------
+#
+# A set is a matrix whose rows are vectors over the states; its value at the weights
+# `w` is `maximum(G * w)`. The step and the pruning are those of
+# `proofs/DecisionAnalysisProofs/Finite/ValueVectors.lean`. `method=:vectors` keeps
+# every vector that matters and is for two states only: there they are an upper
+# envelope of lines, found exactly by sorting. With more states the pruning needs a
+# linear programme for each vector and, in exact arithmetic, was slower than the
+# recursion over beliefs on every problem tried. `method=:points` keeps only the
+# vectors that are best at the points of a grid, for any number of states.
+
+# The matrices `K` with next weights `K * w`, one for each signal of each action.
+function _kernels(m::_Sequential{T}) where {T}
+    n = size(m.Q, 2)
+    same = Matrix{T}(I, n, n)
+    return map(axes(m.Q, 1)) do a
+        move = m.moves[a] === nothing ? same : m.moves[a]
+        L = m.likelihoods[a]
+        L === nothing && return [move]
+        return [m.signal_next ? Diagonal(L[z, :]) * move : move * Diagonal(L[z, :])
+                for z in axes(L, 1)]
+    end
+end
+
+# The indices of the rows of `G` that are needed for the maximum at some nonnegative
+# weights over two states: the rows on the upper envelope of the lines
 # `G[i, 1] + (G[i, 2] − G[i, 1]) x` over `0 ≤ x ≤ 1`, found as a convex hull. A row
 # that reaches the envelope at a single point is not needed. Among equal rows the
 # first is kept.
-function _prune_vectors(G::AbstractMatrix{T}, tags::AbstractVector{Int}) where {T}
+function _envelope(G::AbstractMatrix{T}) where {T}
     m = size(G, 1)
-    m <= 1 && return Matrix(G), collect(tags)
+    m <= 1 && return collect(1:m)
     slope(i) = G[i, 2] - G[i, 1]
     crossing(i, j) = (G[i, 1] - G[j, 1]) / (slope(j) - slope(i))
     order = sort(1:m; by=i -> (slope(i), -G[i, 1], i))
@@ -111,53 +337,76 @@ function _prune_vectors(G::AbstractMatrix{T}, tags::AbstractVector{Int}) where {
         to = k == length(hull) ? one(T) : min(one(T), crossing(hull[k], hull[k + 1]))
         from < to && push!(keep, hull[k])
     end
-    sort!(keep)
-    return G[keep, :], tags[keep]
+    return sort!(keep)
+end
+
+# One step back, exactly: the vectors for one more period from the set `G` for the
+# periods that follow, each tagged with its action.
+function _backup_vectors(G::AbstractMatrix{T}, Q::AbstractMatrix{T}, kernels,
+                         discount::T) where {T}
+    blocks, tags = Matrix{T}[], Int[]
+    for a in axes(Q, 1)
+        sums = Matrix{T}(reshape(Q[a, :], 1, :))
+        for K in kernels[a]
+            later = discount .* (G * K)
+            later = later[_envelope(later), :]
+            crossed = Matrix{T}(undef, size(sums, 1) * size(later, 1), size(G, 2))
+            for i in axes(sums, 1), j in axes(later, 1)
+                crossed[(i - 1) * size(later, 1) + j, :] = view(sums, i, :) .+
+                                                           view(later, j, :)
+            end
+            sums = crossed[_envelope(crossed), :]
+        end
+        push!(blocks, sums)
+        append!(tags, fill(a, size(sums, 1)))
+    end
+    all_rows = reduce(vcat, blocks)
+    keep = _envelope(all_rows)
+    return all_rows[keep, :], tags[keep]
 end
 
 # The beliefs over `n` states whose entries are multiples of `1 / k`, the corners of
 # the simplex first.
 function _simplex_grid(::Type{T}, n::Integer, k::Integer) where {T}
-    corners = [T[s == t for s in 1:n] for t in 1:n]
-    others = Vector{T}[]
-    counts = zeros(Int, n)
-    function fill!(position, left)
-        if position == n
-            counts[n] = left
-            maximum(counts) == k || push!(others, T[T(c) / T(k) for c in counts])
-            return nothing
-        end
-        for c in 0:left
-            counts[position] = c
-            fill!(position + 1, left - c)
-        end
-        return nothing
+    grid = [T[s == t for s in 1:n] for t in 1:n]
+    _fill_grid!(grid, zeros(Int, n), 1, k, k, T)
+    return grid
+end
+function _fill_grid!(grid::Vector{Vector{T}}, counts::Vector{Int}, position::Integer,
+                     left::Integer, k::Integer, ::Type{T}) where {T}
+    if position == length(counts)
+        counts[position] = left
+        maximum(counts) == k || push!(grid, T[T(c) / T(k) for c in counts])
+        return grid
     end
-    fill!(1, k)
-    return vcat(corners, others)
+    for c in 0:left
+        counts[position] = c
+        _fill_grid!(grid, counts, position + 1, left - c, k, T)
+    end
+    return grid
 end
 
-# One step back at chosen points (`method=:points`): for each point, the vector of the
-# best action there, each signal followed by the best vector of `G` at the weights it
-# leads to. The result is a lower bound on the value function, tight at the points if
-# `G` is.
-function _point_backup(G::AbstractMatrix{T}, Q::AbstractMatrix, kernels, discount,
-                       points) where {T}
-    rows, tags = Vector{T}[], Int[]
+# One step back at chosen points: for each point, the vector of the best action there,
+# each signal followed by the best vector of `G` at the weights it leads to. The
+# result is a lower bound on the value function, tight at the points if `G` is.
+function _point_backup(G::AbstractMatrix{T}, Q::AbstractMatrix{T}, kernels, discount::T,
+                       points::Vector{Vector{T}}) where {T}
+    products = [[G * K for K in ks] for ks in kernels]
+    rows, tags, seen = Vector{T}[], Int[], Set{Vector{T}}()
     for q in points
         best_vector, best_value, best_action = T[], zero(T), 0
         for a in axes(Q, 1)
-            candidate = collect(T, view(Q, a, :))
-            for K in kernels[a]
-                later = G * (K * q)
-                candidate .+= discount .* vec(transpose(view(G, argmax(later), :)) * K)
+            candidate = Q[a, :]
+            for GK in products[a]
+                candidate .+= discount .* view(GK, argmax(GK * q), :)
             end
-            value = sum(candidate .* q)
+            value = dot(candidate, q)
             if best_action == 0 || value > best_value
                 best_vector, best_value, best_action = candidate, value, a
             end
         end
-        if !(best_vector in rows)
+        if !(best_vector in seen)
+            push!(seen, best_vector)
             push!(rows, best_vector)
             push!(tags, best_action)
         end
@@ -165,27 +414,60 @@ function _point_backup(G::AbstractMatrix{T}, Q::AbstractMatrix, kernels, discoun
     return permutedims(reduce(hcat, rows)), tags
 end
 
-# One step back: the vectors for one more period from the set `G` for the periods that
-# follow. `kernels[a]` holds, for each signal of action `a`, the matrix `K` with
-# next weights `K * w`. Each vector is tagged with its action.
-function _backup_vectors(G::AbstractMatrix{T}, Q::AbstractMatrix, kernels,
-                         discount) where {T}
-    blocks, tags = Matrix{T}[], Int[]
-    for a in axes(Q, 1)
-        sums = Matrix{T}(reshape(collect(T, view(Q, a, :)), 1, :))
-        for K in kernels[a]
-            later, _ = _prune_vectors(discount .* (G * K), zeros(Int, size(G, 1)))
-            crossed = Matrix{T}(undef, size(sums, 1) * size(later, 1), size(G, 2))
-            for i in axes(sums, 1), j in axes(later, 1)
-                crossed[(i - 1) * size(later, 1) + j, :] = view(sums, i, :) .+
-                                                           view(later, j, :)
-            end
-            sums, _ = _prune_vectors(crossed, zeros(Int, size(crossed, 1)))
-        end
-        push!(blocks, sums)
-        append!(tags, fill(a, size(sums, 1)))
+# An upper bound on the value function from the same points: for each number of
+# periods left, a bound at each point (`values`) and how far it lies below the plane
+# through the corner values (`gaps`, never positive for a convex function).
+struct _UpperBound{T}
+    points::Vector{Vector{T}}
+    values::Vector{Vector{T}}
+    gaps::Vector{Vector{T}}
+end
+
+# The bound for `n` periods from the weights `w`. The value function is convex and
+# scales with the weights, so it lies below the plane through the corner values and
+# below each "sawtooth" that hangs from one more point.
+function _upper_at(u::_UpperBound{T}, n::Integer, w::Vector{T}) where {T}
+    n == 0 && return zero(T)
+    total = sum(w)
+    iszero(total) && return zero(T)
+    b = w ./ total
+    values, gaps = u.values[n], u.gaps[n]
+    states = eachindex(b)
+    plane = sum(b[t] * values[t] for t in states)
+    bound = plane
+    for i in (length(b) + 1):length(u.points)
+        q = u.points[i]
+        share = minimum(b[t] / q[t] for t in states if !iszero(q[t]))
+        hanging = plane + share * gaps[i]
+        hanging < bound && (bound = hanging)
     end
-    return _prune_vectors(reduce(vcat, blocks), tags)
+    return total * bound
+end
+
+# The upper bound on the value of `horizon` periods from `w0`. What each action leads
+# to from each point does not depend on the number of periods left, so it is found
+# once.
+function _upper_value(m::_Sequential{T}, points::Vector{Vector{T}}, horizon::Integer,
+                      w0::Vector{T}) where {T}
+    u = _UpperBound{T}(points, Vector{T}[], Vector{T}[])
+    actions = axes(m.Q, 1)
+    successors = [[_updates(m, q, a) for a in actions] for q in points]
+    function step(n, q, after)
+        return maximum(dot(view(m.Q, a, :), q) +
+                       (n == 1 ? zero(T) :
+                        m.discount * sum(_upper_at(u, n - 1, next)
+                                         for (_, next) in after[a]; init=zero(T)))
+                       for a in actions)
+    end
+    corners = 1:length(w0)
+    for n in 1:(horizon - 1)
+        values = [step(n, q, successors[i]) for (i, q) in enumerate(points)]
+        push!(u.values, values)
+        push!(u.gaps,
+              [values[i] - sum(q[t] * values[t] for t in corners)
+               for (i, q) in enumerate(points)])
+    end
+    return step(horizon, w0, [_updates(m, w0, a) for a in actions])
 end
 
 """
@@ -238,7 +520,8 @@ done:
 - `passive=false` leaves out the passive manager. Its value is not a maximum of linear
   functions, so with every method it is found by following its beliefs, and where
   those multiply it can take longer than everything else. It is left out by default
-  with `method=:points`.
+  with `method=:points`, where asking for it throws an `ArgumentError` unless the
+  fixed plan can be found (see above).
 
 Four ways of managing are valued, each as a total over the horizon:
 
@@ -262,9 +545,10 @@ Four ways of managing are valued, each as a total over the horizon:
 Always `no_learning ≤ passive ≤ active ≤ perfect` (proved in the Lean development,
 `Finite/Adaptive.lean` and, for a state that moves, `Finite/AdaptiveDynamic.lean`).
 With a moving state a manager who took only the best action for the current period
-could do worse than the fixed plan, which is why `passive` plans ahead. The result is `(; horizon, discount, no_learning, passive,
-active, perfect, value_of_learning, value_of_probing, evpi, baseline, act_now_action,
-first_action, plan, policy, beliefs_evaluated, value_function, active_upper)`: `value_of_learning = active − no_learning`;
+could do worse than the fixed plan, which is why `passive` plans ahead. The result is
+`(; horizon, discount, no_learning, passive, active, active_upper, perfect,
+value_of_learning, value_of_probing, evpi, baseline, act_now_action, first_action, plan,
+policy, beliefs_evaluated, value_function)`: `value_of_learning = active − no_learning`;
 `value_of_probing = active − passive`, what deliberate experimentation adds;
 `evpi = perfect − no_learning`, which bounds both; `baseline` is the value of taking
 the baseline action in every period (`nothing` without a baseline); `act_now_action`
@@ -287,10 +571,12 @@ the first action; the rows of `value_function` need not.)
 `(; period, probability, belief, action, value, branches)`, with the probability of
 reaching it, the belief there, the action taken, the expected value from there on
 given that the node is reached, and `branches`, a vector of `signal => node` for the
-signals of positive probability (empty at the last period shown).
+signals of positive probability. `branches` is empty at the last period shown, and
+after an action that shows nothing, where the tree stops. `policy` is `nothing` with
+`depth=0`.
 
-Ties go to the first action. Exact in, exact out. The recursion visits every distinct
-belief once (`beliefs_evaluated`); beliefs reached by the same observations in a
+Ties go to the first action. Exact in, exact out. With `method=:beliefs` the recursion visits every distinct
+belief once (`beliefs_evaluated`, which is `nothing` with the other methods); beliefs reached by the same observations in a
 different order coincide, so repeated trials of one kind stay cheap, but the number
 grows quickly with the number of signals, actions and periods. With floating-point
 inputs, beliefs that agree to twelve significant digits are treated as one. The exact
@@ -337,261 +623,114 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
     method === :vectors && length(problem.payoff.states) != 2 &&
         throw(ArgumentError("method = :vectors needs exactly two states, got " *
                             "$(length(problem.payoff.states)); use method = :beliefs"))
-    Q = _feasible_Q(problem)
-    actions = feasible_actions(problem)
-    studies = _action_experiments(problem, experiments)
-    likelihoods = [e === nothing ? nothing : e.likelihood for e in studies]
-    moves = _action_transitions(problem, transitions)
-    moving = transitions !== nothing
-    T = promote_type(eltype(Q), eltype(p), typeof(discount),
-                     (eltype(L) for L in likelihoods if L !== nothing)...,
-                     (eltype(M) for M in moves if M !== nothing)...)
     method === :points && grid < 1 &&
         throw(ArgumentError("the grid must have at least one division, got $grid"))
-    # The points of a grid are fractions, so integers are carried as rationals.
-    method === :points && T <: Integer && (T = Rational{T})
-    w0 = collect(T, p)
-    # The weights moved to the next period under action a, no signal used.
-    push_forward(w, a) = moves[a] === nothing ? w : moves[a] * w
-    # The weights of the next period after each signal of positive probability under
-    # action a.
-    function updates(w, a)
-        local L = likelihoods[a]
-        L === nothing && return [(0, push_forward(w, a))]
-        local out = Tuple{Int,Vector{T}}[]
-        local before = signal_of === :next ? push_forward(w, a) : w
-        for z in axes(L, 1)
-            local seen = before .* view(L, z, :)
-            local next = signal_of === :next ? seen : push_forward(seen, a)
-            iszero(sum(next)) || push!(out, (z, next))
-        end
-        return out
-    end
-    # With method = :vectors, the value functions for 1, 2, ... periods left: of the
-    # best policy, and (when the state moves) of the best fixed plan.
-    by_vectors = method !== :beliefs
-    policy_vectors = Tuple{Matrix{T},Vector{Int}}[]
-    plan_vectors = Tuple{Matrix{T},Vector{Int}}[]
-    # With method = :points, the beliefs at which the value function is backed up (the
-    # corners of the simplex first) and, for each number of periods left, an upper
-    # bound on the value at each of them.
-    points = Vector{T}[]
-    upper_values = Vector{T}[]
-    if method === :points
-        local nstates = length(w0)
-        append!(points, _simplex_grid(T, nstates, grid))
-        local start = w0 ./ sum(w0)
-        start in points || push!(points, start)
-    end
-    # An upper bound on the value of n periods from the weights w: the value function
-    # is convex and scales with the weights, so it lies below the plane through the
-    # corner values and below each "sawtooth" that hangs from one more point.
-    function upper_at(n, w)
-        n == 0 && return zero(T)
-        local total = sum(w)
-        iszero(total) && return zero(T)
-        local b = w ./ total
-        local values = upper_values[n]
-        local nstates = length(b)
-        local plane = sum(b[t] * values[t] for t in 1:nstates)
-        local bound = plane
-        for i in (nstates + 1):length(points)
-            local q = points[i]
-            local share = minimum(b[t] / q[t] for t in 1:nstates if !iszero(q[t]))
-            local hanging = plane +
-                            share * (values[i] - sum(q[t] * values[t] for t in 1:nstates))
-            hanging < bound && (bound = hanging)
-        end
-        return total * bound
-    end
-    if by_vectors
-        local nstates = length(w0)
-        local same = Matrix{T}(I, nstates, nstates)
-        local moved = [M === nothing ? same : Matrix{T}(M) for M in moves]
-        local kernels = map(eachindex(actions)) do a
-            local L = likelihoods[a]
-            L === nothing && return [moved[a]]
-            return [signal_of === :next ?
-                    Diagonal(collect(T, view(L, z, :))) * moved[a] :
-                    moved[a] * Diagonal(collect(T, view(L, z, :)))
-                    for z in axes(L, 1)]
-        end
-        local G = zeros(T, 1, nstates)
-        local H = zeros(T, 1, nstates)
-        for n in 1:horizon
-            if method === :points
-                # A lower bound: at each point, the vector of the best action there
-                # followed by the best of the vectors already held. Every vector is
-                # the value of a plan that can be carried out.
-                G, tags = _point_backup(G, Q, kernels, discount, points)
-                push!(policy_vectors, (G, tags))
-                # An upper bound at each point, from the bound for one period fewer.
-                push!(upper_values,
-                      [maximum(sum(view(Q, a, :) .* q) +
-                               (n == 1 ? zero(T) :
-                                discount * sum(upper_at(n - 1, next)
-                                               for (_, next) in updates(q, a)))
-                               for a in eachindex(actions)) for q in points])
-                continue
-            end
-            G, tags = _backup_vectors(G, Q, kernels, discount)
-            push!(policy_vectors, (G, tags))
-            if moving
-                H, plan_tags = _backup_vectors(H, Q, [[M] for M in moved], discount)
-                push!(plan_vectors, (H, plan_tags))
-            end
-        end
-    end
-    # With method = :points the fixed plan is found exactly only where the state stays
-    # put or moves in the same way whatever is done: then it is the best action for
-    # the weights of each period in turn. Otherwise it is left out.
-    shared_moves = moving && all(M -> M == first(moves), moves)
-    plan_known = method !== :points || !moving || shared_moves
-    vector_value(sets, n, w) = n == 0 ? zero(T) : maximum(first(sets[n]) * w)
-    # The closures below recurse, so every variable they assign is declared local: a
-    # name shared with the enclosing function would be overwritten by the inner calls.
-    active = Dict{Tuple{Int,Vector{T}},Tuple{T,Int}}()
-    function best(n, w)
-        n == 0 && return (zero(T), 0)
-        local key = (n, _weights_key(w))
-        haskey(active, key) && return active[key]
-        local scores = Q * w
-        local value, choice = zero(T), 0
-        for a in eachindex(actions)
-            local v = scores[a]
-            if n > 1
-                for (_, next) in updates(w, a)
-                    v += discount *
-                         (by_vectors ? vector_value(policy_vectors, n - 1, next) :
-                          first(best(n - 1, next)))
-                end
-            end
-            (choice == 0 || v > value) && ((value, choice) = (v, a))
-        end
-        active[key] = (value, choice)
-        return (value, choice)
-    end
-    # The best plan fixed in advance for n periods from the weights w, and its first
-    # action. With a fixed state it is the best action for w, repeated.
-    plans = Dict{Tuple{Int,Vector{T}},Tuple{T,Int}}()
-    function plan(n, w)
-        n == 0 && return (zero(T), 0)
-        local scores = Q * w
-        if !moving
-            local first_best = argmax(scores)
-            return (_horizon_weight(discount, n) * scores[first_best], first_best)
-        end
-        if method === :points
-            local total, moved_on = maximum(scores), w
-            for t in 1:(n - 1)
-                moved_on = first(moves) * moved_on
-                total += discount^t * maximum(Q * moved_on)
-            end
-            return (total, argmax(scores))
-        end
-        local key = (n, _weights_key(w))
-        haskey(plans, key) && return plans[key]
-        local value, choice = zero(T), 0
-        for a in eachindex(actions)
-            local v = scores[a]
-            if n > 1
-                local later = push_forward(w, a)
-                v += discount *
-                     (method === :vectors ? vector_value(plan_vectors, n - 1, later) :
-                      first(plan(n - 1, later)))
-            end
-            (choice == 0 || v > value) && ((value, choice) = (v, a))
-        end
-        plans[key] = (value, choice)
-        return (value, choice)
-    end
-    myopic = Dict{Tuple{Int,Vector{T}},T}()
-    function replanned(n, w)
-        n == 0 && return zero(T)
-        local key = (n, _weights_key(w))
-        haskey(myopic, key) && return myopic[key]
-        local scores = Q * w
-        local a = last(plan(n, w))
-        local v = scores[a]
-        if n > 1
-            for (_, next) in updates(w, a)
-                v += discount * replanned(n - 1, next)
-            end
-        end
-        myopic[key] = v
-        return v
-    end
-    function node(n, w, levels)
-        local value, a = best(n, w)
-        local total = sum(w)
-        local branches = levels <= 1 || n <= 1 || likelihoods[a] === nothing ? [] :
-                         [studies[a].signals[z] => node(n - 1, next, levels - 1)
-                          for (z, next) in updates(w, a)]
-        return (; period=horizon - n + 1, probability=total, belief=w ./ total,
-                action=actions[a], value=value / total, branches)
-    end
-
-    no_learning, a0, fixed_plan = nothing, 0, nothing
-    if plan_known
-        no_learning, a0 = plan(horizon, w0)
-        fixed_plan = Symbol[]
-        let w = w0
-            for n in horizon:-1:1
-                a = last(plan(n, w))
-                push!(fixed_plan, actions[a])
-                w = push_forward(w, a)
-            end
-        end
-    end
-    # The state seen before every action: backward induction on the states.
-    seen_value = zeros(T, length(w0))
-    for _ in 1:horizon
-        seen_value = [maximum(Q[a, t] +
-                              discount * (moves[a] === nothing ? seen_value[t] :
-                                          sum(moves[a][s, t] * seen_value[s]
-                                              for s in eachindex(w0)))
-                              for a in eachindex(actions)) for t in eachindex(w0)]
-    end
-    perfect = sum(w0 .* seen_value)
-    active_value, first_choice_index = best(horizon, w0)
+    actions = feasible_actions(problem)
+    studies = _action_experiments(problem, experiments)
+    transition = _action_transitions(problem, transitions)
+    moving = transitions !== nothing
+    # With method = :points the fixed plan, and so the passive manager, is found only
+    # where the state stays put or moves in the same way whatever is done.
+    plan_known = method !== :points || !moving || all(==(first(transition)), transition)
     passive && !plan_known &&
         throw(ArgumentError("with method = :points the passive manager is found only " *
                             "where the state stays put or moves in the same way " *
                             "whatever is done; use passive = false"))
-    passive_value = passive ? replanned(horizon, w0) : nothing
-    # With method = :points, `active` is a lower bound and this is the upper one.
-    active_upper = active_value
-    if method === :points
-        active_upper = maximum(sum(view(Q, a, :) .* w0) +
-                               (horizon == 1 ? zero(T) :
-                                discount * sum(upper_at(horizon - 1, next)
-                                               for (_, next) in updates(w0, a)))
-                               for a in eachindex(actions))
-    end
-    base = problem.baseline === nothing ? nothing :
-           findfirst(==(problem.baseline), actions)
-    baseline_value = nothing
-    if base !== nothing
-        baseline_value = zero(T)
-        let w = w0
-            for t in 1:horizon
-                baseline_value += discount^(t - 1) * sum(view(Q, base, :) .* w)
-                w = push_forward(w, base)
+    Q = _feasible_Q(problem)
+    given = promote_type(eltype(Q), eltype(p), typeof(discount),
+                         (eltype(e.likelihood) for e in studies if e !== nothing)...,
+                         (eltype(M) for M in transition if M !== nothing)...)
+    # The points of a grid are fractions, so integers are carried as rationals.
+    T = method === :points && given <: Integer ? Rational{given} : given
+    model = _Sequential{T}(Q,
+                           [e === nothing ? nothing : Matrix{T}(e.likelihood)
+                            for e in studies],
+                           [M === nothing ? nothing : Matrix{T}(M) for M in transition],
+                           T(discount), signal_of === :next)
+    signals = [e === nothing ? nothing : e.signals for e in studies]
+    return _manage(model, collect(T, p), actions, signals, problem.baseline, horizon, depth,
+                   method, passive, plan_known, moving, grid, discount)
+end
+
+# Everything after the checks, with the element type fixed.
+function _manage(m::_Sequential{T}, w0::Vector{T}, actions::Vector{Symbol}, signals,
+                 baseline, horizon::Integer, depth::Integer, method::Symbol,
+                 passive::Bool, plan_known::Bool, moving::Bool, grid::Integer,
+                 discount) where {T}
+    states = length(w0)
+    # The value of the best policy, and of the best fixed plan.
+    sets = Tuple{Matrix{T},Vector{Int}}[]
+    plan_sets = Tuple{Matrix{T},Vector{Int}}[]
+    active_upper = nothing
+    if method === :beliefs
+        policy = _ByBeliefs{T}(Dict{Tuple{Int,Vector{T}},Tuple{T,Int}}())
+        plan = moving ? _PlanByBeliefs{T}(Dict{Tuple{Int,Vector{T}},Tuple{T,Int}}()) :
+               _RepeatPlan()
+    else
+        kernels = _kernels(m)
+        G = zeros(T, 1, states)
+        if method === :vectors
+            # The fixed plan sees no signal: one kernel for each action, its move.
+            H = zeros(T, 1, states)
+            moves_only = [[M] for M in m.moves if M !== nothing]
+            for _ in 1:horizon
+                G, tags = _backup_vectors(G, m.Q, kernels, m.discount)
+                push!(sets, (G, tags))
+                if moving
+                    H, plan_tags = _backup_vectors(H, m.Q, moves_only, m.discount)
+                    push!(plan_sets, (H, plan_tags))
+                end
             end
+            plan = moving ? _PlanBySets{T}(plan_sets) : _RepeatPlan()
+        else
+            # A lower bound, from vectors kept at the points of a grid, each the value
+            # of a plan that can be carried out; and an upper bound from the same points.
+            points = _simplex_grid(T, states, grid)
+            start = w0 ./ sum(w0)
+            start in points || push!(points, start)
+            for _ in 1:horizon
+                G, tags = _point_backup(G, m.Q, kernels, m.discount, points)
+                push!(sets, (G, tags))
+            end
+            active_upper = _upper_value(m, points, horizon, w0)
+            plan = !plan_known ? nothing : moving ? _SharedPlan() : _RepeatPlan()
         end
+        policy = _BySets{T}(sets)
     end
+
+    active_value, first_choice = _best(policy, m, horizon, w0)
+    active_upper === nothing && (active_upper = active_value)
+    perfect = _seen_value(m, horizon, w0)
+    base = baseline === nothing ? nothing : findfirst(==(baseline), actions)
+    baseline_value = base === nothing ? nothing : _repeated_value(m, base, horizon, w0)
+
+    no_learning, act_now, fixed_plan, passive_value = nothing, nothing, nothing, nothing
+    if plan !== nothing
+        no_learning, a0 = _plan(plan, m, horizon, w0)
+        act_now = actions[a0]
+        fixed_plan = Symbol[]
+        w = w0
+        for n in horizon:-1:1
+            a = last(_plan(plan, m, n, w))
+            push!(fixed_plan, actions[a])
+            w = _push_forward(m, w, a)
+        end
+        passive &&
+            (passive_value = _replanned!(Dict{Tuple{Int,Vector{T}},T}(), plan, m, horizon,
+                                         w0))
+    end
+    tree = depth == 0 ? nothing :
+           _policy_node(policy, m, signals, actions, horizon, horizon, w0, depth)
     return (; horizon, discount, no_learning, passive=passive_value, active=active_value,
             active_upper, perfect,
-            value_of_learning=plan_known ? active_value - no_learning : nothing,
-            value_of_probing=passive ? active_value - passive_value : nothing,
-            evpi=plan_known ? perfect - no_learning : nothing,
-            baseline=baseline_value,
-            act_now_action=plan_known ? actions[a0] : nothing,
-            first_action=actions[first_choice_index],
-            plan=fixed_plan,
-            policy=depth == 0 ? nothing : node(horizon, w0, depth),
-            beliefs_evaluated=length(active),
-            value_function=by_vectors ?
-                           [(; actions=actions[tags], vectors=G)
-                            for (G, tags) in policy_vectors] : nothing)
+            value_of_learning=no_learning === nothing ? nothing :
+                              active_value - no_learning,
+            value_of_probing=passive_value === nothing ? nothing :
+                             active_value - passive_value,
+            evpi=no_learning === nothing ? nothing : perfect - no_learning,
+            baseline=baseline_value, act_now_action=act_now,
+            first_action=actions[first_choice], plan=fixed_plan, policy=tree,
+            beliefs_evaluated=method === :beliefs ? length(policy.memo) : nothing,
+            value_function=method === :beliefs ? nothing :
+                           [(; actions=actions[tags], vectors=G) for (G, tags) in sets])
 end
