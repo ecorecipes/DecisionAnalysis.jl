@@ -352,7 +352,8 @@ lean_available() = get(ENV, "DECISIONANALYSIS_LEAN", "") == "1"
                     end
                 end
                 # One tampered copy of each must be refused.
-                tampered = Dict("decision" => ("\"evpi\": \"207/20\"" => "\"evpi\": \"10\""),
+                tampered = Dict("decision" =>
+                                    ("\"evpi\": \"207/20\"" => "\"evpi\": \"10\""),
                                 "garbling" => ("\"4/5\"" => "\"3/5\""),
                                 "eadmissible" => ("\"action\": 1" => "\"action\": 2"))
                 for (kind, change) in tampered

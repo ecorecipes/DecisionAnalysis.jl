@@ -421,9 +421,9 @@ function export_not_eadmissible_witness(io::IO, problem::DecisionProblem,
                                       "actions" => _json(actions),
                                       "states" => _json(problem.payoff.states),
                                       "payoff" => _json(Q),
-                                      "priors" => "[" *
-                                                  join((_json(q) for q in priors), ", ") *
-                                                  "]", "action" => string(a - 1),
+                                      "priors" => "[" * join((_json(q) for q in priors),
+                                                             ", ") * "]",
+                                      "action" => string(a - 1),
                                       "mixed_action" => _json(μ)], 0)
     println(io)
     return nothing

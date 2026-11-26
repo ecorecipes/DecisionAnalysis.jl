@@ -304,7 +304,7 @@ function failed_runs(t::OutcomeTable)
     return [(; action=t.actions[a], draw=t.draws[d], replicate=t.replicates[r],
              status=t.status[a, d, r])
             for a in eachindex(t.actions), d in eachindex(t.draws),
-            r in eachindex(t.replicates)
+                r in eachindex(t.replicates)
             if t.status[a, d, r] != _OK && t.status[a, d, r] != _ABSENT]
 end
 
@@ -416,8 +416,8 @@ end
 _outcome_tuple(o::NamedTuple) = o
 _outcome_tuple(o::Real) = (; outcome=o)
 function _outcome_tuple(o)
-    throw(InvalidOutcomeError("`outcome` must return a named tuple of numbers, got " *
-                              "$(typeof(o))"))
+    return throw(InvalidOutcomeError("`outcome` must return a named tuple of numbers, got " *
+                                     "$(typeof(o))"))
 end
 
 """

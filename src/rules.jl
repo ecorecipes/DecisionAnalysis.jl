@@ -561,10 +561,10 @@ function _eadmissible_witness(E::AbstractMatrix, a::Int; tol::Real=0, optimizer=
         certified = _mixed_dominator(E, a; optimizer, rounding_tol) !== nothing
         return false, nothing, certified, sol.route
     end
-    throw(ExactVerificationError(:e_admissibility,
-                                 "the floating-point optimiser reports action $a " *
-                                 "E-admissible to its tolerance, but the rounded " *
-                                 "weights do not make it exactly optimal"))
+    return throw(ExactVerificationError(:e_admissibility,
+                                        "the floating-point optimiser reports action $a " *
+                                        "E-admissible to its tolerance, but the rounded " *
+                                        "weights do not make it exactly optimal"))
 end
 
 function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,

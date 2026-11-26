@@ -5,7 +5,7 @@ using LinearAlgebra: rank
 function oracle_lp_minimum(c, A, b)
     m, n = size(A)
     best = nothing
-    for mask in 0:(2^n - 1)
+    for mask in 0:(2 ^ n - 1)
         cols = [j for j in 1:n if (mask >> (j - 1)) & 1 == 1]
         length(cols) == m || continue
         B = A[:, cols]

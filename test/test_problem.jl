@@ -44,8 +44,9 @@
     @testset "feasibility filter" begin
         p = [1 // 2, 3 // 10, 3 // 20, 1 // 20]
         full = DecisionProblem(t, p)
-        for filter in ([true, false, true], [:nothing, :relocate], ["nothing", "relocate"],
-                       a -> a != :levee)
+        for filter in
+            ([true, false, true], [:nothing, :relocate], ["nothing", "relocate"],
+             a -> a != :levee)
             restricted = DecisionProblem(t, p; feasible=filter)
             @test feasible_actions(restricted) == [:nothing, :relocate]
             @test feasible_payoff(restricted).Q == Q[[1, 3], :]

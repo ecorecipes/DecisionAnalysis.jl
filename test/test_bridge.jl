@@ -24,7 +24,7 @@
         julia = Base.julia_cmd()
         setup = "using Pkg; Pkg.instantiate()"
         env = filter(p -> !startswith(first(p), "JULIA_LOAD_PATH") &&
-                         first(p) != "JULIA_PROJECT", collect(ENV))
+                          first(p) != "JULIA_PROJECT", collect(ENV))
         run_in(cmd) = success(pipeline(setenv(cmd, env); stdout, stderr))
         @test run_in(`$julia --project=$project -e $setup`)
         @test run_in(`$julia --project=$project $script`)

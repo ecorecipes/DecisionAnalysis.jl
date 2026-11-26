@@ -12,7 +12,7 @@
 # Results and methods
 # -------------------
 
-const _Bias = @NamedTuple{act_now::Float64,cells::Union{Nothing,Float64}}
+const _Bias = @NamedTuple{act_now::Float64, cells::Union{Nothing,Float64}}
 
 """
     VOIEstimate
@@ -668,7 +668,7 @@ function _spline_fit(method::SplineRegression, columns::NamedTuple, Q::AbstractM
 end
 
 function fitted_conditional_means(method::GAMRegression, columns, Q, w)
-    throw(MissingExtensionError(:GAMRegression, :GAM))
+    return throw(MissingExtensionError(:GAMRegression, :GAM))
 end
 
 function _fit(method::AbstractRegression, columns::NamedTuple, Q, w)
@@ -786,8 +786,8 @@ function evpi(problem::DecisionProblem, method::AbstractRegression; bootstrap::I
 end
 
 function evpi(problem::DecisionProblem, method::AbstractVOIMethod; kw...)
-    throw(ArgumentError("$(_method_name(method)) estimates a partial value of " *
-                        "information; for EVPI use SampleAverage() or a regression"))
+    return throw(ArgumentError("$(_method_name(method)) estimates a partial value of " *
+                               "information; for EVPI use SampleAverage() or a regression"))
 end
 
 """

@@ -39,53 +39,64 @@ end
         raised = Dict{Type,Function}(InvalidBeliefError => () -> FiniteBelief([0.5, 0.6]),
                                      InvalidPayoffError => () -> PayoffTable([1.0 Inf]),
                                      InvalidExperimentError => () -> Experiment([0.5 0.5]),
-                                     LabelMismatchError => () -> DecisionProblem(t,
-                                                                                 FiniteBelief([:s,
-                                                                                               :u],
-                                                                                              [0.5,
-                                                                                               0.5])),
-                                     BeliefFormError => () -> evpi(DecisionProblem(t,
-                                                                                   ScenarioSet([:s]))),
-                                     NoFeasibleActionError => () -> DecisionProblem(t,
-                                                                                    [0.5,
-                                                                                     0.5];
-                                                                                    feasible=[false,
-                                                                                              false]),
-                                     InvalidBaselineError => () -> DecisionProblem(t,
-                                                                                   [0.5,
-                                                                                    0.5];
-                                                                                   baseline=:c),
-                                     MissingBaselineError => () -> gain_over_baseline(DecisionProblem(t,
-                                                                                                      [0.5,
-                                                                                                       0.5])),
-                                     InexactCertificateError => () -> export_decision_certificate(IOBuffer(),
-                                                                                                  DecisionProblem(t,
-                                                                                                                  [0.5,
-                                                                                                                   0.5])),
-                                     WitnessError => () -> export_eadmissible_witness(IOBuffer(),
-                                                                                      DecisionProblem(PayoffTable([1//1 0;
-                                                                                                                   0 0]),
-                                                                                                      [1 //
-                                                                                                       1,
-                                                                                                       0 //
-                                                                                                       1]),
-                                                                                      :a2),
-                                     InvalidOutcomeError => () -> OutcomeTable([(;
-                                                                                 draw=1,
-                                                                                 action=:a,
-                                                                                 replicate=1,
-                                                                                 n=NaN)];
-                                                                               outcomes=[:n]),
-                                     MissingExtensionError => () -> throw(MissingExtensionError(:GAMRegression,
-                                                                                                :GAM)),
-                                     LinearProgramError => () -> throw(LinearProgramError(:deficiency,
-                                                                                          :unbounded)),
-                                     ExactVerificationError => () -> deficiency(Experiment([4//5 1//5;
-                                                                                            1//5 4//5]),
-                                                                                Experiment([2//3 1//7;
-                                                                                            1//3 6//7]);
-                                                                                optimizer=HiGHS.Optimizer,
-                                                                                rounding_tol=0.2))
+                                     LabelMismatchError =>
+                                         () -> DecisionProblem(t,
+                                                               FiniteBelief([:s,
+                                                                             :u],
+                                                                            [0.5,
+                                                                             0.5])),
+                                     BeliefFormError =>
+                                         () -> evpi(DecisionProblem(t,
+                                                                    ScenarioSet([:s]))),
+                                     NoFeasibleActionError =>
+                                         () -> DecisionProblem(t,
+                                                               [0.5,
+                                                                0.5];
+                                                               feasible=[false,
+                                                                         false]),
+                                     InvalidBaselineError =>
+                                         () -> DecisionProblem(t,
+                                                               [0.5,
+                                                                0.5];
+                                                               baseline=:c),
+                                     MissingBaselineError =>
+                                         () -> gain_over_baseline(DecisionProblem(t,
+                                                                                  [0.5,
+                                                                                   0.5])),
+                                     InexactCertificateError =>
+                                         () -> export_decision_certificate(IOBuffer(),
+                                                                           DecisionProblem(t,
+                                                                                           [0.5,
+                                                                                            0.5])),
+                                     WitnessError =>
+                                         () -> export_eadmissible_witness(IOBuffer(),
+                                                                          DecisionProblem(PayoffTable([1//1 0;
+                                                                                                       0 0]),
+                                                                                          [1 //
+                                                                                           1,
+                                                                                           0 //
+                                                                                           1]),
+                                                                          :a2),
+                                     InvalidOutcomeError =>
+                                         () -> OutcomeTable([(;
+                                                              draw=1,
+                                                              action=:a,
+                                                              replicate=1,
+                                                              n=NaN)];
+                                                            outcomes=[:n]),
+                                     MissingExtensionError =>
+                                         () -> throw(MissingExtensionError(:GAMRegression,
+                                                                           :GAM)),
+                                     LinearProgramError =>
+                                         () -> throw(LinearProgramError(:deficiency,
+                                                                        :unbounded)),
+                                     ExactVerificationError =>
+                                         () -> deficiency(Experiment([4//5 1//5;
+                                                                      1//5 4//5]),
+                                                          Experiment([2//3 1//7;
+                                                                      1//3 6//7]);
+                                                          optimizer=HiGHS.Optimizer,
+                                                          rounding_tol=0.2))
         @test Set(keys(raised)) == Set(concrete)
         for (T, f) in raised
             @test_throws T f()

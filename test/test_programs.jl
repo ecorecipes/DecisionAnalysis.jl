@@ -142,8 +142,8 @@ end
             n, m = rand(rng, 2:4), rand(rng, 1:3)
             model = JuMP.GenericModel{BigRat}()
             lo = BigRat.(rand(rng, -3:1, n))
-            x = JuMP.@variable(model, [j = 1:n], lower_bound = lo[j],
-                               upper_bound = lo[j] + rand(rng, 1:5))
+            x = JuMP.@variable(model, [j = 1:n], lower_bound=lo[j],
+                               upper_bound=lo[j] + rand(rng, 1:5))
             free = JuMP.@variable(model)
             A = BigRat.(rand(rng, -3:3, m, n))
             centre = A * (lo .+ 1 // 2)
@@ -169,7 +169,7 @@ end
         end
         # Infeasible and unbounded models are reported, not thrown.
         model = JuMP.GenericModel{BigRat}()
-        x = JuMP.@variable(model, lower_bound = 0)
+        x = JuMP.@variable(model, lower_bound=0)
         JuMP.@constraint(model, x <= -1)
         prog = DecisionProgram(:test, model, (; x), (;))
         for opt in (nothing, CDD, HIGHS)
@@ -179,14 +179,14 @@ end
             @test sol.exact == (opt !== HIGHS)
         end
         model = JuMP.GenericModel{BigRat}()
-        x = JuMP.@variable(model, lower_bound = 0)
+        x = JuMP.@variable(model, lower_bound=0)
         JuMP.@objective(model, Max, x)
         @test solve_program(DecisionProgram(:test, model, (; x), (;))).status === :unbounded
         @test_throws ArgumentError solve_program(prog; rounding_tol=-1)
         # An exact optimiser cannot take a floating-point model, nor the reverse
         # without rounding; a rational-only optimiser on a float model is refused.
         fmodel = JuMP.GenericModel{Float64}()
-        y = JuMP.@variable(fmodel, lower_bound = 0.0)
+        y = JuMP.@variable(fmodel, lower_bound=0.0)
         JuMP.@objective(fmodel, Min, y)
         fprog = DecisionProgram(:test, fmodel, (; y), (;))
         @test_throws ArgumentError solve_program(fprog; optimizer=CDD)

@@ -247,7 +247,6 @@ function DecisionReport(problem::DecisionProblem;
         named_quantities = _named_items(quantities, AbstractVector, "quantities")
         for (source, item) in vcat(named_experiments, named_partitions),
             (quantity, g) in named_quantities
-
             push!(estimation_rows,
                   merge((; source, quantity),
                         expected_variance_reduction(problem, item, g)))

@@ -250,7 +250,7 @@
             n = rand(rng, 1:5)
             p = probabilities(random_belief(rng, n; T=BigRat))
             q = probabilities(random_belief(rng, n; T=BigRat))
-            events = [[(mask >> (i - 1)) & 1 == 1 for i in 1:n] for mask in 0:(2^n - 1)]
+            events = [[(mask >> (i - 1)) & 1 == 1 for i in 1:n] for mask in 0:(2 ^ n - 1)]
             @test total_variation(p, q) ==
                   maximum(abs(sum(p[A]) - sum(q[A])) for A in events)
         end

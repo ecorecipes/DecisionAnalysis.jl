@@ -318,7 +318,7 @@ function _envelope(G::AbstractMatrix{T}) where {T}
         # Of lines with the same slope only the highest, which comes first, is needed.
         isempty(hull) || slope(hull[end]) != slope(i) || continue
         while length(hull) >= 2 &&
-            crossing(hull[end - 1], i) <= crossing(hull[end - 1], hull[end])
+              crossing(hull[end - 1], i) <= crossing(hull[end - 1], hull[end])
             pop!(hull)
         end
         push!(hull, i)

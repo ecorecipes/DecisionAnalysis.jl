@@ -46,7 +46,7 @@ function policy_regions(base::DecisionProblem, direction::PayoffTable; from::Rea
         return _is_exact(T) ? zero(T) :
                sqrt(eps(float(T))) * max(one(T), maximum(abs, α .+ t .* β))
     end
-    best_at(t) = (v = α .+ t .* β; findall(>=(maximum(v) - tol(t)), v))
+    best_at(t) = (v=α .+ t .* β; findall(>=(maximum(v) - tol(t)), v))
     # Candidate breakpoints: every crossing of two lines inside the interval.
     points = T[from, to]
     for i in eachindex(α), j in (i + 1):length(α)
@@ -55,7 +55,7 @@ function policy_regions(base::DecisionProblem, direction::PayoffTable; from::Rea
         from < t < to && push!(points, t)
     end
     sort!(unique!(points))
-    regions = @NamedTuple{from::T,to::T,actions::Vector{Symbol}}[]
+    regions = @NamedTuple{from::T, to::T, actions::Vector{Symbol}}[]
     for k in 1:(length(points) - 1)
         lo, hi = points[k], points[k + 1]
         # Lines optimal at the midpoint are optimal on the whole open interval,
@@ -135,13 +135,13 @@ other way in `b`. An empty result says that the two analyses order the actions
 alike, ties aside.
 """
 function rank_reversals(sweep::AbstractVector{<:NamedTuple})
-    out = @NamedTuple{from::Any,to::Any,actions::Tuple{Symbol,Symbol},
+    out = @NamedTuple{from::Any, to::Any, actions::Tuple{Symbol,Symbol},
                       top_changed::Bool}[]
     for k in 1:(length(sweep) - 1)
         x, y = sweep[k], sweep[k + 1]
         position = Dict(a => i for (i, a) in enumerate(y.ranking))
         all(a -> haskey(position, a), x.ranking) &&
-            length(x.ranking) == length(y.ranking) ||
+        length(x.ranking) == length(y.ranking) ||
             throw(ArgumentError("the feasible actions change along the sweep"))
         for i in eachindex(x.ranking), j in (i + 1):length(x.ranking)
             a, b = x.ranking[i], x.ranking[j]

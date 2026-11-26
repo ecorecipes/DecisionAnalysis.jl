@@ -241,9 +241,9 @@ julia> probabilities(inv.posteriors[2])
 ```
 """
 function bayes_invert(prior::SampleBelief, ::Experiment)
-    throw(BeliefFormError(:bayes_invert, :SampleBelief,
-                          "a sample is updated by reweighting its draws; see " *
-                          "ImportanceSampling for the value of a study"))
+    return throw(BeliefFormError(:bayes_invert, :SampleBelief,
+                                 "a sample is updated by reweighting its draws; see " *
+                                 "ImportanceSampling for the value of a study"))
 end
 function bayes_invert(prior::FiniteBelief, experiment::Experiment)
     _check_states(experiment, prior.states, "prior")

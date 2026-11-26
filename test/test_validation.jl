@@ -38,7 +38,8 @@ end
             @test decide(problem, MinimaxRegret()).chosen ==
                   action_labels(problem.payoff)[argmin_set(exact("max_regret"))]
             # Hurwicz: α is the weight on the best outcome, here and in the fixture.
-            for (α, scores) in zip(fixture_rationals(ex["hurwicz_optimism"]), ex["hurwicz"])
+            for (α, scores) in
+                zip(fixture_rationals(ex["hurwicz_optimism"]), ex["hurwicz"])
                 @test aggregate(Hurwicz(α), problem) == fixture_rationals(scores)
             end
             @test aggregate(Expectation(), problem) == exact("expected_utility")

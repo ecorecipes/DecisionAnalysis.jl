@@ -85,7 +85,7 @@ end
                   PowerUtility(:n; risk_aversion=0.5, worst=5, best=45),
                   PowerUtility(:n; risk_aversion=1, worst=5, best=45),
                   PowerUtility(:n; risk_aversion=3, worst=5, best=45),
-         # Outcomes that count against: best below worst.
+                  # Outcomes that count against: best below worst.
                   LinearUtility(:n; worst=45, best=5),
                   ExponentialUtility(:n; risk_aversion=0.08, worst=45, best=5))
             @test u(u.worst) ≈ 0 atol = 1e-12
@@ -140,7 +140,6 @@ end
                 table = payoff_table(t, u)
                 for (d, draw) in enumerate(1:4),
                     (a, action) in enumerate((:none, :treat, :cull))
-
                     us = oracle_cell_utilities(rows, draw, action, f)
                     m, se = oracle_cell(us)
                     @test table.Q[a, d] ≈ m
@@ -165,7 +164,7 @@ end
                     row.draw == 2 && row.action == :treat || continue
                     # Only the replicates that the baseline also has are paired.
                     base = filter(x -> x.draw == 2 && x.action == :none &&
-                                           x.replicate == row.replicate, rows)
+                                       x.replicate == row.replicate, rows)
                     isempty(base) || push!(paired, f(row) - f(only(base)))
                 end
                 @test gains.Q[2, 2] ≈ sum(paired) / length(paired)
@@ -200,7 +199,7 @@ end
             # A linear utility returns the expected count, exactly.
             linear = certainty_equivalent(tw, LinearUtility(:uninfected))
             @test all(row.certainty_equivalent == row.expected_outcome &&
-                      row.certainty_equivalent isa Rational for row in linear)
+                          row.certainty_equivalent isa Rational for row in linear)
             @test [row.certainty_equivalent for row in linear] ==
                   aggregate(Expectation(),
                             DecisionProblem(tw, IndividualsUtility(:uninfected)))
@@ -229,10 +228,12 @@ end
             # U = (uninfected − w infected) / (N (1 + w)) + w / (1 + w): the same choice
             # and the same value of information up to the factor.
             N = 60
-            scaled = AdditiveUtility(LinearUtility(:uninfected; worst=0, best=N) => 1 //
-                                                                                    (1 + w),
-                                     LinearUtility(:infected; worst=N, best=0) => w //
-                                                                                  (1 + w))
+            scaled = AdditiveUtility(LinearUtility(:uninfected; worst=0, best=N) =>
+                                         1 //
+                                         (1 + w),
+                                     LinearUtility(:infected; worst=N, best=0) =>
+                                         w //
+                                         (1 + w))
             Qs = payoff_table(t, scaled).Q
             @test Qs == reference.Q .// (N * (1 + w)) .+ w // (1 + w)
             @test all(0 .<= Qs .<= 1)

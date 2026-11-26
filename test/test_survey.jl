@@ -78,7 +78,6 @@ plain_unit(value, cost) = (; choice=:act_now, value, cost, largest_cost=cost)
         surveyed = 0
         for p in (1 // 20):(1 // 20):(19 // 20), d in (1 // 20):(1 // 20):(19 // 20),
             C in (1000, 2573, 7146, 28560, 100000)
-
             problem, survey = presence_problem(p), detection(d)
             imposed = survey_or_act(problem, survey; action_costs=[0, C], survey_cost=M,
                                     policy=FOUND_ONLY)
@@ -285,7 +284,8 @@ plain_unit(value, cost) = (; choice=:act_now, value, cost, largest_cost=cost)
     @testset "what is refused" begin
         problem, survey = presence_problem(1 // 10), detection(7 // 10)
         run(; problem=problem, survey=survey, action_costs=[0, 5000], survey_cost=750,
-        policy=nothing) = survey_or_act(problem, survey; action_costs, survey_cost, policy)
+            policy=nothing) = survey_or_act(problem, survey; action_costs, survey_cost,
+                                            policy)
         table = PayoffTable([:none, :protect], [:absent, :present], [0 0; 0 1])
         @test_throws MissingBaselineError run(problem=DecisionProblem(table, [0.9, 0.1]))
         @test_throws BeliefFormError run(problem=DecisionProblem(table,

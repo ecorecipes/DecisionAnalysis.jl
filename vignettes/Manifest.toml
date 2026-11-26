@@ -338,7 +338,7 @@ uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
 version = "1.16.2+0"
 
 [[deps.DecisionAnalysis]]
-deps = ["FiniteKernels", "JuMP", "LinearAlgebra", "Logging", "Random", "Statistics", "Tables"]
+deps = ["FiniteKernels", "JuMP", "LinearAlgebra", "Logging", "Random", "SpecialFunctions", "Statistics", "Tables"]
 path = ".."
 uuid = "6a9d793e-d09c-4461-8cb4-55c12d181024"
 version = "0.1.1"

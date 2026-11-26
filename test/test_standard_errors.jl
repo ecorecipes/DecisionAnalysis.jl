@@ -22,7 +22,7 @@ end
                 problem = voi_normal_sample(rng, n)
                 study = importance_loglikelihoods(simulate_data, loglikelihood,
                                                   problem.belief; datasets=K,
-                                                  seed=rand(rng, 1:(10^9)))
+                                                  seed=rand(rng, 1:(10 ^ 9)))
                 return evsi(problem, study)
             end
             values = [e.value for e in estimates]
@@ -96,7 +96,7 @@ end
             return map(1:count) do _
                 problem = voi_normal_sample(rng, n)
                 return evsi(problem, GaussianApproximation(:p1; n0=1, n=m, regression);
-                            bootstrap, seed=rand(rng, 1:(10^6)))
+                            bootstrap, seed=rand(rng, 1:(10 ^ 6)))
             end
         end
         default = repetitions(nothing, 150)

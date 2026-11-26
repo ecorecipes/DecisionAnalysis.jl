@@ -65,18 +65,18 @@
         @test Tables.istable(sweep)
         for row in sweep
             region = only(filter(r -> r.from <= row.weight < r.to ||
-                                     (row.weight == 3 && r.to == 3), regions))
+                                      (row.weight == 3 && r.to == 3), regions))
             @test [row.first_choice] == region.actions
             @test row.ranking[1] == row.first_choice
             @test row.scores == aggregate(Expectation(), build(row.weight))
         end
         reversals = rank_reversals(sweep)
         @test any(r -> r.top_changed && r.from == 1 // 2 && r.to == 3 // 4 &&
-                           Set(r.actions) == Set([:treat, :cull]), reversals)
+                       Set(r.actions) == Set([:treat, :cull]), reversals)
         # none and cull swap when 65 − 30w = 55 − w, at w = 10/29, without changing the
         # first choice.
         @test any(r -> !r.top_changed && Set(r.actions) == Set([:none, :cull]) &&
-                           r.from <= 10 // 29 <= r.to, reversals)
+                       r.from <= 10 // 29 <= r.to, reversals)
         # A sweep under another rule.
         maximin = weight_sweep(build, [0, 1]; rule=Maximin())
         @test maximin[1].first_choice == decide(build(0), Maximin()).chosen[1]

@@ -313,12 +313,12 @@ function _prior(p::DecisionProblem{T,PointBelief}, ::Symbol) where {T}
     return Int[s == p.belief.state for s in p.payoff.states]
 end
 function _prior(p::DecisionProblem{T,<:CredalSet}, operation::Symbol) where {T}
-    throw(BeliefFormError(operation, :CredalSet,
-                          "it needs a single prior; use robust_evpi or robust_evsi, " *
-                          "or build the problem from one member of the set"))
+    return throw(BeliefFormError(operation, :CredalSet,
+                                 "it needs a single prior; use robust_evpi or robust_evsi, " *
+                                 "or build the problem from one member of the set"))
 end
 function _prior(p::DecisionProblem{T,ScenarioSet}, operation::Symbol) where {T}
-    throw(BeliefFormError(operation, :ScenarioSet,
-                          "a scenario set carries no probabilities; supply a " *
-                          "FiniteBelief"))
+    return throw(BeliefFormError(operation, :ScenarioSet,
+                                 "a scenario set carries no probabilities; supply a " *
+                                 "FiniteBelief"))
 end

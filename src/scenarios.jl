@@ -68,8 +68,10 @@ decision_axis(name, levels) = ScenarioAxis(name, levels; kind=:decision)
 A [`ScenarioAxis`](@ref) of a factor outside anyone's control, with optional
 probabilities of its levels.
 """
-uncertainty_axis(name, levels; weights=nothing) = ScenarioAxis(name, levels;
-                                                               kind=:uncertainty, weights)
+function uncertainty_axis(name, levels; weights=nothing)
+    return ScenarioAxis(name, levels;
+                        kind=:uncertainty, weights)
+end
 
 """
     ScenarioDesign(axes...; purpose=nothing, audience="")
@@ -368,7 +370,7 @@ function factor_effects(design::ScenarioDesign, values)
     grand = sum(y) / n
     total = sum(abs2, y .- grand)
     function level_means(k)
-        return [(members = findall(c -> c[k] == l, design.cells);
+        return [(members=findall(c -> c[k] == l, design.cells);
                  isempty(members) ? NaN : sum(y[members]) / length(members))
                 for l in eachindex(design.axes[k].levels)]
     end
@@ -389,7 +391,9 @@ function factor_effects(design::ScenarioDesign, values)
     if full
         for i in eachindex(design.axes), j in (i + 1):length(design.axes)
             joint = 0.0
-            for a in eachindex(design.axes[i].levels), b in eachindex(design.axes[j].levels)
+            for a in eachindex(design.axes[i].levels), b in
+                                                       eachindex(design.axes[j].levels)
+
                 members = findall(c -> c[i] == a && c[j] == b, design.cells)
                 joint += length(members) * (sum(y[members]) / length(members) - grand)^2
             end

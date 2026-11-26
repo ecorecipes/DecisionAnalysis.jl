@@ -193,8 +193,9 @@ const _Study = Union{Experiment,SummaryStatistics,ImportanceSampling,GaussianApp
 
 function _design_list(designs)
     if designs isa GaussianApproximation && !(designs.n isa Real)
-        return [Symbol("n = ", n) => GaussianApproximation(designs.focal; n0=designs.n0, n,
-                                                           designs.regression)
+        return [Symbol("n = ", n) =>
+                    GaussianApproximation(designs.focal; n0=designs.n0, n,
+                                          designs.regression)
                 for n in designs.n]
     end
     designs isa _Study && return [:design => designs]

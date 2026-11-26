@@ -317,8 +317,8 @@ function solve_program(prog::DecisionProgram{T}; optimizer=nothing,
         x = T[_round_rational(v, first(tols)) for v in xf]
         return _solved(prog, data, x, :float_optimizer, false)
     end
-    throw(ArgumentError("the optimiser supports linear constraints neither in the " *
-                        "model's number type $T nor in Float64"))
+    return throw(ArgumentError("the optimiser supports linear constraints neither in the " *
+                               "model's number type $T nor in Float64"))
 end
 
 # Clean-up of a rounded point that should lie in the probability simplex: negative

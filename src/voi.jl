@@ -404,7 +404,7 @@ function _credal_view(problem::DecisionProblem, operation::Symbol)
                               "a scenario set carries no probabilities; supply a " *
                               "CredalSet"))
     v.form === :PointBelief && return _View(_feasible_Q(problem),
-                                            [_prior(problem, operation)], v.form)
+                 [_prior(problem, operation)], v.form)
     return v
 end
 
@@ -566,5 +566,5 @@ floating point, as in InfluenceDiagrams.jl. Utilities are whatever the diagram's
 utility nodes hold; this package takes the payoff's unit as given.
 """
 function normal_form(model; kw...)
-    throw(MissingExtensionError(:normal_form, :InfluenceDiagrams))
+    return throw(MissingExtensionError(:normal_form, :InfluenceDiagrams))
 end

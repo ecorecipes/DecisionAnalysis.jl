@@ -285,7 +285,7 @@ end
                 return sum(eachindex(states)) do k
                     return w[k] * maximum(-S1[r, k]
                                           for r in eachindex(courses)
-                                              if first_stage[r] == g)
+                                          if first_stage[r] == g)
                 end
             end
             @test slow == r.value
@@ -1072,7 +1072,7 @@ end
         function wins(action, combination)
             a = findfirst(==(action), actions)
             return count(j -> combinations[j] == combination &&
-                             argmax(view(low.payoff.Q, :, j)) == a, eachindex(states))
+                              argmax(view(low.payoff.Q, :, j)) == a, eachindex(states))
         end
         # The count for community transmission is the paper's (37 of 37). Those for the
         # other two are not (36 and 31 in the text): the fixture pins ours, and no
@@ -1465,7 +1465,6 @@ end
         stubborn = ours["persistence_0.99_1to100"]
         for (key, q) in (("q_0.95", 95 // 100), ("q_0.05", 5 // 100)),
             (years, label) in ((300, "300_years"), (600, "600_years"))
-
             @test stops_after(99 // 100, q, 100; years) == stubborn[key][label]
         end
         @test stubborn["q_0.05"]["300_years"] == 0 == stubborn["q_0.95"]["600_years"]

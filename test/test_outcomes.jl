@@ -17,7 +17,7 @@ function DecisionAnalysis.apply_action(p::ToyPond, a::Symbol)
     a === :none && return p
     a === :fence && return ToyPond(p.frogs, p.survival, 0.2, p.fail)
     a === :broken && return ToyPond(p.frogs, p.survival, 0.0, true)
-    throw(ArgumentError("unknown action $a"))
+    return throw(ArgumentError("unknown action $a"))
 end
 function DecisionAnalysis.simulate(p::ToyPond; rng)
     p.fail && throw(DomainError(p.frogs, "the toy model failed"))

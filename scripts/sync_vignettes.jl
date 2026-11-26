@@ -54,9 +54,10 @@ function documenter_html(text::AbstractString)
         s = String(take!(prose))
         s = replace(s, r"<span[^>]*>(.*?)</span>"s => s"\1")
         s = replace(s,
-                    r"^[ \t]*(?:<div\b[^>]*>|</div>)[ \t]*$"m => tag -> "```@raw html\n" *
-                                                                        strip(tag) *
-                                                                        "\n```")
+                    r"^[ \t]*(?:<div\b[^>]*>|</div>)[ \t]*$"m =>
+                        tag -> "```@raw html\n" *
+                               strip(tag) *
+                               "\n```")
         return print(out, s)
     end
     fence = ""

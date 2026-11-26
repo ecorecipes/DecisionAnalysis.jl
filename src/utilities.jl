@@ -533,8 +533,8 @@ function inverse_utility(u::PowerUtility, value::Real)
     return _natural_inverse(u, lo + value * (_natural(u, u.best) - lo))
 end
 function inverse_utility(u::AbstractUtility, ::Real)
-    throw(ArgumentError("$(nameof(typeof(u))) is not a utility of a single outcome, so " *
-                        "it has no inverse and no certainty equivalent"))
+    return throw(ArgumentError("$(nameof(typeof(u))) is not a utility of a single outcome, so " *
+                               "it has no inverse and no certainty equivalent"))
 end
 
 _direction(::AbstractUtility) = 1

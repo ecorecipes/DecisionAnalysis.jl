@@ -5,8 +5,8 @@
 _payoff_vector(y::NamedTuple) = Float64[v for v in values(y)]
 _payoff_vector(y::AbstractVector{<:Real}) = Float64.(y)
 function _payoff_vector(y)
-    throw(ArgumentError("`payoffs(θ)` must return a vector or a named tuple of numbers, " *
-                        "one per action; got $(typeof(y))"))
+    return throw(ArgumentError("`payoffs(θ)` must return a vector or a named tuple of numbers, " *
+                               "one per action; got $(typeof(y))"))
 end
 
 # E max(m + Z) − max(m) for Z ~ N(0, C), by simulation: by how much noise of covariance

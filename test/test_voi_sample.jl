@@ -101,7 +101,8 @@ using GAM: GAM
         end
         # Sadatsafavi is exact when the best action changes once along the parameter
         # (one separator) or twice (two separators).
-        for (separators, pattern) in ((1, [-3, -1, -1, 2, 4, 5]), (2, [3, 1, -2, -4, 1, 2]))
+        for (separators, pattern) in
+            ((1, [-3, -1, -1, 2, 4, 5]), (2, [3, 1, -2, -4, 1, 2]))
             l = 4
             g = repeat(1:6; inner=l)
             noise = repeat([-2, -1, 1, 2]; outer=6)

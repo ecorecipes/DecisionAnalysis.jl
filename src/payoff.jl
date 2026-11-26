@@ -282,8 +282,10 @@ julia> individuals_payoff((; toadlets=counts), :toadlets) == counts
 true
 ```
 """
-individuals_payoff(counts::PayoffTable) = _linear_payoff(IndividualsUtility(:n),
-                                                         _ -> counts)
+function individuals_payoff(counts::PayoffTable)
+    return _linear_payoff(IndividualsUtility(:n),
+                          _ -> counts)
+end
 individuals_payoff(outcomes, name) = individuals_payoff(_named_table(outcomes, name))
 
 """

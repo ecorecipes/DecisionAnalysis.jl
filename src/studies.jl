@@ -117,10 +117,12 @@ draws), as its sufficient statistics: `(; x1)` for a [`BinomialStudy`](@ref),
 [`NormalStudy`](@ref). These are also the summary statistics that the regression
 method regresses on.
 """
-simulate_study(rng::AbstractRNG, s::BinomialStudy, θ) = (;
-                                                         x1=_binomial(rng, s.n,
-                                                                      _probability(θ,
-                                                                                   s.parameter)))
+function simulate_study(rng::AbstractRNG, s::BinomialStudy, θ)
+    return (;
+            x1=_binomial(rng, s.n,
+                         _probability(θ,
+                                      s.parameter)))
+end
 function simulate_study(rng::AbstractRNG, s::TwoArmBinomialStudy, θ)
     return (; x1=_binomial(rng, s.n, _probability(θ, s.parameters[1])),
             x2=_binomial(rng, s.n, _probability(θ, s.parameters[2])))
@@ -140,9 +142,11 @@ _binomial_loglikelihood(x::Real, n::Int, p::Float64) = _xlogy(x, p) + _xlogy(n -
 The log-likelihood of a data set of [`simulate_study`](@ref) under the parameters `θ`,
 up to a constant that does not depend on `θ` (the binomial coefficient is left out).
 """
-study_loglikelihood(s::BinomialStudy, data, θ) = _binomial_loglikelihood(data.x1, s.n,
-                                                                         _probability(θ,
-                                                                                      s.parameter))
+function study_loglikelihood(s::BinomialStudy, data, θ)
+    return _binomial_loglikelihood(data.x1, s.n,
+                                   _probability(θ,
+                                                s.parameter))
+end
 function study_loglikelihood(s::TwoArmBinomialStudy, data, θ)
     return _binomial_loglikelihood(data.x1, s.n, _probability(θ, s.parameters[1])) +
            _binomial_loglikelihood(data.x2, s.n, _probability(θ, s.parameters[2]))

@@ -124,7 +124,8 @@ end
 # at the neighbouring file of the same format.
 function retarget_links(body::AbstractString, ext::AbstractString)
     return replace(body,
-                   r"\]\(\.\./(\d+_[A-Za-z0-9_]+)/\1\.(?:md|qmd)\)" => SubstitutionString("](../\\1/\\1.$ext)"))
+                   r"\]\(\.\./(\d+_[A-Za-z0-9_]+)/\1\.(?:md|qmd)\)" =>
+                       SubstitutionString("](../\\1/\\1.$ext)"))
 end
 
 function markdown_images(text::AbstractString)

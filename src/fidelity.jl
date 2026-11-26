@@ -31,10 +31,10 @@ function total_variation(p::FiniteBelief, q::FiniteBelief)
 end
 
 function total_variation(p::SampleBelief, ::SampleBelief)
-    throw(BeliefFormError(:total_variation, :SampleBelief,
-                          "two samples of a continuous distribution share no draw, so " *
-                          "the distance between their empirical distributions says " *
-                          "nothing about the distributions"))
+    return throw(BeliefFormError(:total_variation, :SampleBelief,
+                                 "two samples of a continuous distribution share no draw, so " *
+                                 "the distance between their empirical distributions says " *
+                                 "nothing about the distributions"))
 end
 
 """
