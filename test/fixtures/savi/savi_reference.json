@@ -1,0 +1,48 @@
+{
+  "source": "SAVI test_data/brennan1000 (costs.csv, effects.csv, parameters.csv), BSD 3-clause, copyright 2014 The University of Sheffield",
+  "script": "validation/savi_reference.R",
+  "versions": {
+    "R": "R version 4.6.0 (2026-04-24)",
+    "mgcv": "1.9.4"
+  },
+  "lambda": 20000,
+  "draws": 1000,
+  "expected_net_benefit": [11180.282941340563, 12381.709112400084],
+  "evpi": 2098.766239551156,
+  "probability_best": [0.459, 0.541],
+  "evppi_single": {
+    "theta1": 3.392336864906,
+    "theta2": 8.864121558255,
+    "theta3": 0,
+    "theta4": 0,
+    "theta5": 78.183324516576,
+    "theta6": 1232.852091178884,
+    "theta7": 7.71243398517,
+    "theta8": 0,
+    "theta9": 0,
+    "theta10": 11.622815445869,
+    "theta11": 0,
+    "theta12": 0,
+    "theta13": 0.4780308749584,
+    "theta14": 455.880360618846,
+    "theta15": 520.96332975164,
+    "theta16": 928.54518640743,
+    "theta17": 0,
+    "theta18": 0,
+    "theta19": 0
+  },
+  "evppi_groups": [
+    {
+      "parameters": ["theta5", "theta14"],
+      "evppi": 493.720941881751
+    },
+    {
+      "parameters": ["theta6", "theta15"],
+      "evppi": 1507.973139175982
+    },
+    {
+      "parameters": ["theta7", "theta16"],
+      "evppi": 1100.300058692996
+    }
+  ]
+}

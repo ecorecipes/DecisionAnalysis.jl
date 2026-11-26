@@ -211,6 +211,20 @@ pounds at 20,000 pounds per QALY; a validation target only).
 | EVPPI of the pair, GAM tensor | 332.34506 | 333.87573 | 5.58 | −1.53 |
 | EVPPI of five parameters, Gaussian process, first 1500 draws | 339.22751 | 339.35972 | 14.1 | −0.13 |
 
+### Sample-based estimators against SAVI's test data
+
+`test/fixtures/savi/` holds the 1000-draw test data of
+[SAVI](https://github.com/Sheffield-Accelerated-VoI/SAVI) (BSD 3-clause, copied unchanged with
+its licence): costs, effects and 19 parameters of a two-option model. `savi_reference.R` fits
+with mgcv the regressions that SAVI fits (a smooth of one parameter, a tensor product for a
+pair) at SAVI's default threshold of 20,000 per unit of effect, the source's own valuation.
+The expected net benefits, the EVPI (2098.77) and the probability that each option is best
+(0.459, 0.541) agree exactly. The 19 single-parameter EVPPI agree within twice our standard
+error, the three largest within 2% (1232.9 against 1232.9, 521.0 against 521.0, 917.6 against
+928.5), and the three pairs within one standard error (477.0 against 493.7, 1477.4 against
+1508.0, 1104.0 against 1100.3). The largest difference in standard errors is for `theta1`
+(0.1 against 3.4, standard error 3.0), a parameter that matters to neither fit.
+
 ### Published analyses
 
 Eight published value-of-information analyses are recomputed from the tables printed in

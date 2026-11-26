@@ -44,6 +44,7 @@ Utilities with a risk attitude and over several attributes are on [their own pag
 ```@docs
 VOIEstimate
 expected_utility_estimates
+probability_optimal
 expected_gain_estimates
 variance_components
 conditional_problem

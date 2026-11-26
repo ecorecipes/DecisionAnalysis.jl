@@ -61,6 +61,10 @@ A sample-based estimate of a value of information, as returned by [`evpi`](@ref)
   fitted values are not conditional means (too few draws for its coefficients, or a
   misspecified form). The estimate is then wrong by more than its standard error
   says, a warning is logged, and the value is returned as computed, not capped.
+  `redundant_parameters` names the focal parameters that a regression was not fitted
+  on: a numeric parameter that is constant, or a linear function of the numeric
+  parameters named before it, tells nothing more than they do and is left out (at
+  least one is always kept). It is empty for the methods that are not regressions.
 
 `Float64(e)` and `e.value` give the number; arithmetic is deliberately not defined,
 so that an error cannot be dropped by accident.
@@ -679,10 +683,49 @@ function _fit(method::AbstractRegression, columns::NamedTuple, Q, w)
 end
 
 # One estimate from a fit, with its errors.
+# The columns a regression should be fitted on, and the names of those left out. A
+# numeric column that is constant, or a linear function of the numeric columns before
+# it, tells nothing more than they do, but a regression given it has more to fit and
+# overfits a little more. At least one column is always kept. (SAVI screens its
+# parameters in the same way.)
+function _screen_columns(columns::NamedTuple)
+    kept = Symbol[]
+    dropped = Symbol[]
+    basis = Vector{Float64}[]
+    for (name, column) in pairs(columns)
+        if !_is_numeric(column)
+            push!(kept, name)
+            continue
+        end
+        v = Float64.(column) .- mean(column)
+        scale = sqrt(dot(v, v))
+        if allequal(column) || iszero(scale)
+            push!(dropped, name)
+            continue
+        end
+        v ./= scale
+        for b in basis
+            v .-= dot(b, v) .* b
+        end
+        rest = sqrt(dot(v, v))
+        if rest < _REDUNDANT_TOL
+            push!(dropped, name)
+        else
+            push!(basis, v ./ rest)
+            push!(kept, name)
+        end
+    end
+    isempty(kept) && push!(kept, popfirst!(dropped))
+    return NamedTuple{Tuple(kept)}(Tuple(columns[name] for name in kept)), dropped
+end
+const _REDUNDANT_TOL = 1e-8
+
 function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTuple,
                    Q::AbstractMatrix, w::AbstractVector; bootstrap::Integer, seed::Integer,
                    cells=nothing, extra=(;))
-    G, info = _fit(method, columns, Q, w)
+    used, redundant = method isa Union{AbstractRegression,_Shrunk} ?
+                      _screen_columns(columns) : (columns, Symbol[])
+    G, info = _fit(method, used, Q, w)
     value, v0, a = _voi_from_fit(G, Q, w)
     # A constant fit is worth nothing; the sum above gives zero only to rounding.
     get(info, :degree, 1) == 0 && (value = zero(value))
@@ -695,7 +738,7 @@ function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTu
             wb = Float64.(w[idx])
             wb ./= sum(wb)
             Qb = Q[:, idx]
-            Gb, _ = _fit(method, map(c -> c[idx], columns), Qb, wb)
+            Gb, _ = _fit(method, map(c -> c[idx], used), Qb, wb)
             return first(_voi_from_fit(Gb, Qb, wb))
         end
     end
@@ -713,7 +756,8 @@ function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTu
                      effective_sample_size=Float64(effective_sample_size(w)),
                      bootstrap=Int(bootstrap), sample_evpi,
                      policy_gain=sum(Float64(w[i]) * gains[i] for i in eachindex(gains)),
-                     above_sample_evpi=above), info, extra)
+                     above_sample_evpi=above, redundant_parameters=redundant), info,
+                    extra)
     return VOIEstimate(quantity, _method_name(method), value, se, bias, details)
 end
 
@@ -1285,6 +1329,53 @@ end
 
 # Expected utility with its Monte Carlo error
 # -------------------------------------------
+
+"""
+    probability_optimal(problem::DecisionProblem) -> Vector{NamedTuple}
+
+The probability, under the belief, that each feasible action is a best one, one
+`(; action, probability, standard_error)` per action: the total weight of the states
+(or draws) in which no feasible action pays more. In cost-effectiveness analysis this
+is a point of the acceptability curve.
+
+A tie counts for every tied action, so the probabilities sum to one when no state has
+a tie and to more otherwise. For a [`FiniteBelief`](@ref) the probability is exact and
+`standard_error` is `nothing`; for a [`SampleBelief`](@ref) it is the Monte Carlo error
+of the proportion when the draws are a random sample of the belief. Other belief forms
+throw [`BeliefFormError`](@ref).
+
+The action with the largest expected utility need not be the one most likely to be
+best, and a high probability says nothing of how much is lost when the action is not
+best: [`expected_regret`](@ref) and [`evpi`](@ref) measure that. The probability of the
+act-now action is one exactly when perfect information is worth nothing.
+
+```jldoctest
+julia> table = PayoffTable([0 0 0; 4 -1 -1]; actions=[:none, :act]);
+
+julia> problem = DecisionProblem(table, FiniteBelief([1 // 2, 1 // 4, 1 // 4]));
+
+julia> [(r.action, r.probability) for r in probability_optimal(problem)]
+2-element Vector{Tuple{Symbol, Rational{Int64}}}:
+ (:none, 1//2)
+ (:act, 1//2)
+```
+"""
+function probability_optimal(problem::DecisionProblem)
+    belief = problem.belief
+    belief isa Union{FiniteBelief,SampleBelief} ||
+        throw(BeliefFormError(:probability_optimal, nameof(typeof(belief)),
+                              "the probability that an action is best needs a single " *
+                              "prior over the states"))
+    Q = _feasible_Q(problem)
+    w = belief isa SampleBelief ? belief.weights : belief.probabilities
+    best = [maximum(view(Q, :, i)) for i in axes(Q, 2)]
+    return map(enumerate(feasible_actions(problem))) do (a, action)
+        hit = [Q[a, i] == best[i] for i in axes(Q, 2)]
+        return (; action, probability=sum(w[i] * hit[i] for i in eachindex(hit)),
+                standard_error=belief isa SampleBelief ? _weighted_mean_se(hit, w) :
+                               nothing)
+    end
+end
 
 """
     expected_utility_estimates(problem::DecisionProblem) -> Vector{NamedTuple}

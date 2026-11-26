@@ -131,7 +131,8 @@ export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Groupi
        compare_regressions, ScenarioAxis, decision_axis, uncertainty_axis, ScenarioDesign,
        design_class, scenarios, design_actions, design_draws, design_belief,
        fractional_design, factor_effects, scenario_forecast, decision_robustness,
-       expected_utility_estimates, expected_gain_estimates, conditional_problem
+       expected_utility_estimates, expected_gain_estimates, conditional_problem,
+       probability_optimal
 # Sensitivity
 export policy_regions, one_way_thresholds, weight_sweep, rank_reversals
 # Linear programmes as JuMP models

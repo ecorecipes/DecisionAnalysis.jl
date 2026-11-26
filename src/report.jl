@@ -407,6 +407,13 @@ function _monte_carlo(problem::DecisionProblem, parameters, regression, seed::In
               "the same sample by more than twice its standard error. No information " *
               "is worth more than perfect information: the fit is poor (too few draws " *
               "for the regression) and that estimate should not be used.")
+    spare = [string(q.name, " (", join(q.estimate.details.redundant_parameters, ", "), ")")
+             for q in partial if !isempty(q.estimate.details.redundant_parameters)]
+    isempty(spare) ||
+        push!(notes,
+              "Parameters left out of the regression for $(join(spare, "; ")): each is " *
+              "constant or a linear function of the parameters before it, and tells " *
+              "nothing more than they do.")
     flat = [q.name for q in partial if get(q.estimate.details, :degree, 1) == 0]
     isempty(flat) ||
         push!(notes,

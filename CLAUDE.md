@@ -108,6 +108,13 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   the INLA/SPDE Gaussian process (INLA is an R package) and BART. Two deliberate differences:
   `population_value` at a zero discount rate is value × population × horizon (the limit of the formula;
   `pop_voi` returns value × population), and `MARSRegression` takes knots from a grid of quantiles.
+- **A regression is fitted on the focal parameters that carry something.** `_estimate` leaves out a numeric
+  column that is constant or a linear function of the numeric columns before it (`_screen_columns`; an
+  exact copy of a parameter moved an estimate by half a standard error before), keeps at least one, and
+  names what it left out in `details.redundant_parameters` and in the report. Only for regressions: the
+  cell-mean and single-parameter methods get the columns as given, and the default method is still chosen
+  from the columns as named. SAVI (BSD 3-clause) screens in the same way; its 1000-draw test data are a
+  fixture (`test/fixtures/savi/`, `test/test_savi.jl`), with reference values from mgcv.
 - **A model-based estimator needs the function the table was made from.** `MomentMatching` and
   `evppi_nested` take `payoffs(θ)`; for `MomentMatching` it must return the payoffs of the feasible actions
   in the problem's order and reproduce the payoff table, and the non-focal parameters are drawn from the
@@ -331,6 +338,8 @@ julia scripts/sync_vignettes.jl [--check]                         # copy the ren
   add `html` or `pdf` to `vignettes/_quarto.yml` or a vignette's front matter (Quarto would re-run the code per
   format).
 - `test/fixtures/voi/` and `test/fixtures/validation/` are written by the scripts of `validation/`.
+- `test/fixtures/savi/`: the three `.csv` files and `LICENSE.txt` are copied unchanged from SAVI (BSD
+  3-clause; keep the licence beside them); `savi_reference.json` is written by `validation/savi_reference.R`.
 - `test/fixtures/worked_examples.json` is shared with the Lean development. Edit it only together with
   that side, and keep every number in it equal to what `lab/wiki/references/computations/worked_examples.py`
   prints.
