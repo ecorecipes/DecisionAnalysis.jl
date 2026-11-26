@@ -170,6 +170,9 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.sum_mul_backupVector
 #print axioms DecisionAnalysisProofs.dynamicValue_succ_of_vectors
 #print axioms DecisionAnalysisProofs.exists_vectors_dynamicValue
+#print axioms DecisionAnalysisProofs.sum_mul_backupVector_le_dynamicValue
+#print axioms DecisionAnalysisProofs.dynamicValue_weighted_sum_le
+#print axioms DecisionAnalysisProofs.dynamicValue_succ_le_of_upper
 
 -- T8: minimax regret and independence of irrelevant alternatives.
 #print axioms DecisionAnalysisProofs.isMinimaxRegret_iiaSmall_iff

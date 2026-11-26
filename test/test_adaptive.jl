@@ -631,3 +631,120 @@ end
                                                        horizon=2, method=:grid)
     end
 end
+
+# Bounds from a grid of beliefs (method = :points; Lean: Finite/ValueVectors.lean,
+# sum_mul_backupVector_le_dynamicValue and dynamicValue_weighted_sum_le), against the
+# exact recursion over beliefs.
+@testset "adaptive management by points" begin
+    @testset "the grid" begin
+        grid = DecisionAnalysis._simplex_grid(Rational{Int}, 3, 4)
+        @test length(grid) == binomial(4 + 2, 2) && allunique(grid)
+        @test grid[1:3] == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        @test all(sum(q) == 1 && all(>=(0), q) && all(isinteger, 4 .* q) for q in grid)
+        @test length(DecisionAnalysis._simplex_grid(Float64, 4, 5)) == binomial(8, 3)
+        @test DecisionAnalysis._simplex_grid(Rational{Int}, 2, 1) == [[1, 0], [0, 1]]
+    end
+
+    @testset "the exact value lies between the bounds" begin
+        rng = Random.Xoshiro(20261205)
+        tight, narrower = 0, 0
+        for trial in 1:60
+            m, n = rand(rng, 2:3), rand(rng, 2:4)
+            base = exact_problem(rng, m, n)
+            horizon = rand(rng, 1:4)
+            discount = rand(rng, (1, 9 // 10, 1 // 2))
+            signal_of = rand(rng, (:current, :next))
+            given = [base.payoff.actions[a] => Experiment(random_stochastic(rng, BigRat,
+                                                                            rand(rng, 2:3),
+                                                                            n))
+                     for a in 1:m if rand(rng) < 0.75]
+            kind = rand(rng, 1:3)       # fixed state, one transition, one for each action
+            transitions = kind == 1 ? nothing :
+                          kind == 2 ? random_stochastic(rng, BigRat, n, n) :
+                          [base.payoff.actions[a] => random_stochastic(rng, BigRat, n, n)
+                           for a in 1:m]
+            function run(; kwargs...)
+                return adaptive_management(base, given; horizon, discount,
+                                           transitions, signal_of, kwargs...)
+            end
+            exact = run()
+            coarse = run(; method=:points, grid=3)
+            fine = run(; method=:points, grid=9)
+            for r in (coarse, fine)
+                @test r.active <= exact.active <= r.active_upper
+                @test r.perfect == exact.perfect && r.baseline == exact.baseline
+                @test r.active_upper <= r.perfect
+                @test r.passive === nothing && r.value_of_probing === nothing
+                @test length(r.value_function) == horizon
+                # The lower bound is the look-ahead on the vectors for one period fewer.
+                @test r.policy.value == r.active
+                if kind == 3
+                    @test r.no_learning === nothing && r.plan === nothing
+                    @test r.act_now_action === nothing && r.evpi === nothing
+                    @test r.value_of_learning === nothing
+                    @test_throws ArgumentError run(; method=:points, passive=true)
+                else
+                    @test r.no_learning == exact.no_learning && r.plan == exact.plan
+                    @test r.act_now_action == exact.act_now_action
+                    @test r.no_learning <= r.active
+                    @test run(; method=:points, grid=3, passive=true).passive ==
+                          exact.passive
+                end
+            end
+            # The exact methods report no gap.
+            @test exact.active_upper == exact.active
+            # One period needs no grid: the first action is chosen on the prior itself.
+            horizon == 1 && @test coarse.active == exact.active == coarse.active_upper
+            # A finer grid is usually tighter (counted below; it is not a theorem).
+            tight += fine.active_upper == fine.active
+            narrower += fine.active_upper - fine.active <
+                        coarse.active_upper - coarse.active
+            # Floating point: the same bounds to rounding.
+            fl = adaptive_management(DecisionProblem(PayoffTable(base.payoff.actions,
+                                                                 base.payoff.states,
+                                                                 Float64.(base.payoff.Q)),
+                                                     Float64.(probabilities(base.belief))),
+                                     [a => Experiment(Float64.(e.likelihood))
+                                      for (a, e) in given]; horizon,
+                                     discount=Float64(discount),
+                                     transitions=transitions === nothing ? nothing :
+                                                 transitions isa AbstractMatrix ?
+                                                 Float64.(transitions) :
+                                                 [a => Float64.(T)
+                                                  for (a, T) in transitions], signal_of,
+                                     method=:points, grid=3)
+            @test fl.active ≈ coarse.active atol = 1e-8
+            @test fl.active_upper ≈ coarse.active_upper atol = 1e-8
+        end
+        @test tight > 0 && narrower > 10
+    end
+
+    @testset "two states: against the exact vectors over a long horizon" begin
+        table = PayoffTable([:none, :inspect, :treat], [:clear, :infested],
+                            BigRat[50 20; 48 18; 40 10])
+        untreated = BigRat[23//25 0; 2//25 1]
+        treated = BigRat[23//25 391//500; 2//25 109//500]
+        moves = (; none=untreated, inspect=untreated, treat=treated)
+        noticed(d) = Experiment(BigRat[1 1-d; 0 d]; signals=[:not_seen, :seen])
+        seen = (; none=noticed(1 // 5), inspect=noticed(9 // 10), treat=noticed(9 // 10))
+        problem = DecisionProblem(table, BigRat[9 // 10, 1 // 10]; baseline=:none)
+        exact = adaptive_management(problem, seen; horizon=30, transitions=moves, depth=0,
+                                    method=:vectors, passive=false)
+        approx = adaptive_management(problem, seen; horizon=30, transitions=moves, depth=0,
+                                     method=:points, grid=20)
+        @test approx.active <= exact.active <= approx.active_upper
+        @test approx.active_upper - approx.active < exact.active / 200
+        @test approx.first_action == exact.first_action
+    end
+
+    @testset "what is refused" begin
+        two = DecisionProblem(PayoffTable([:a, :b], [:x, :y], [1 0; 0 1]), [1 // 2, 1 // 2])
+        shows = Experiment([1 0; 0 1])
+        @test_throws ArgumentError adaptive_management(two, shows; horizon=2,
+                                                       method=:points, grid=0)
+        # Integer payoffs and an integer prior are carried as rationals.
+        sure = DecisionProblem(PayoffTable([:a, :b], [:x, :y], [1 0; 0 1]), [1, 0])
+        r = adaptive_management(sure, shows; horizon=3, method=:points, grid=2)
+        @test r.active == r.active_upper == 3 && r.active isa Rational
+    end
+end

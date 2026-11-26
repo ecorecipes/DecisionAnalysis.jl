@@ -10,6 +10,7 @@ Simon Frost
 - [When inspection is worth it](#when-inspection-is-worth-it)
 - [Which state the signal is about](#which-state-the-signal-is-about)
 - [The size of the calculation](#the-size-of-the-calculation)
+- [More than two states](#more-than-two-states)
 - [What to take from this](#what-to-take-from-this)
 
 ## The question
@@ -356,6 +357,83 @@ md_table(["quantity, 60 years", "value"],
 The [next
 vignette](29_ecology_chades_tiger.md) uses it
 to reproduce a published 30-year analysis.
+
+## More than two states
+
+`method=:vectors` needs two states. With more, `method=:points` gives
+two numbers that the value of the best policy lies between: a lower
+bound, which is the value of a policy that can be carried out, and an
+upper bound. Both come from backing the value function up only at the
+beliefs of a grid, and a finer grid brings them together.
+
+Suppose the infestation can be `light` or `heavy`. **These numbers are
+invented too.** A light infestation costs 12 pairs a year and a heavy
+one 30; a light one becomes heavy with probability 0.3 a year; a
+treatment clears a light infestation with probability 0.9 and usually
+only reduces a heavy one; and a light infestation is much harder to
+notice than a heavy one.
+
+``` julia
+const STAGES = [:clear, :light, :heavy]
+stages = PayoffTable(ACTIONS, STAGES, [50 38 20; 48 36 18; 40 28 10])
+spread = [0.92 0.0 0.0; 0.08 0.7 0.0; 0.0 0.3 1.0]               # untreated
+cleared = [0.92 0.9*0.92 0.25; 0.08 1-0.9*0.92 0.6; 0.0 0.0 0.15]  # treated
+stage_moves = (; none=spread, inspect=spread, treat=cleared)
+found(light, heavy) = Experiment([1 1-light 1-heavy; 0 light heavy];
+                                 signals=[:not_seen, :seen], states=STAGES)
+stage_seen = (; none=found(0.1, 0.4), inspect=found(0.7, 0.95), treat=found(0.7, 0.95))
+three = DecisionProblem(stages, [0.9, 0.08, 0.02]; baseline=:none)
+
+# Eight years can still be done exactly, as a check.
+checked = adaptive_management(three, stage_seen; horizon=8, transitions=stage_moves,
+                            depth=0, passive=false)
+md_table(["eight years", "lower bound", "upper bound", "points of the grid"],
+         vcat([Any["exact (" * string(checked.beliefs_evaluated) * " beliefs)", checked.active,
+                   checked.active, "-"]],
+              [begin
+                   r = adaptive_management(three, stage_seen; horizon=8,
+                                           transitions=stage_moves, depth=0,
+                                           method=:points, grid=g)
+                   Any["grid of " * string(g), r.active, r.active_upper,
+                       binomial(g + 2, 2)]
+               end
+               for g in (5, 10, 20)]); digits=2)
+```
+
+| eight years            | lower bound | upper bound | points of the grid |
+|:-----------------------|------------:|------------:|-------------------:|
+| exact (335923 beliefs) |      361.18 |      361.18 |                 \- |
+| grid of 5              |      361.18 |      366.39 |                 21 |
+| grid of 10             |      361.18 |      365.75 |                 66 |
+| grid of 20             |      361.18 |      364.35 |                231 |
+
+``` julia
+md_table(["thirty years", "leave alone (baseline)", "lower bound", "upper bound", "gap",
+          "state seen every year", "first action"],
+         [begin
+              r = adaptive_management(three, stage_seen; horizon=30,
+                                      transitions=stage_moves, depth=0, method=:points,
+                                      grid=g)
+              Any["grid of " * string(g), r.baseline, r.active, r.active_upper,
+                  r.active_upper - r.active, r.perfect, r.first_action]
+          end
+          for g in (5, 10, 20, 40)]; digits=1)
+```
+
+| thirty years | leave alone (baseline) | lower bound | upper bound | gap | state seen every year | first action |
+|:---|---:|---:|---:|---:|---:|---:|
+| grid of 5 | 962.6 | 1325.8 | 1354.4 | 28.5 | 1441.7 | `none` |
+| grid of 10 | 962.6 | 1326.1 | 1350.8 | 24.7 | 1441.7 | `none` |
+| grid of 20 | 962.6 | 1326.2 | 1343.8 | 17.6 | 1441.7 | `none` |
+| grid of 40 | 962.6 | 1326.2 | 1336.8 | 10.6 | 1441.7 | `none` |
+
+The lower bound is the one to act on: it is what the policy returned is
+worth at least. The upper bound says how much a better policy could
+still add. Here the lower bound hardly moves with the grid and is
+already exact at eight years, while the upper bound closes slowly. The
+baseline and the value of seeing the state every year are exact with
+this method. The fixed plan and the passive manager are not computed
+here, because the actions move the state differently.
 
 ## What to take from this
 

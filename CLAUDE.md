@@ -221,7 +221,13 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   horizons when the state moves. For three or more states exact pruning needs a linear programme per
   vector and was slower than `:beliefs` on every problem tried, so it is refused, not approximated.
   For a fixed state with repeated trials the lines are as many as the beliefs: use `:beliefs`. The
-  passive manager is always found by following its beliefs (`passive=false` skips it).
+  passive manager is always found by following its beliefs (`passive=false` skips it). A third method,
+  `:points`, is for any number of states and is **not exact**: it backs the value function up at the
+  beliefs of a grid and returns `active` as a lower bound (the value of a policy that can be carried out)
+  and `active_upper` as an upper bound (the "sawtooth" interpolation of a convex function), both proved
+  in `Finite/ValueVectors.lean`. Never present its `active` as the value; report the pair. With it the
+  fixed plan and the passive manager are computed only where the state is fixed or moves in the same way
+  whatever is done, and are `nothing` otherwise.
 - `src/survey.jl`: `survey_or_act` (act now or survey first, by value per unit of expected cost, after
   Raymond et al. 2020; values are gains over the baseline, the baseline costs zero, a tie means act now,
   and the survey policy is the best over all policies unless one is imposed) and `select_under_budget`

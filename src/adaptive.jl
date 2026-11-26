@@ -115,6 +115,56 @@ function _prune_vectors(G::AbstractMatrix{T}, tags::AbstractVector{Int}) where {
     return G[keep, :], tags[keep]
 end
 
+# The beliefs over `n` states whose entries are multiples of `1 / k`, the corners of
+# the simplex first.
+function _simplex_grid(::Type{T}, n::Integer, k::Integer) where {T}
+    corners = [T[s == t for s in 1:n] for t in 1:n]
+    others = Vector{T}[]
+    counts = zeros(Int, n)
+    function fill!(position, left)
+        if position == n
+            counts[n] = left
+            maximum(counts) == k || push!(others, T[T(c) / T(k) for c in counts])
+            return nothing
+        end
+        for c in 0:left
+            counts[position] = c
+            fill!(position + 1, left - c)
+        end
+        return nothing
+    end
+    fill!(1, k)
+    return vcat(corners, others)
+end
+
+# One step back at chosen points (`method=:points`): for each point, the vector of the
+# best action there, each signal followed by the best vector of `G` at the weights it
+# leads to. The result is a lower bound on the value function, tight at the points if
+# `G` is.
+function _point_backup(G::AbstractMatrix{T}, Q::AbstractMatrix, kernels, discount,
+                       points) where {T}
+    rows, tags = Vector{T}[], Int[]
+    for q in points
+        best_vector, best_value, best_action = T[], zero(T), 0
+        for a in axes(Q, 1)
+            candidate = collect(T, view(Q, a, :))
+            for K in kernels[a]
+                later = G * (K * q)
+                candidate .+= discount .* vec(transpose(view(G, argmax(later), :)) * K)
+            end
+            value = sum(candidate .* q)
+            if best_action == 0 || value > best_value
+                best_vector, best_value, best_action = candidate, value, a
+            end
+        end
+        if !(best_vector in rows)
+            push!(rows, best_vector)
+            push!(tags, best_action)
+        end
+    end
+    return permutedims(reduce(hcat, rows)), tags
+end
+
 # One step back: the vectors for one more period from the set `G` for the periods that
 # follow. `kernels[a]` holds, for each signal of action `a`, the matrix `K` with
 # next weights `K * w`. Each vector is tagged with its action.
@@ -142,7 +192,8 @@ end
     adaptive_management(problem::DecisionProblem, experiments;
                         horizon, discount=1, depth=min(horizon, 3),
                         transitions=nothing, signal_of=:current,
-                        method=:beliefs, passive=true) -> NamedTuple
+                        method=:beliefs, passive=(method !== :points),
+                        grid=10) -> NamedTuple
 
 **Sequential (adaptive) management**: the decision of `problem` is taken in each of
 `horizon` periods. The state is unknown, and fixed unless `transitions` is given; in
@@ -172,9 +223,22 @@ done:
   that are never the maximum. The sets are usually far smaller than the set of
   beliefs, so long horizons become practical. It is available for **two states**
   only, where the functions are lines and the ones that matter are found by sorting.
+- `method=:points` is for **any number of states** over long horizons, and is **not
+  exact**: it returns two numbers that the value of the best policy lies between.
+  `active` is a lower bound, the value of a policy that can be carried out: the value
+  function is backed up only at the beliefs of a grid (entries that are multiples of
+  `1 / grid`, and the prior). `active_upper` is an upper bound, from the same grid,
+  using that the value function is convex. Both are computed exactly for exact inputs;
+  only the grid is an approximation, and the gap between the two says how good it is.
+  A finer `grid` narrows it and costs more: the number of points is
+  `binomial(grid + n − 1, n − 1)` for `n` states. With this method `perfect` and
+  `baseline` are exact. The fixed plan (`no_learning`, `plan`, `act_now_action`) is
+  found, exactly, only where the state is fixed or moves in the same way whatever is
+  done; otherwise those fields, `value_of_learning` and `evpi` are `nothing`.
 - `passive=false` leaves out the passive manager. Its value is not a maximum of linear
-  functions, so with either method it is found by following its beliefs, and where
-  those multiply it can take longer than everything else.
+  functions, so with every method it is found by following its beliefs, and where
+  those multiply it can take longer than everything else. It is left out by default
+  with `method=:points`.
 
 Four ways of managing are valued, each as a total over the horizon:
 
@@ -200,7 +264,7 @@ Always `no_learning ≤ passive ≤ active ≤ perfect` (proved in the Lean deve
 With a moving state a manager who took only the best action for the current period
 could do worse than the fixed plan, which is why `passive` plans ahead. The result is `(; horizon, discount, no_learning, passive,
 active, perfect, value_of_learning, value_of_probing, evpi, baseline, act_now_action,
-first_action, plan, policy, beliefs_evaluated, value_function)`: `value_of_learning = active − no_learning`;
+first_action, plan, policy, beliefs_evaluated, value_function, active_upper)`: `value_of_learning = active − no_learning`;
 `value_of_probing = active − passive`, what deliberate experimentation adds;
 `evpi = perfect − no_learning`, which bounds both; `baseline` is the value of taking
 the baseline action in every period (`nothing` without a baseline); `act_now_action`
@@ -209,7 +273,10 @@ the active one, so the two differ exactly when it pays to probe at once. `plan` 
 fixed plan of the no-learning manager, one action for each period. With
 `passive=false`, `passive` and `value_of_probing` are `nothing`.
 
-`value_function` is `nothing` with `method=:beliefs`. With `:vectors` its entry `n` is
+`active_upper` equals `active` with the exact methods.
+
+`value_function` is `nothing` with `method=:beliefs`. With `:vectors` (and with
+`:points`, where it gives the lower bound) its entry `n` is
 `(; actions, vectors)` for `n` periods left: the value at the belief `b` is
 `maximum(vectors * b)`, and the action of the row that attains it is a best action
 there. So the best action at any belief and any time can be read off without
@@ -256,15 +323,16 @@ julia> [signal => node.action for (signal, node) in r.policy.branches]
 function adaptive_management(problem::DecisionProblem, experiments; horizon::Integer,
                              discount::Real=1, depth::Integer=min(horizon, 3),
                              transitions=nothing, signal_of::Symbol=:current,
-                             method::Symbol=:beliefs, passive::Bool=true)
+                             method::Symbol=:beliefs,
+                             passive::Bool=method !== :points, grid::Integer=10)
     horizon >= 1 || throw(ArgumentError("the horizon must be at least 1, got $horizon"))
     discount >= 0 ||
         throw(ArgumentError("the discount cannot be negative, got $discount"))
     depth >= 0 || throw(ArgumentError("the depth cannot be negative, got $depth"))
     signal_of in (:current, :next) ||
         throw(ArgumentError("signal_of must be :current or :next, got :$signal_of"))
-    method in (:beliefs, :vectors) ||
-        throw(ArgumentError("method must be :beliefs or :vectors, got :$method"))
+    method in (:beliefs, :vectors, :points) ||
+        throw(ArgumentError("method must be :beliefs, :vectors or :points, got :$method"))
     p = _prior(problem, :adaptive_management)
     method === :vectors && length(problem.payoff.states) != 2 &&
         throw(ArgumentError("method = :vectors needs exactly two states, got " *
@@ -278,6 +346,10 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
     T = promote_type(eltype(Q), eltype(p), typeof(discount),
                      (eltype(L) for L in likelihoods if L !== nothing)...,
                      (eltype(M) for M in moves if M !== nothing)...)
+    method === :points && grid < 1 &&
+        throw(ArgumentError("the grid must have at least one division, got $grid"))
+    # The points of a grid are fractions, so integers are carried as rationals.
+    method === :points && T <: Integer && (T = Rational{T})
     w0 = collect(T, p)
     # The weights moved to the next period under action a, no signal used.
     push_forward(w, a) = moves[a] === nothing ? w : moves[a] * w
@@ -297,9 +369,41 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
     end
     # With method = :vectors, the value functions for 1, 2, ... periods left: of the
     # best policy, and (when the state moves) of the best fixed plan.
-    by_vectors = method === :vectors
+    by_vectors = method !== :beliefs
     policy_vectors = Tuple{Matrix{T},Vector{Int}}[]
     plan_vectors = Tuple{Matrix{T},Vector{Int}}[]
+    # With method = :points, the beliefs at which the value function is backed up (the
+    # corners of the simplex first) and, for each number of periods left, an upper
+    # bound on the value at each of them.
+    points = Vector{T}[]
+    upper_values = Vector{T}[]
+    if method === :points
+        local nstates = length(w0)
+        append!(points, _simplex_grid(T, nstates, grid))
+        local start = w0 ./ sum(w0)
+        start in points || push!(points, start)
+    end
+    # An upper bound on the value of n periods from the weights w: the value function
+    # is convex and scales with the weights, so it lies below the plane through the
+    # corner values and below each "sawtooth" that hangs from one more point.
+    function upper_at(n, w)
+        n == 0 && return zero(T)
+        local total = sum(w)
+        iszero(total) && return zero(T)
+        local b = w ./ total
+        local values = upper_values[n]
+        local nstates = length(b)
+        local plane = sum(b[t] * values[t] for t in 1:nstates)
+        local bound = plane
+        for i in (nstates + 1):length(points)
+            local q = points[i]
+            local share = minimum(b[t] / q[t] for t in 1:nstates if !iszero(q[t]))
+            local hanging = plane +
+                            share * (values[i] - sum(q[t] * values[t] for t in 1:nstates))
+            hanging < bound && (bound = hanging)
+        end
+        return total * bound
+    end
     if by_vectors
         local nstates = length(w0)
         local same = Matrix{T}(I, nstates, nstates)
@@ -314,7 +418,22 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
         end
         local G = zeros(T, 1, nstates)
         local H = zeros(T, 1, nstates)
-        for _ in 1:horizon
+        for n in 1:horizon
+            if method === :points
+                # A lower bound: at each point, the vector of the best action there
+                # followed by the best of the vectors already held. Every vector is
+                # the value of a plan that can be carried out.
+                G, tags = _point_backup(G, Q, kernels, discount, points)
+                push!(policy_vectors, (G, tags))
+                # An upper bound at each point, from the bound for one period fewer.
+                push!(upper_values,
+                      [maximum(sum(view(Q, a, :) .* q) +
+                               (n == 1 ? zero(T) :
+                                discount * sum(upper_at(n - 1, next)
+                                               for (_, next) in updates(q, a)))
+                               for a in eachindex(actions)) for q in points])
+                continue
+            end
             G, tags = _backup_vectors(G, Q, kernels, discount)
             push!(policy_vectors, (G, tags))
             if moving
@@ -323,6 +442,11 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
             end
         end
     end
+    # With method = :points the fixed plan is found exactly only where the state stays
+    # put or moves in the same way whatever is done: then it is the best action for
+    # the weights of each period in turn. Otherwise it is left out.
+    shared_moves = moving && all(M -> M == first(moves), moves)
+    plan_known = method !== :points || !moving || shared_moves
     vector_value(sets, n, w) = n == 0 ? zero(T) : maximum(first(sets[n]) * w)
     # The closures below recurse, so every variable they assign is declared local: a
     # name shared with the enclosing function would be overwritten by the inner calls.
@@ -357,6 +481,14 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
             local first_best = argmax(scores)
             return (_horizon_weight(discount, n) * scores[first_best], first_best)
         end
+        if method === :points
+            local total, moved_on = maximum(scores), w
+            for t in 1:(n - 1)
+                moved_on = first(moves) * moved_on
+                total += discount^t * maximum(Q * moved_on)
+            end
+            return (total, argmax(scores))
+        end
         local key = (n, _weights_key(w))
         haskey(plans, key) && return plans[key]
         local value, choice = zero(T), 0
@@ -364,8 +496,9 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
             local v = scores[a]
             if n > 1
                 local later = push_forward(w, a)
-                v += discount * (by_vectors ? vector_value(plan_vectors, n - 1, later) :
-                                 first(plan(n - 1, later)))
+                v += discount *
+                     (method === :vectors ? vector_value(plan_vectors, n - 1, later) :
+                      first(plan(n - 1, later)))
             end
             (choice == 0 || v > value) && ((value, choice) = (v, a))
         end
@@ -398,13 +531,16 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
                 action=actions[a], value=value / total, branches)
     end
 
-    no_learning, a0 = plan(horizon, w0)
-    fixed_plan = Symbol[]
-    let w = w0
-        for n in horizon:-1:1
-            a = last(plan(n, w))
-            push!(fixed_plan, actions[a])
-            w = push_forward(w, a)
+    no_learning, a0, fixed_plan = nothing, 0, nothing
+    if plan_known
+        no_learning, a0 = plan(horizon, w0)
+        fixed_plan = Symbol[]
+        let w = w0
+            for n in horizon:-1:1
+                a = last(plan(n, w))
+                push!(fixed_plan, actions[a])
+                w = push_forward(w, a)
+            end
         end
     end
     # The state seen before every action: backward induction on the states.
@@ -418,7 +554,20 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
     end
     perfect = sum(w0 .* seen_value)
     active_value, first_choice_index = best(horizon, w0)
+    passive && !plan_known &&
+        throw(ArgumentError("with method = :points the passive manager is found only " *
+                            "where the state stays put or moves in the same way " *
+                            "whatever is done; use passive = false"))
     passive_value = passive ? replanned(horizon, w0) : nothing
+    # With method = :points, `active` is a lower bound and this is the upper one.
+    active_upper = active_value
+    if method === :points
+        active_upper = maximum(sum(view(Q, a, :) .* w0) +
+                               (horizon == 1 ? zero(T) :
+                                discount * sum(upper_at(horizon - 1, next)
+                                               for (_, next) in updates(w0, a)))
+                               for a in eachindex(actions))
+    end
     base = problem.baseline === nothing ? nothing :
            findfirst(==(problem.baseline), actions)
     baseline_value = nothing
@@ -432,11 +581,13 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
         end
     end
     return (; horizon, discount, no_learning, passive=passive_value, active=active_value,
-            perfect, value_of_learning=active_value - no_learning,
+            active_upper, perfect,
+            value_of_learning=plan_known ? active_value - no_learning : nothing,
             value_of_probing=passive ? active_value - passive_value : nothing,
-            evpi=perfect - no_learning,
+            evpi=plan_known ? perfect - no_learning : nothing,
             baseline=baseline_value,
-            act_now_action=actions[a0], first_action=actions[first_choice_index],
+            act_now_action=plan_known ? actions[a0] : nothing,
+            first_action=actions[first_choice_index],
             plan=fixed_plan,
             policy=depth == 0 ? nothing : node(horizon, w0, depth),
             beliefs_evaluated=length(active),

@@ -27,8 +27,17 @@ smaller than the set of beliefs.
   matches or beats at every state is never needed, at any weights (apply it with the family
   of the values at `w`), so leaving it out changes nothing.
 
-Not claimed: that the pruned family is the smallest possible, or anything about the passive
-manager, whose value is not a maximum of linear functions.
+* **`sum_mul_backupVector_le_dynamicValue`**: vectors that are below the value stay below it
+  when backed up, so the vectors kept at the points of a grid (`method = :points`) give a
+  lower bound, `active`.
+* **`dynamicValue_weighted_sum_le`** and **`dynamicValue_succ_le_of_upper`**: the value is
+  sublinear in the weights, and an upper bound stays one when carried a step back. Together
+  they back `active_upper`: a belief is written as a nonnegative combination of the corners
+  and one grid point, and the bound is the same combination of their bounds.
+
+Not claimed: that the pruned family is the smallest possible, how wide the gap between the two
+bounds of `method = :points` is, or anything about the passive manager, whose value is not a
+maximum of linear functions.
 -/
 
 set_option autoImplicit false
@@ -133,5 +142,53 @@ theorem exists_vectors_dynamicValue (u : A → Θ → K) (k : A → Z → Θ →
     exact ⟨A × (Z → ι), inferInstance, inferInstance,
       fun p => backupVector u k δ α p.1 p.2,
       fun w => dynamicValue_succ_of_vectors u k hδ α n h w⟩
+
+/-- A lower bound carried one step back. If every vector of a family is, at all weights, at
+most the value with `n` periods to go, then every backed-up vector is at most the value with
+`n + 1` to go: the vectors kept at chosen beliefs (`method = :points`) bound the value from
+below, whichever vectors are left out. -/
+theorem sum_mul_backupVector_le_dynamicValue {ι : Type} (u : A → Θ → K)
+    (k : A → Z → Θ → Θ → K) {δ : K} (hδ : 0 ≤ δ) (α : ι → Θ → K) (n : ℕ)
+    (h : ∀ i w, ∑ θ, w θ * α i θ ≤ dynamicValue u k δ n w) (a : A) (f : Z → ι) (w : Θ → K) :
+    ∑ θ, w θ * backupVector u k δ α a f θ ≤ dynamicValue u k δ (n + 1) w := by
+  rw [sum_mul_backupVector]
+  refine le_trans ?_ (le_maxOver _ a)
+  have h1 : ∑ z, ∑ θ', stepWeights k w a z θ' * α (f z) θ' ≤
+      ∑ z, dynamicValue u k δ n (stepWeights k w a z) :=
+    Finset.sum_le_sum fun z _ => h (f z) _
+  have h2 := mul_le_mul_of_nonneg_left h1 hδ
+  linarith
+
+/-- The value is sublinear in the weights: at a nonnegative combination of weights it is at
+most the same combination of the values. This is what makes an interpolation between beliefs
+an upper bound (`active_upper` of `method = :points`). -/
+theorem dynamicValue_weighted_sum_le {J : Type} [Fintype J] (u : A → Θ → K)
+    (k : A → Z → Θ → Θ → K) {δ : K} (hδ : 0 ≤ δ) (n : ℕ) {c : J → K} (hc : ∀ j, 0 ≤ c j)
+    (v : J → Θ → K) :
+    dynamicValue u k δ n (fun θ => ∑ j, c j * v j θ) ≤ ∑ j, c j * dynamicValue u k δ n (v j) := by
+  obtain ⟨ι, hF, hN, α, h⟩ := exists_vectors_dynamicValue u k hδ n
+  rw [h]
+  refine maxOver_le fun i => ?_
+  have hsplit : ∑ θ, (∑ j, c j * v j θ) * α i θ = ∑ j, c j * ∑ θ, v j θ * α i θ := by
+    simp only [Finset.sum_mul, Finset.mul_sum]
+    rw [Finset.sum_comm]
+    exact Finset.sum_congr rfl fun j _ => Finset.sum_congr rfl fun θ _ => by ring
+  rw [hsplit]
+  refine Finset.sum_le_sum fun j _ => mul_le_mul_of_nonneg_left ?_ (hc j)
+  rw [h (v j)]
+  exact le_maxOver (fun i => ∑ θ, v j θ * α i θ) i
+
+/-- An upper bound carried one step back: a function that is at least the value with `n`
+periods to go gives, by one step of the recursion, at least the value with `n + 1`. -/
+theorem dynamicValue_succ_le_of_upper (u : A → Θ → K) (k : A → Z → Θ → Θ → K) {δ : K}
+    (hδ : 0 ≤ δ) (n : ℕ) (U : (Θ → K) → K) (hU : ∀ w, dynamicValue u k δ n w ≤ U w)
+    (w : Θ → K) :
+    dynamicValue u k δ (n + 1) w ≤
+      maxOver fun a => expectedUtility u w a + δ * ∑ z, U (stepWeights k w a z) := by
+  refine maxOver_mono fun a => ?_
+  have h1 : ∑ z, dynamicValue u k δ n (stepWeights k w a z) ≤ ∑ z, U (stepWeights k w a z) :=
+    Finset.sum_le_sum fun z _ => hU _
+  have h2 := mul_le_mul_of_nonneg_left h1 hδ
+  linarith
 
 end DecisionAnalysisProofs
