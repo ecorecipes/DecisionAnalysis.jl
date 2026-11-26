@@ -127,7 +127,7 @@ script detects this and renders that vignette once more; later runs execute once
 
 ## Requirements
 
-- Julia 1.12 or later, and this directory's environment (`Project.toml`: the package
+- Julia 1.13 or later, and this directory's environment (`Project.toml`: the package
   and FiniteKernels by path, Plots, Tables, and the solvers HiGHS and CDDLib that
   vignette 07 uses; the package itself depends on no solver). The script instantiates
   and precompiles it.

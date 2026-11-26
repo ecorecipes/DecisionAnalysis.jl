@@ -180,10 +180,13 @@ end
 
 function main()
     ENV["PATH"] = tex_path()
+    # Quarto's Julia engine runs the code with the Julia that runs this script, not
+    # with whichever `julia` is first on the PATH.
+    haskey(ENV, "QUARTO_JULIA") || (ENV["QUARTO_JULIA"] = first(Base.julia_cmd().exec))
     fontvars, fonts = pdf_fonts()
     println("PDF fonts: ", fonts)
     NO_EXECUTE ||
-        run(`julia --project=$VIG -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`)
+        run(`$(Base.julia_cmd()) --project=$VIG -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'`)
     total = @elapsed for d in vignette_dirs()
         t = render(d, fontvars)
         println(rpad(d, 40),

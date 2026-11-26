@@ -127,8 +127,8 @@ an optional source of problems, each loaded as a weak-dependency extension.
 
 ## Installation
 
-The ecosystem packages are not registered; they are found through `[sources]` URLs, so one
-command installs the package:
+Julia 1.13 or later is needed. The ecosystem packages are not registered; they are found
+through `[sources]` URLs, which Pkg follows from 1.13, so one command installs the package:
 
 ```julia
 using Pkg

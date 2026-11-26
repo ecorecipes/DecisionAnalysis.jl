@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ['1.12', '1']
+        version: ['1.13', '1']
         os: [ubuntu-latest]
         include:
           - version: '1'
@@ -24,18 +24,18 @@ jobs:
             os: windows-latest
     steps:
       - run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: DecisionAnalysis.jl
       # The sibling whose proofs the Lean project path-requires; Julia finds FiniteKernels by URL.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ecorecipes/FiniteKernels.jl
           path: FiniteKernels.jl
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
         with:
           cache-compiled: 'true'
       - uses: julia-actions/julia-buildpkg@v1
@@ -48,8 +48,8 @@ jobs:
     name: Formatter check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
       - name: Check formatting against .JuliaFormatter.toml
@@ -78,8 +78,8 @@ jobs:
     name: Vignette sync check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
       - run: julia scripts/sync_vignettes.jl --check
@@ -90,17 +90,17 @@ jobs:
       contents: write
       statuses: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: DecisionAnalysis.jl
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ecorecipes/FiniteKernels.jl
           path: FiniteKernels.jl
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
         with:
           cache-compiled: 'true'
       - name: Install dependencies

@@ -10,8 +10,9 @@ Model packages produce outcomes; this package analyses the payoff table they giv
 FiniteKernels (finite spaces, kernels and states) through a `[sources]` URL
 (the Lean project in `proofs/` still path-requires the sibling clone `../FiniteKernels.jl`), on `JuMP` (to state linear programmes; never on a solver), and on `LinearAlgebra`,
 `Logging`, `Random`, `Statistics` and `Tables`. FiniteKernels brings
-ResilienceCore and StructuredPopulationCore; Pkg does not follow the `[sources]` of a URL dependency, so
-both are listed in `[deps]` and `[sources]` here although the code never loads them (Aqua is told so).
+ResilienceCore and StructuredPopulationCore through its own `[sources]`; Pkg follows the sources of a URL
+dependency from Julia 1.13, which is why 1.13 is the minimum and why neither is listed here (on 1.12 both
+had to be, and installing this package by URL failed).
 Keep every `[sources]` entry a URL, in this file and in the docs, vignette and test environments. The planned `CategoricalDecisionAnalysis.jl` sits one level up, imports Catlab
 generics, forwards to this package and re-exports its names (ADR 0009). No model package depends on this
 one: a model package writes a table of runs (or the user gives methods to the adapter verbs). An adapter

@@ -16,10 +16,10 @@ jobs:
       # repository cannot `lake build`. Both repositories are checked out side by side. For
       # reproducible releases, configure FINITE_KERNELS_PROOFS_REF to an immutable companion
       # commit; main is the compatibility default.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: DecisionAnalysis.jl
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ecorecipes/FiniteKernels.jl
           ref: ${{ vars.FINITE_KERNELS_PROOFS_REF || 'main' }}
