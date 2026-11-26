@@ -133,9 +133,10 @@ end
         @test evppi(normal, :p2, Sadatsafavi(; separators=2)).value ≈ r["p2_sal_2"] rtol = 1e-9
         # Regressions: different software fits the smooths (GAM.jl and mgcv; our
         # Gaussian process and voi's), so agreement is close, not exact. Observed
-        # relative differences: GAM 0.02% and 0.03%, Gaussian process 0.9% and 0.5%.
-        @test evppi(normal, :p1, GAMRegression()).value ≈ r["p1_gam"] rtol = 0.01
-        @test evppi(normal, :p2, GAMRegression()).value ≈ r["p2_gam"] rtol = 0.01
+        # relative differences: Gaussian process 0.9% and 0.5%. The GAM is the same
+        # regression as voi's (differences from the first action, GCV) and agrees to 1e-10.
+        @test evppi(normal, :p1, GAMRegression()).value ≈ r["p1_gam"] rtol = 1e-6
+        @test evppi(normal, :p2, GAMRegression()).value ≈ r["p2_gam"] rtol = 1e-6
         gp = GaussianProcessRegression(; max_points=2000)
         @test evppi(normal, :p1, gp).value ≈ r["p1_gp"] rtol = 0.03
         @test evppi(normal, :p2, gp).value ≈ r["p2_gp"] rtol = 0.03

@@ -166,8 +166,8 @@ sides. "s.e." is the standard error reported by this package.
 | EVPPI p2, Sadatsafavi, 1 separator | 0.35821184 | 0.35821184 | 0.0210 | 5e-13 |
 | EVPPI p1, Sadatsafavi, 2 separators | 0.084406414 | 0.084406414 | 0.0146 | 2e-15 |
 | EVPPI p2, Sadatsafavi, 2 separators | 0.35821184 | 0.35821184 | 0.0210 | 5e-13 |
-| EVPPI p1, GAM (GAM.jl; `mgcv`) | 0.069319861 | 0.069330048 | 0.0157 | −1.0e-5 |
-| EVPPI p2, GAM | 0.35982196 | 0.35994357 | 0.0207 | −1.2e-4 |
+| EVPPI p1, GAM (GAM.jl; `mgcv`) | 0.069330048 | 0.069330048 | 0.0157 | 1e-12 |
+| EVPPI p2, GAM | 0.35994357 | 0.35994357 | 0.0207 | 3e-11 |
 | EVPPI p1, built-in spline against `voi`'s GAM | 0.075750719 | 0.069330048 | 0.0155 | 6.4e-3 |
 | EVPPI p1, Gaussian process | 0.069330044 | 0.069938964 | 0.0157 | −6.1e-4 |
 | EVPPI p2, Gaussian process | 0.35828473 | 0.35994195 | 0.0208 | −1.7e-3 |
@@ -200,15 +200,15 @@ pounds at 20,000 pounds per QALY; a validation target only).
 | EVPPI `p_side_effects_t1`, Strong and Oakley, 50 blocks | 38.497408 | 38.497408 | 6.12 | −5e-9 |
 | EVPPI `p_side_effects_t1`, Sadatsafavi, 1 separator | 32.352557 | 32.352557 | 4.92 | 5e-8 |
 | EVPPI `p_side_effects_t1`, Sadatsafavi, 2 separators | 32.520482 | 32.520482 | 4.93 | 4e-8 |
-| EVPPI `p_side_effects_t1`, GAM | 26.15845 | 26.754625 | 5.68 | −0.60 |
+| EVPPI `p_side_effects_t1`, GAM | 26.906262 | 26.754625 | 5.61 | 0.15 |
 | EVPPI `logor_side_effects`, Strong and Oakley, 50 blocks | 333.30938 | 333.30938 | 5.58 | −3e-9 |
 | EVPPI `logor_side_effects`, Sadatsafavi, 1 separator | 333.50404 | 333.50404 | 5.58 | 5e-8 |
 | EVPPI `logor_side_effects`, Sadatsafavi, 2 separators | 333.50404 | 333.50404 | 5.58 | 2e-8 |
-| EVPPI `logor_side_effects`, GAM | 329.71456 | 331.86758 | 5.57 | −2.15 |
+| EVPPI `logor_side_effects`, GAM | 332.05596 | 331.86758 | 5.56 | 0.19 |
 | EVPPI `logor_side_effects`, Gaussian process, first 1500 draws | 328.47937 | 329.81334 | 14.3 | −1.33 |
 | EVPPI `u_hospital`, Sadatsafavi, 1 separator | 6.9508085 | 6.9508085 | 4.44 | 4e-8 |
-| EVPPI `u_hospital`, GAM | 4.2297831 | 4.6710089 | 5.16 | −0.44 |
-| EVPPI of the pair, GAM tensor | 332.34506 | 333.87573 | 5.58 | −1.53 |
+| EVPPI `u_hospital`, GAM | 4.7256313 | 4.6710089 | 3.31 | 0.055 |
+| EVPPI of the pair, GAM tensor | 333.85329 | 333.87573 | 5.57 | −0.022 |
 | EVPPI of five parameters, Gaussian process, first 1500 draws | 339.22751 | 339.35972 | 14.1 | −0.13 |
 
 ### Sample-based estimators against SAVI's test data
@@ -219,11 +219,12 @@ its licence): costs, effects and 19 parameters of a two-option model. `savi_refe
 with mgcv the regressions that SAVI fits (a smooth of one parameter, a tensor product for a
 pair) at SAVI's default threshold of 20,000 per unit of effect, the source's own valuation.
 The expected net benefits, the EVPI (2098.77) and the probability that each option is best
-(0.459, 0.541) agree exactly. The 19 single-parameter EVPPI agree within twice our standard
-error, the three largest within 2% (1232.9 against 1232.9, 521.0 against 521.0, 917.6 against
-928.5), and the three pairs within one standard error (477.0 against 493.7, 1477.4 against
-1508.0, 1104.0 against 1100.3). The largest difference in standard errors is for `theta1`
-(0.1 against 3.4, standard error 3.0), a parameter that matters to neither fit.
+(0.459, 0.541) agree exactly. With `GAMRegression`, the same regression as the reference, the 19 single-parameter EVPPI
+agree to four significant figures (`theta16`: 928.5628 against 928.5452) and two of the three
+pairs to five (493.7165 against 493.7209, 1507.9751 against 1507.9731); the third is 1107.84
+against 1100.30, the shortfall of GAM.jl's search described under Findings. The built-in
+spline is a different regression and agrees within twice its standard error (single
+parameters) and within one (pairs).
 
 ### Published analyses
 
@@ -338,9 +339,16 @@ What the comparisons found:
    with one separator, before any change. `voi`'s `sal` places cuts pair of actions by
    pair of actions; with two actions, as in both examples, that is the exhaustive
    search. With more than two actions the two can differ, and ours is then the larger.
-3. **Regressions agree closely, not exactly**, as different software fits the smooths:
-   GAM.jl against `mgcv` within 0.02% on the normal model and within 0.4 of a standard
-   error on the chemotherapy example; our Gaussian process against `voi`'s within 1.3%
+3. **The GAM regression reproduces `mgcv`; the others agree closely, not exactly.**
+   `GAMRegression` first fitted every action's payoff separately with smoothing by REML,
+   and was within 0.02% of `voi` on the normal model and up to 2.2 (0.4 of a standard
+   error) off on the chemotherapy example. `voi` and SAVI fit each action's **difference**
+   from the first, with `mgcv`'s default GCV; doing the same gives 1e-11 on the normal
+   model, at most 0.19 on the chemotherapy example, and four significant figures on
+   SAVI's data. One gap is left and is GAM.jl's, not ours: for the tensor product of
+   `theta7` and `theta16` of SAVI's data its search stops at a GCV score 0.017% above
+   the one `mgcv` reaches, and the estimate is 0.7% higher (a `@test_broken` in
+   `test/test_savi.jl` keeps it visible); our Gaussian process against `voi`'s within 1.3%
    and within 0.1 of a standard error. No change was needed.
 4. **EVSI** estimates differ by Monte Carlo error only: each side simulates its own
    data. All are within about one standard error of each other and of the closed forms.

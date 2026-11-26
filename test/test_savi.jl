@@ -2,6 +2,7 @@
 # 1000 draws of a two-option model with 19 parameters, copied unchanged with its
 # licence into test/fixtures/savi/. The reference values are written by
 # validation/savi_reference.R with mgcv, fitting the regressions that SAVI fits.
+# (The REML value for theta16 below, 924.9076, is mgcv's with method = "REML".)
 
 function savi_columns(file)
     lines = readlines(joinpath(@__DIR__, "fixtures", "savi", file))
@@ -45,6 +46,25 @@ end
         estimate = evppi(problem, Tuple(Symbol.(group["parameters"])))
         @test abs(estimate.value - group["evppi"]) <= estimate.standard_error
     end
+
+    # The same regression as the reference (GAM.jl for mgcv, differences from the
+    # first option, smoothing by GCV): the same estimate, not only a compatible one.
+    for (name, target) in ref["evppi_single"]
+        @test evppi(problem, Symbol(name), GAMRegression()).value ≈ target rtol = 1e-3 atol = 0.02
+    end
+    pairs_gam = [evppi(problem, Tuple(Symbol.(group["parameters"])),
+                       GAMRegression(; tensor=true)).value
+                 for group in ref["evppi_groups"]]
+    targets = [group["evppi"] for group in ref["evppi_groups"]]
+    @test pairs_gam[1] ≈ targets[1] rtol = 1e-4
+    @test pairs_gam[2] ≈ targets[2] rtol = 1e-4
+    # For theta7 with theta16 GAM.jl stops at a GCV score 0.017% above the one mgcv
+    # reaches (smoothing parameters 90 and 5.1 against 2e8 and 0.32), and the estimate
+    # is 0.7% higher: a shortfall of GAM.jl's search, kept visible here.
+    @test pairs_gam[3] ≈ targets[3] rtol = 0.01
+    @test_broken pairs_gam[3] ≈ targets[3] rtol = 1e-3
+    @test evppi(problem, :theta16, GAMRegression(; smoothing=:REML)).value ≈ 924.9076 rtol = 1e-3
+    @test_throws ArgumentError GAMRegression(; smoothing=:ML)
 end
 
 @testset "redundant focal parameters" begin

@@ -48,15 +48,17 @@ function DecisionAnalysis.fitted_conditional_means(method::GAMRegression,
     formula, data = _formula(method, columns)
     weights = Float64.(w) .* length(w)
     G = zeros(Float64, size(Q))
-    for a in axes(Q, 1)
-        y = Float64.(view(Q, a, :))
-        # A payoff that does not vary (that of a reference action, say) is its own
-        # conditional mean: there is nothing to fit, and a fit would not converge.
-        if allequal(y)
-            G[a, :] .= y
-        else
-            G[a, :] .= GAM.gam(formula, (; y, data...); weights).fitted_values
-        end
+    # The first action is fitted as it is and every other one through its difference
+    # from the first, as voi and SAVI do. Something that does not vary is its own
+    # conditional mean: there is nothing to fit, and a fit would not converge.
+    function fitted(y)
+        allequal(y) && return y
+        return GAM.gam(formula, (; y, data...); weights, method=method.smoothing).fitted_values
+    end
+    first_row = Float64.(view(Q, 1, :))
+    G[1, :] .= fitted(first_row)
+    for a in 2:size(Q, 1)
+        G[a, :] .= view(G, 1, :) .+ fitted(Float64.(view(Q, a, :)) .- first_row)
     end
     return G
 end

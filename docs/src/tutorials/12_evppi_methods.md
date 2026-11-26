@@ -103,7 +103,7 @@ voi_table(contact)
 | Sadatsafavi, one cut       | 1.663 |          0.089 |            0 |              \- |
 | Sadatsafavi, two cuts      | 1.663 |          0.089 |            0 |              \- |
 | ten bins of equal weight   | 1.638 |          0.088 |            0 |              \- |
-| GAM.jl smooth              | 1.503 |          0.086 |            0 |              \- |
+| GAM.jl smooth              | 1.604 |          0.087 |            0 |              \- |
 
 `SplineRegression()` chooses the size of its basis from the draws: a
 constant (the payoffs do not depend on the parameter, and the value is
@@ -283,9 +283,9 @@ voi_table(groups)
 |:---|---:|---:|---:|---:|
 | contact and habitat, spline | 1.709 | 0.085 | 0 | \- |
 | contact and habitat, spline with interaction | 1.81 | 0.085 | 0 | \- |
-| contact and habitat, GAM.jl | 1.612 | 0.084 | 0 | \- |
+| contact and habitat, GAM.jl | 1.683 | 0.085 | 0 | \- |
 | contact and newts, spline | 1.662 | 0.086 | 0 | \- |
-| contact and newts, Gaussian process | 1.678 | 0.089 | 0 | \- |
+| contact and newts, Gaussian process | 1.685 | 0.088 | 0 | \- |
 | all three: the regression EVPI | 1.717 | 0.085 | 0 | \- |
 | EVPI, plain sample average | 1.914 | 0.082 | 0 | 0.269 |
 
@@ -358,9 +358,9 @@ md_table(["focal parameters", "method chosen", "EVPPI (newts)", "standard error"
 
 | focal parameters | method chosen | EVPPI (newts) | standard error |
 |:---|---:|---:|---:|
-| five parameters (default: Gaussian process) | GaussianProcessRegression | 1.928 | 0.112 |
+| five parameters (default: Gaussian process) | GaussianProcessRegression | 1.45 | 0.109 |
 | the same five, additive spline | SplineRegression | 1.795 | 0.109 |
-| all six | GaussianProcessRegression | 2.067 | 0.113 |
+| all six | GaussianProcessRegression | 2.142 | 0.113 |
 | the four added ones only (spline, by default) | SplineRegression | 0.429 | 0.147 |
 
 The method column shows the rule at work: four parameters go to the
@@ -436,8 +436,8 @@ voi_table(gp_checks; digits=4, truth=[closed(1 + 1), closed(4 + 1)])
 
 | estimate | value | standard error | act-now bias | cell-noise bias | reference |
 |:---|---:|---:|---:|---:|---:|
-| EVPPI(p1, x3..x6), Gaussian process | 0.2245 | 0.0176 | 0 | \- | 0.1996 |
-| EVPPI(p2, x3..x6), Gaussian process | 0.4957 | 0.0177 | 0 | \- | 0.4798 |
+| EVPPI(p1, x3..x6), Gaussian process | 0.2212 | 0.0176 | 0 | \- | 0.1996 |
+| EVPPI(p2, x3..x6), Gaussian process | 0.4976 | 0.0177 | 0 | \- | 0.4798 |
 
 These estimators are also compared with the R package `voi` on the same
 draws: its `so` and `sal` methods agree with `StrongOakley` and

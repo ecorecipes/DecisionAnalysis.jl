@@ -115,6 +115,12 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   cell-mean and single-parameter methods get the columns as given, and the default method is still chosen
   from the columns as named. SAVI (BSD 3-clause) screens in the same way; its 1000-draw test data are a
   fixture (`test/fixtures/savi/`, `test/test_savi.jl`), with reference values from mgcv.
+- **`GAMRegression` is held to parity with `mgcv`, not to agreement within error.** It fits the first
+  action as it is and every other action through its difference from the first, with smoothing by GCV, as
+  `voi` and SAVI do; fitting each payoff separately with REML was up to 2.2 off `voi` on the chemotherapy
+  example. Tests hold it to 1e-6 on `voi`'s normal model and four figures on SAVI's data. The one gap left
+  (tensor product of `theta7` and `theta16`, 0.7%) is a shortfall of GAM.jl's GCV search and is a
+  `@test_broken`: fix it in GAM.jl, do not loosen the test.
 - **A model-based estimator needs the function the table was made from.** `MomentMatching` and
   `evppi_nested` take `payoffs(θ)`; for `MomentMatching` it must return the payoffs of the feasible actions
   in the problem's order and reproduce the payoff table, and the non-focal parameters are drawn from the

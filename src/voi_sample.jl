@@ -269,13 +269,21 @@ end
 const _AUTO_KNOTS = 4
 
 """
-    GAMRegression(; k=10, tensor=false)
+    GAMRegression(; k=10, tensor=false, smoothing=:GCV)
 
 Regression by a generalised additive model with penalised smooths, fitted by GAM.jl
 (`github.com/ecorecipes/GAM.jl`): one smooth `s(x, k = k)` per numeric column, or a
 tensor-product smooth of all of them with `tensor = true`; non-numeric columns enter
 as factors. This is the regression that the R package `voi` uses by default for up to
 four parameters (Strong, Oakley and Brennan 2014).
+
+The fit follows `voi` and SAVI, so that the same draws give the same estimate as
+`mgcv` to about four significant figures: the first feasible action is fitted as it
+is, and every other action through its **difference** from the first (the estimate
+depends only on the differences, and a difference is smoother than either payoff);
+and the smoothing parameters are chosen by generalised cross-validation
+(`smoothing = :GCV`, the default of `mgcv::gam`). `smoothing = :REML` chooses them by
+restricted maximum likelihood, which smooths a little more.
 
 The method lives in a weak-dependency extension: load GAM.jl (`using GAM`) before
 using it, otherwise [`MissingExtensionError`](@ref) is thrown. GAM.jl is not a
@@ -284,9 +292,12 @@ dependency of this package.
 struct GAMRegression <: AbstractRegression
     k::Int
     tensor::Bool
-    function GAMRegression(; k::Integer=10, tensor::Bool=false)
+    smoothing::Symbol
+    function GAMRegression(; k::Integer=10, tensor::Bool=false, smoothing::Symbol=:GCV)
         k >= 3 || throw(ArgumentError("k must be at least 3, got $k"))
-        return new(k, tensor)
+        smoothing in (:GCV, :REML) ||
+            throw(ArgumentError("smoothing must be :GCV or :REML, got :$smoothing"))
+        return new(k, tensor, smoothing)
     end
 end
 
