@@ -216,6 +216,24 @@ function _matched_value(Gc::AbstractMatrix, w::AbstractVector, target::AbstractM
     return dot(w, best) - maximum(centre), best
 end
 
+# The estimate for the covariance `target` that the study is expected to remove: the
+# target made symmetric and positive semidefinite, capped at the fitted covariance
+# (information cannot remove more than the EVPPI variance), and then matched. Returns
+# the value, the best matched payoff of each draw, the variance removed, whether the
+# cap applied, and the ratio before capping. A function of its own, not a closure: it is
+# called again for each leave-one-out replicate, and must not write to the caller's
+# variables.
+function _matched_estimate(Gc::AbstractMatrix, w::AbstractVector, target::AbstractMatrix,
+                           fitted::AbstractMatrix)
+    F = eigen(Symmetric((target .+ target') ./ 2))
+    removed = F.vectors * (max.(F.values, 0.0) .* F.vectors')
+    ratio = tr(removed) / tr(fitted)
+    capped = ratio > 1
+    capped && (removed = removed ./ ratio)
+    value, best = _matched_value(Gc, w, removed, fitted)
+    return value, best, tr(removed), capped, ratio
+end
+
 function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     Q, w = _sample_problem(problem, :evsi)
     belief = problem.belief
@@ -300,18 +318,9 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
     end
     K = length(removed_covariances)
     removed_mean = sum(removed_covariances) ./ K
-    function value_for(target)
-        F = eigen(Symmetric((target .+ target') ./ 2))
-        target = F.vectors * (max.(F.values, 0.0) .* F.vectors')
-        ratio = tr(target) / tr(fitted)
-        capped = ratio > 1
-        capped && (target = target ./ ratio)
-        value, best = _matched_value(Gc, wf, target, fitted)
-        return value, best, tr(target), capped, ratio
-    end
-    value, best, removed, capped, ratio = value_for(removed_mean)
-    leave_one_out = [first(value_for((removed_mean .* K .- C) ./ (K - 1)))
-                     for C in removed_covariances]
+    value, best, removed, capped, ratio = _matched_estimate(Gc, wf, removed_mean, fitted)
+    leave_one_out = [first(_matched_estimate(Gc, wf, (removed_mean .* K .- C) ./ (K - 1),
+                                             fitted)) for C in removed_covariances]
     centre = sum(leave_one_out) / K
     nested_se = sqrt((K - 1) / K * sum(v -> (v - centre)^2, leave_one_out))
     draws_se = _weighted_mean_se(best, wf)

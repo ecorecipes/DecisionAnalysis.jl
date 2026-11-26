@@ -241,6 +241,11 @@
                   hypot(e.details.draws_standard_error, e.details.nested_standard_error)
             @test e.details.capped == (e.details.variance_ratio > 1) &&
                   e.details.focal == [:p1]
+            # The details describe the estimate itself, not the last leave-one-out
+            # replicate of its standard error (they once did): the variance removed is
+            # the ratio times the EVPPI variance, or all of it when the cap applies.
+            @test e.details.variance_removed ≈
+                  min(e.details.variance_ratio, 1) * e.details.evppi_variance rtol = 1e-10
             @test e.value <= evppi(problem, :p1).value + 1e-12
             # `voi` on the shared draws, with its own nested sample: recorded with
             # the truth beside it, since the two differ by Monte Carlo error.
