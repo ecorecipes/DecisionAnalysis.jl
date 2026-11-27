@@ -5,7 +5,7 @@
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="author" content="Simon Frost" />
-  <title>From an influence diagram to a decision table</title>
+  <title>From influence diagrams and Bayesian networks to a decision table</title>
   <style>
 
 code{white-space: pre-wrap;}
@@ -122,7 +122,8 @@ img { background: #fff; }
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">From an influence diagram to a decision table</h1>
+<h1 class="title">From influence diagrams and Bayesian networks to a
+decision table</h1>
 <p class="author">Simon Frost</p>
 </header>
 <nav id="TOC" role="doc-toc">
@@ -136,6 +137,11 @@ table adds</a></li>
 pond</a></li>
 <li><a href="#which-variables-make-the-state" id="toc-which-variables-make-the-state">Which variables make the
 state</a></li>
+<li><a href="#from-bayesian-networks" id="toc-from-bayesian-networks">From Bayesian networks</a>
+<ul>
+<li><a href="#several-networks-for-one-system" id="toc-several-networks-for-one-system">Several networks for one
+system</a></li>
+</ul></li>
 <li><a href="#what-to-take-away" id="toc-what-to-take-away">What to take
 away</a></li>
 </ul>
@@ -520,6 +526,171 @@ to observe, and learning the swab alone is a partial value.</p>
 <p>The value of the swab is the same either way: an EVSI when the swab
 is an experiment on the state, an EVPPI when it is one coordinate of a
 larger state.</p>
+<h1 id="from-bayesian-networks">From Bayesian networks</h1>
+<p>Once its decision is made, an influence diagram is an ordinary
+Bayesian network. So a decision problem is also a <strong>set of
+networks, one for each action</strong>, and that is how networks are
+usually built in ecology: one network with a management node, or one
+network per management scenario. <code>normal_form</code> takes them
+directly, with no diagram in between. A network has no utility, so the
+payoff is named: a count read from its nodes.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">using</span> <span class="bu">BayesianNetworks</span>: BayesianNetworks</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> BN <span class="op">=</span> BayesianNetworks</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>network <span class="op">=</span> BN.<span class="fu">bayesnet</span>(<span class="op">:</span>Bd <span class="op">=&gt;</span> states, <span class="op">:</span>Swab <span class="op">=&gt;</span> [<span class="op">:</span>negative, <span class="op">:</span>positive],</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>                      <span class="op">:</span>Visual <span class="op">=&gt;</span> [<span class="op">:</span>no_signs, <span class="op">:</span>signs], <span class="op">:</span>Response <span class="op">=&gt;</span> actions;</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>                      mechanisms<span class="op">=</span>[<span class="op">:</span>Swab <span class="op">=&gt;</span> (<span class="op">:</span>Bd,), <span class="op">:</span>Visual <span class="op">=&gt;</span> (<span class="op">:</span>Bd,)])</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>network <span class="op">=</span> BN.<span class="fu">bind_cpt</span>(BN.<span class="fu">BayesModel</span>(network),</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>                      [<span class="op">:</span>Bd <span class="op">=&gt;</span> [<span class="fl">0.5</span>, <span class="fl">0.3</span>, <span class="fl">0.2</span>], <span class="op">:</span>Swab <span class="op">=&gt;</span> [<span class="fl">0.95</span> <span class="fl">0.05</span>; <span class="fl">0.4</span> <span class="fl">0.6</span>; <span class="fl">0.05</span> <span class="fl">0.95</span>],</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>                       <span class="op">:</span>Visual <span class="op">=&gt;</span> [<span class="fl">0.55</span> <span class="fl">0.45</span>; <span class="fl">0.5</span> <span class="fl">0.5</span>; <span class="fl">0.45</span> <span class="fl">0.55</span>],</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>                       <span class="op">:</span>Response <span class="op">=&gt;</span> [<span class="fl">1</span> <span class="op">/</span> <span class="fl">3</span>, <span class="fl">1</span> <span class="op">/</span> <span class="fl">3</span>, <span class="fl">1</span> <span class="op">/</span> <span class="fl">3</span>]])</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>frogs <span class="op">=</span> <span class="fu">Float64</span>.(<span class="fu">permutedims</span>(uninfected <span class="op">.-</span> infected))          <span class="co"># Bd by response</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>from_network <span class="op">=</span> <span class="fu">normal_form</span>(network; decision<span class="op">=:</span>Response, states<span class="op">=:</span>Bd,</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>                           observed<span class="op">=</span>(<span class="op">:</span>Swab, <span class="op">:</span>Visual),</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>                           outcome<span class="op">=</span>(<span class="op">:</span>Bd, <span class="op">:</span>Response) <span class="op">=&gt;</span> frogs, baseline<span class="op">=:</span>no_intervention)</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>from_network.problem.payoff.Q <span class="op">≈</span> pond_form.problem.payoff.Q</span></code></pre></div>
+<pre><code>true</code></pre>
+<p>The management node’s own probabilities play no part: each action’s
+network is the intervention that sets the node to that action. The pond
+now has a second test, a visual check for signs of disease, with the
+likelihood of <a href="../06_comparing_experiments/06_comparing_experiments.html">Comparing
+experiments</a>.</p>
+<p><strong>Which node is worth monitoring?</strong> Every observed
+variable comes back as an experiment of its own, so the question is one
+table.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;observe&quot;</span>, <span class="st">&quot;EVSI (frogs)&quot;</span>, <span class="st">&quot;share of EVPI&quot;</span>],</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>         <span class="fu">vcat</span>([[<span class="fu">String</span>(x), <span class="fu">evsi</span>(from_network.problem, <span class="cn">e</span>),</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>                <span class="fu">evsi</span>(from_network.problem, <span class="cn">e</span>) <span class="op">/</span> <span class="fu">evpi</span>(from_network.problem)]</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>               for (x, <span class="cn">e</span>) <span class="kw">in</span> <span class="fu">pairs</span>(from_network.experiments)],</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>              [[<span class="st">&quot;both&quot;</span>, <span class="fu">evsi</span>(from_network.problem, from_network.experiment),</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>                <span class="fu">evsi</span>(from_network.problem, from_network.experiment) <span class="op">/</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>                <span class="fu">evpi</span>(from_network.problem)]]); digits<span class="op">=</span><span class="fl">3</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">observe</th>
+<th style="text-align: right;">EVSI (frogs)</th>
+<th style="text-align: right;">share of EVPI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Swab</td>
+<td style="text-align: right;">31.1</td>
+<td style="text-align: right;">0.598</td>
+</tr>
+<tr>
+<td style="text-align: left;">Visual</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;">both</td>
+<td style="text-align: right;">31.1</td>
+<td style="text-align: right;">0.598</td>
+</tr>
+</tbody>
+</table>
+<p>A state, and anything observed before the decision, must not depend
+on the action. The bridge checks that across the networks and refuses
+otherwise. In the reference habitat network that BayesianNetworks.jl
+ships, soil moisture is downstream of irrigation, so it cannot be
+observed before deciding how much to irrigate:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>habitat <span class="op">=</span> BN.<span class="fu">reference_habitat_model</span>()</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>occupied <span class="op">=</span> <span class="op">:</span>Occupancy <span class="op">=&gt;</span> (absent<span class="op">=</span><span class="fl">0</span>, present<span class="op">=</span><span class="fl">100</span>)        <span class="co"># occupied sites of 100</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">normal_form</span>(habitat; decision<span class="op">=:</span>Irrigation, states<span class="op">=:</span>Climate, observed<span class="op">=:</span>SoilMoisture,</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>                outcome<span class="op">=</span>occupied)</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<pre><code>ArgumentError: the distribution of [:Climate, :SoilMoisture] under high differs from that under low: a state, or something observed before the decision, cannot depend on the action</code></pre>
+<h2 id="several-networks-for-one-system">Several networks for one
+system</h2>
+<p>The networks can also stand for <strong>hypotheses</strong>: rival
+structures, or the networks of several experts. The states are then the
+hypotheses, and the payoff is each action’s expected outcome under each.
+Here the published network is set beside one in which habitat quality
+matters much less to occupancy, and irrigating is charged three occupied
+sites lost downstream (both <strong>illustrative</strong>). Less
+irrigation is the baseline.</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>doubtful <span class="op">=</span> BN.<span class="fu">bind_cpt</span>(habitat, <span class="op">:</span>Occupancy <span class="op">=&gt;</span> [<span class="fl">0.6</span> <span class="fl">0.4</span>; <span class="fl">0.5</span> <span class="fl">0.5</span>])</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">by_action</span>(model) <span class="op">=</span> (; low<span class="op">=</span>BN.<span class="fu">do_intervention</span>(model, <span class="op">:</span>Irrigation <span class="op">=&gt;</span> <span class="op">:</span>low),</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>                    high<span class="op">=</span>BN.<span class="fu">do_intervention</span>(model, <span class="op">:</span>Irrigation <span class="op">=&gt;</span> <span class="op">:</span>high))</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>count <span class="op">=</span> [occupied, <span class="op">:</span>Irrigation <span class="op">=&gt;</span> (low<span class="op">=</span><span class="fl">0</span>, high<span class="op">=-</span><span class="fl">3</span>)]</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>rivals <span class="op">=</span> <span class="fu">normal_form</span>((; published<span class="op">=</span><span class="fu">by_action</span>(habitat), doubtful<span class="op">=</span><span class="fu">by_action</span>(doubtful));</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>                     outcome<span class="op">=</span>count, baseline<span class="op">=:</span>low)</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>rivals.problem.payoff</span></code></pre></div>
+<p><strong>PayoffTable{Float64}: 2 actions × 2 states</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">action</th>
+<th style="text-align: right;"><code>published</code></th>
+<th style="text-align: right;"><code>doubtful</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>low</code></td>
+<td style="text-align: right;">45.7933</td>
+<td style="text-align: right;">44.6897</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>high</code></td>
+<td style="text-align: right;">47.3703</td>
+<td style="text-align: right;">42.5219</td>
+</tr>
+</tbody>
+</table>
+<p>The two networks disagree: more irrigation is better under the
+published one and worse under the other. With no probabilities on the
+hypotheses the belief is a scenario set, and the rules that need none
+apply. With weights there is an expectation, and a value of finding out
+which network is right.</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>weighted <span class="op">=</span> <span class="fu">normal_form</span>((; published<span class="op">=</span><span class="fu">by_action</span>(habitat), doubtful<span class="op">=</span><span class="fu">by_action</span>(doubtful));</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>                       outcome<span class="op">=</span>count, prior<span class="op">=</span>[<span class="fl">3</span> <span class="op">//</span> <span class="fl">4</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">4</span>], baseline<span class="op">=:</span>low)</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;value&quot;</span>],</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;maximin, no weights&quot;</span>, <span class="fu">decide</span>(rivals.problem, <span class="fu">Maximin</span>()).chosen],</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;minimax regret, no weights&quot;</span>, <span class="fu">decide</span>(rivals.problem, <span class="fu">MinimaxRegret</span>()).chosen],</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;best expected, weights 3/4 and 1/4&quot;</span>,</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>           <span class="fu">decide</span>(weighted.problem, <span class="fu">MaxExpectedUtility</span>()).chosen],</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;its gain over low irrigation (sites of 100)&quot;</span>,</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>           <span class="fu">maximum</span>(<span class="fu">expected_gain_over_baseline</span>(weighted.problem))],</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;value of knowing which network is right (sites of 100)&quot;</span>,</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>           <span class="fu">evpi</span>(weighted.problem)]]; digits<span class="op">=</span><span class="fl">3</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">quantity</th>
+<th style="text-align: right;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">maximin, no weights</td>
+<td style="text-align: right;"><code>low</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">minimax regret, no weights</td>
+<td style="text-align: right;"><code>low</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">best expected, weights 3/4 and 1/4</td>
+<td style="text-align: right;"><code>high</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">its gain over low irrigation (sites of
+100)</td>
+<td style="text-align: right;">0.641</td>
+</tr>
+<tr>
+<td style="text-align: left;">value of knowing which network is right
+(sites of 100)</td>
+<td style="text-align: right;">0.542</td>
+</tr>
+</tbody>
+</table>
 <h1 id="what-to-take-away">What to take away</h1>
 <ul>
 <li><code>normal_form(model; states, baseline)</code> turns a
@@ -535,6 +706,12 @@ priors.</li>
 <li>The state must carry everything the utility depends on. A variable
 can be an experiment on the state or part of it; its value is the
 same.</li>
+<li>A set of Bayesian networks, one for each action, is a decision
+problem too:
+<code>normal_form(network; decision, states, outcome, observed)</code>
+reads it off one network with a management node, and gives an experiment
+for every observed variable. Networks for rival hypotheses give a table
+whose states are the hypotheses.</li>
 <li>One decision only, small diagrams only, and floating-point numbers.
 Sequential problems are for <code>adaptive_management</code> (<a href="../19_adaptive_management/19_adaptive_management.html">Learning
 while managing</a>).</li>

@@ -109,6 +109,10 @@ an optional source of problems, each loaded as a weak-dependency extension.
 - **Influence diagrams.** With InfluenceDiagrams.jl loaded, `normal_form(model)` turns a single-decision
   influence diagram into a `DecisionProblem` and its information into an `Experiment`; the diagram's
   structural values of information are then `evpi` and `evsi` on the table.
+- **Bayesian networks.** With BayesianNetworks.jl loaded, `normal_form` also reads a decision problem off
+  a set of networks, one for each action: one network with a management node, a named collection of
+  networks, or the networks of rival hypotheses crossed with actions. Every variable that could be observed
+  before deciding comes back as an `Experiment`, so `evsi` says which node is worth monitoring.
 - **Checked against other software.** The scripts in [`validation/`](validation/README.md) compare the
   package with the R packages `voi` and `cvar` and with independent Python code and scipy's `linprog`;
   the fixtures they write are read by the test suite, which needs neither R nor Python.
@@ -219,7 +223,7 @@ is also published in the documentation (Tutorials, and Case studies by field), c
 | 18 | [Act now, or wait and learn?](vignettes/18_value_of_waiting/18_value_of_waiting.md) | `value_of_waiting` on an invented outbreak in a herd: the value of a test result to the late decision, the cost of the delay, the best length of wait, and why EVSI with the delay ignored overstates |
 | 19 | [Learning while managing](vignettes/19_adaptive_management/19_adaptive_management.md) | `adaptive_management` on an invented bird colony: no learning, passive and active adaptive management and perfect information over several years, the value of updating against the value of probing, the policy tree, and how both depend on the horizon and the prior |
 | 20 | [Managing a state that changes](vignettes/20_changing_state/20_changing_state.md) | `adaptive_management` with `transitions` on an invented reserve and weed: the fixed plan as a schedule, why the passive manager must plan ahead, an inspection as an action taken only to learn, and which state the signal is about |
-| 21 | [From an influence diagram to a decision table](vignettes/21_influence_diagrams/21_influence_diagrams.md) | `normal_form` with InfluenceDiagrams.jl: the published umbrella problem (Shachter 1986) and the pond as a diagram; the diagram's values of information as `evsi` and `evpi`, checked against its own solver; other rules, regret and a credal set on the same table; which variables make the state |
+| 21 | [From influence diagrams and Bayesian networks to a decision table](vignettes/21_influence_diagrams/21_influence_diagrams.md) | `normal_form` with InfluenceDiagrams.jl: the published umbrella problem (Shachter 1986) and the pond as a diagram; the diagram's values of information as `evsi` and `evpi`, checked against its own solver; other rules, regret and a credal set on the same table; which variables make the state; the same from Bayesian networks with BayesianNetworks.jl: one network with a management node, the EVSI of every observable node, and rival networks as hypotheses |
 
 ### Case studies
 

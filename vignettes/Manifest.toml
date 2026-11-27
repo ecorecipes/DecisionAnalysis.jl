@@ -471,9 +471,10 @@ deps = ["JuMP", "LinearAlgebra", "Logging", "Random", "SpecialFunctions", "Stati
 path = ".."
 uuid = "6a9d793e-d09c-4461-8cb4-55c12d181024"
 version = "0.1.1"
-weakdeps = ["FiniteKernels", "GAM", "InfluenceDiagrams"]
+weakdeps = ["BayesianNetworks", "FiniteKernels", "GAM", "InfluenceDiagrams"]
 
     [deps.DecisionAnalysis.extensions]
+    DecisionAnalysisBayesianNetworksExt = "BayesianNetworks"
     DecisionAnalysisFiniteKernelsExt = "FiniteKernels"
     DecisionAnalysisGAMExt = "GAM"
     DecisionAnalysisInfluenceDiagramsExt = "InfluenceDiagrams"

@@ -147,3 +147,182 @@ end
         @test normal_form(model; states=[:X, :W]).experiment === nothing
     end
 end
+
+# The Bayesian-network bridge: a decision problem as a set of networks, one per action.
+using BayesianNetworks: BayesianNetworks
+const BN = BayesianNetworks
+
+# The pond of the tutorials as a network with a management node: Bd, two tests of it, the
+# response, and a count that depends on Bd and the response.
+function pond_network()
+    states = [:absent, :low_prevalence, :high_prevalence]
+    actions = [:no_intervention, :antifungal_baths, :disinfect_pond]
+    bn = BN.bayesnet(:Bd => states, :Swab => [:negative, :positive],
+                     :Visual => [:no_signs, :signs], :Response => actions;
+                     mechanisms=[:Swab => (:Bd,), :Visual => (:Bd,)])
+    m = BN.bind_cpt(BN.BayesModel(bn),
+                    [:Bd => [0.5, 0.3, 0.2], :Swab => [0.95 0.05; 0.4 0.6; 0.05 0.95],
+                     :Visual => [0.55 0.45; 0.5 0.5; 0.45 0.55],
+                     :Response => [1 / 3, 1 / 3, 1 / 3]])
+    frogs = [500 300 100; 470 380 250; 350 340 320] .- [0 150 250; 0 60 120; 0 10 20]
+    return m, permutedims(frogs)               # (Bd, Response)
+end
+
+@testset "Bayesian-network bridge" begin
+    @test Base.get_extension(DecisionAnalysis, :DecisionAnalysisBayesianNetworksExt) !==
+          nothing
+
+    @testset "one network with a management node" begin
+        m, frogs = pond_network()
+        nf = normal_form(m; decision=:Response, states=:Bd, observed=(:Swab, :Visual),
+                         outcome=(:Bd, :Response) => frogs, baseline=:no_intervention)
+        @test nf.decision === :Response && nf.states == [:Bd]
+        @test nf.actions == [:no_intervention, :antifungal_baths, :disinfect_pond]
+        @test nf.observed == [:Swab, :Visual]
+        problem = nf.problem
+        @test problem.payoff.Q ≈ permutedims(frogs)
+        @test probabilities(problem.belief) ≈ [0.5, 0.3, 0.2]
+        @test problem.baseline === :no_intervention
+        # The numbers of the tutorials on this pond, which were computed exactly.
+        @test evpi(problem) ≈ 52
+        @test evsi(problem, nf.experiments.Swab) ≈ 311 / 10
+        @test nf.experiments.Swab.likelihood ≈ [0.95 0.4 0.05; 0.05 0.6 0.95]
+        @test nf.experiments.Visual.likelihood ≈ [0.55 0.5 0.45; 0.45 0.5 0.55]
+        @test signal_labels(nf.experiments.Swab) == [:negative, :positive]
+        # Both tests together: four signals, the first variable fastest, and worth at
+        # least as much as either alone.
+        @test signal_labels(nf.experiment) ==
+              [:negative_no_signs, :positive_no_signs, :negative_signs, :positive_signs]
+        both = evsi(problem, nf.experiment)
+        @test both >= evsi(problem, nf.experiments.Swab) - 1e-9
+        @test both >= evsi(problem, nf.experiments.Visual) - 1e-9
+        @test both <= evpi(problem) + 1e-9
+        # The same problem from the influence diagram, which shares no code with this.
+        id = ID.influence_diagram(:Bd => BN.states(BN.syntax(m), :Bd),
+                                  :Swab => [:negative, :positive],
+                                  :Response => nf.actions;
+                                  mechanisms=[:Swab => :Bd], decisions=[:Response => :Swab],
+                                  utilities=[:Frogs => (:Bd, :Response)])
+        diagram = ID.bind_cpt(ID.InfluenceDiagramModel(id),
+                              [:Bd => [0.5, 0.3, 0.2],
+                               :Swab => [0.95 0.05; 0.4 0.6; 0.05 0.95]])
+        diagram = ID.bind_utility(diagram, :Frogs => Float64.(frogs))
+        from_diagram = normal_form(diagram; states=:Bd)
+        @test from_diagram.problem.payoff.Q ≈ problem.payoff.Q
+        @test from_diagram.experiment.likelihood ≈ nf.experiments.Swab.likelihood
+        @test ID.optimize(diagram).expected_utility ≈
+              value_with_information(problem, nf.experiments.Swab)
+        # No observation, no experiment.
+        plain = normal_form(m; decision=:Response, states=:Bd,
+                            outcome=(:Bd, :Response) => frogs)
+        @test plain.experiment === nothing && isempty(plain.experiments)
+        @test plain.problem.payoff.Q ≈ problem.payoff.Q
+    end
+
+    @testset "a named collection of networks" begin
+        m, frogs = pond_network()
+        actions = BN.states(BN.syntax(m), :Response)
+        models = NamedTuple{Tuple(actions)}(Tuple(BN.do_intervention(m, :Response => a)
+                                                  for a in actions))
+        from_one = normal_form(m; decision=:Response, states=:Bd, observed=:Swab,
+                               outcome=(:Bd, :Response) => frogs)
+        from_many = normal_form(models; states=:Bd, observed=:Swab,
+                                outcome=(:Bd, :Response) => frogs)
+        @test from_many.problem.payoff.Q == from_one.problem.payoff.Q
+        @test from_many.experiment.likelihood == from_one.experiment.likelihood
+        @test from_many.actions == actions
+        # A count read from an outcome node, by state name, by vector, and as two terms.
+        habitat = BN.reference_habitat_model()
+        by_name = normal_form(habitat; decision=:Irrigation, states=:Climate,
+                              outcome=:Occupancy => (absent=0, present=100), baseline=:low)
+        by_vector = normal_form(habitat; decision=:Irrigation, states=:Climate,
+                                outcome=:Occupancy => [0, 100])
+        @test by_name.problem.payoff.Q == by_vector.problem.payoff.Q
+        @test by_name.problem.baseline === :low
+        for (a, action) in enumerate((:low, :high)),
+            (s, climate) in enumerate((:dry, :normal, :wet))
+            conditioned = BN.do_intervention(habitat,
+                                             [:Irrigation => action, :Climate => climate])
+            @test by_name.problem.payoff.Q[a, s] ≈
+                  100 * BN.marginal(conditioned, :Occupancy).table[2]
+        end
+        with_term = normal_form(habitat; decision=:Irrigation, states=:Climate,
+                                outcome=[:Occupancy => [0, 100],
+                                         :Irrigation => (low=0, high=-5)])
+        @test with_term.problem.payoff.Q ≈ by_name.problem.payoff.Q .+ [0; -5]
+        # Two states: their joint, the first fastest.
+        two = normal_form(habitat; decision=:Irrigation,
+                          states=(:Climate, :GrazingPressure),
+                          outcome=:Occupancy => [0, 100])
+        @test state_labels(two.problem) ==
+              [:dry_low, :normal_low, :wet_low, :dry_high, :normal_high, :wet_high]
+        @test sum(probabilities(two.problem.belief)) ≈ 1
+        @test aggregate(Expectation(), two.problem) ≈
+              aggregate(Expectation(), by_name.problem)
+    end
+
+    @testset "hypotheses" begin
+        habitat = BN.reference_habitat_model()
+        doubtful = BN.bind_cpt(habitat, :Occupancy => [0.6 0.4; 0.5 0.5])
+        networks(model) = (; low=BN.do_intervention(model, :Irrigation => :low),
+                           high=BN.do_intervention(model, :Irrigation => :high))
+        outcome = [:Occupancy => [0, 100], :Irrigation => (low=0, high=-5)]
+        nf = normal_form((; published=networks(habitat), doubtful=networks(doubtful));
+                         outcome, baseline=:low)
+        @test nf.actions == [:low, :high] &&
+              state_labels(nf.problem) == [:published, :doubtful]
+        @test nf.problem.belief isa ScenarioSet
+        @test nf.experiment === nothing
+        for (h, model) in enumerate((habitat, doubtful)),
+            (a, action) in enumerate((:low, :high))
+            fixed = BN.do_intervention(model, :Irrigation => action)
+            @test nf.problem.payoff.Q[a, h] ≈
+                  100 * BN.marginal(fixed, :Occupancy).table[2] - 5 * (a == 2)
+        end
+        # With weights on the hypotheses there is an expectation, and a value of knowing
+        # which network is right.
+        weighted = normal_form((; published=networks(habitat), doubtful=networks(doubtful));
+                               outcome, prior=[3 // 4, 1 // 4], baseline=:low)
+        @test weighted.problem.belief isa FiniteBelief
+        @test probabilities(weighted.problem.belief) == [3 // 4, 1 // 4]
+        @test evpi(weighted.problem) >= 0
+        @test_throws ArgumentError normal_form((; a=networks(habitat),
+                                                b=(; low=habitat, other=habitat)); outcome)
+    end
+
+    @testset "what the bridge refuses" begin
+        m, frogs = pond_network()
+        outcome = (:Bd, :Response) => frogs
+        habitat = BN.reference_habitat_model()
+        count = :Occupancy => [0, 100]
+        # Something downstream of the decision is not observed before it, and is no state.
+        @test_throws ArgumentError normal_form(habitat; decision=:Irrigation,
+                                               states=:Climate,
+                                               observed=:SoilMoisture, outcome=count)
+        @test_throws ArgumentError normal_form(habitat; decision=:Irrigation,
+                                               states=:SoilMoisture, outcome=count)
+        # A state that leaves out what the outcome depends on, while it is observed.
+        @test_throws ArgumentError normal_form(m; decision=:Response, states=:Visual,
+                                               observed=:Swab, outcome)
+        @test_throws ArgumentError normal_form(m; decision=:Response, states=:Response,
+                                               outcome)
+        @test_throws ArgumentError normal_form(m; decision=:Response, states=:Bd,
+                                               observed=:Bd, outcome)
+        @test_throws ArgumentError normal_form(m; decision=:Nowhere, states=:Bd, outcome)
+        @test_throws ArgumentError normal_form(m; decision=:Response, states=:Nowhere,
+                                               outcome)
+        @test_throws ArgumentError normal_form(m; decision=:Response, states=:Bd,
+                                               outcome=(:Bd, :Response) => frogs[:, 1:2])
+        @test_throws ArgumentError normal_form(habitat; decision=:Irrigation,
+                                               states=:Climate,
+                                               outcome=:Occupancy => (absent=0, here=1))
+        @test_throws ArgumentError normal_form(habitat; decision=:Irrigation,
+                                               states=:Climate,
+                                               outcome=(:Occupancy, :Climate) => (a=1,))
+        @test_throws ArgumentError normal_form(habitat; decision=:Irrigation, states=(),
+                                               outcome=count)
+        @test_throws InvalidBaselineError normal_form(habitat; decision=:Irrigation,
+                                                      states=:Climate, outcome=count,
+                                                      baseline=:none)
+    end
+end

@@ -31,6 +31,12 @@ tests have an environment of their own, `test/influence_diagrams/`, which lists 
 packages by URL and runs only with `DECISIONANALYSIS_ID=1`. The vignette environment does hold it, with
 those three siblings (the user's decision of 2026-11-27, for vignette 21, the one page on `normal_form`);
 the docs environment still must not, and needs nothing: it publishes the rendered Markdown.
+`BayesianNetworks` (ecorecipes/BayesianNetworks.jl) is a weak dependency in the same way, for the network
+forms of `normal_form` (`ext/DecisionAnalysisBayesianNetworksExt.jl`: one network with a management node,
+a named collection of networks, or hypotheses crossed with actions). It also brings GATlab and ACSets, so the
+same rule holds: `[weakdeps]` only, tested in `test/influence_diagrams/` (59 tests, one cross-checked
+against the influence-diagram bridge), and shown in vignette 21. The state and the observed variables must
+have the same distribution in every network; the bridge checks it and never assumes it.
 
 ## Invariants that must not be broken
 

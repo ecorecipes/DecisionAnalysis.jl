@@ -1,4 +1,4 @@
-# From an influence diagram to a decision table
+# From influence diagrams and Bayesian networks to a decision table
 Simon Frost
 
 - [Motivation](#motivation)
@@ -6,6 +6,8 @@ Simon Frost
 - [What the table adds](#what-the-table-adds)
 - [A diagram of our own: the pond](#a-diagram-of-our-own-the-pond)
 - [Which variables make the state](#which-variables-make-the-state)
+- [From Bayesian networks](#from-bayesian-networks)
+  - [Several networks for one system](#several-networks-for-one-system)
 - [What to take away](#what-to-take-away)
 
 ## Motivation
@@ -279,6 +281,133 @@ The value of the swab is the same either way: an EVSI when the swab is
 an experiment on the state, an EVPPI when it is one coordinate of a
 larger state.
 
+## From Bayesian networks
+
+Once its decision is made, an influence diagram is an ordinary Bayesian
+network. So a decision problem is also a **set of networks, one for each
+action**, and that is how networks are usually built in ecology: one
+network with a management node, or one network per management scenario.
+`normal_form` takes them directly, with no diagram in between. A network
+has no utility, so the payoff is named: a count read from its nodes.
+
+``` julia
+using BayesianNetworks: BayesianNetworks
+const BN = BayesianNetworks
+
+network = BN.bayesnet(:Bd => states, :Swab => [:negative, :positive],
+                      :Visual => [:no_signs, :signs], :Response => actions;
+                      mechanisms=[:Swab => (:Bd,), :Visual => (:Bd,)])
+network = BN.bind_cpt(BN.BayesModel(network),
+                      [:Bd => [0.5, 0.3, 0.2], :Swab => [0.95 0.05; 0.4 0.6; 0.05 0.95],
+                       :Visual => [0.55 0.45; 0.5 0.5; 0.45 0.55],
+                       :Response => [1 / 3, 1 / 3, 1 / 3]])
+frogs = Float64.(permutedims(uninfected .- infected))          # Bd by response
+from_network = normal_form(network; decision=:Response, states=:Bd,
+                           observed=(:Swab, :Visual),
+                           outcome=(:Bd, :Response) => frogs, baseline=:no_intervention)
+from_network.problem.payoff.Q ≈ pond_form.problem.payoff.Q
+```
+
+    true
+
+The management node’s own probabilities play no part: each action’s
+network is the intervention that sets the node to that action. The pond
+now has a second test, a visual check for signs of disease, with the
+likelihood of [Comparing
+experiments](../06_comparing_experiments/06_comparing_experiments.md).
+
+**Which node is worth monitoring?** Every observed variable comes back
+as an experiment of its own, so the question is one table.
+
+``` julia
+md_table(["observe", "EVSI (frogs)", "share of EVPI"],
+         vcat([[String(x), evsi(from_network.problem, e),
+                evsi(from_network.problem, e) / evpi(from_network.problem)]
+               for (x, e) in pairs(from_network.experiments)],
+              [["both", evsi(from_network.problem, from_network.experiment),
+                evsi(from_network.problem, from_network.experiment) /
+                evpi(from_network.problem)]]); digits=3)
+```
+
+| observe | EVSI (frogs) | share of EVPI |
+|:--------|-------------:|--------------:|
+| Swab    |         31.1 |         0.598 |
+| Visual  |            0 |             0 |
+| both    |         31.1 |         0.598 |
+
+A state, and anything observed before the decision, must not depend on
+the action. The bridge checks that across the networks and refuses
+otherwise. In the reference habitat network that BayesianNetworks.jl
+ships, soil moisture is downstream of irrigation, so it cannot be
+observed before deciding how much to irrigate:
+
+``` julia
+habitat = BN.reference_habitat_model()
+occupied = :Occupancy => (absent=0, present=100)        # occupied sites of 100
+try
+    normal_form(habitat; decision=:Irrigation, states=:Climate, observed=:SoilMoisture,
+                outcome=occupied)
+catch err
+    print(sprint(showerror, err))
+end
+```
+
+    ArgumentError: the distribution of [:Climate, :SoilMoisture] under high differs from that under low: a state, or something observed before the decision, cannot depend on the action
+
+### Several networks for one system
+
+The networks can also stand for **hypotheses**: rival structures, or the
+networks of several experts. The states are then the hypotheses, and the
+payoff is each action’s expected outcome under each. Here the published
+network is set beside one in which habitat quality matters much less to
+occupancy, and irrigating is charged three occupied sites lost
+downstream (both **illustrative**). Less irrigation is the baseline.
+
+``` julia
+doubtful = BN.bind_cpt(habitat, :Occupancy => [0.6 0.4; 0.5 0.5])
+by_action(model) = (; low=BN.do_intervention(model, :Irrigation => :low),
+                    high=BN.do_intervention(model, :Irrigation => :high))
+count = [occupied, :Irrigation => (low=0, high=-3)]
+rivals = normal_form((; published=by_action(habitat), doubtful=by_action(doubtful));
+                     outcome=count, baseline=:low)
+rivals.problem.payoff
+```
+
+**PayoffTable{Float64}: 2 actions × 2 states**
+
+| action | `published` | `doubtful` |
+|:-------|------------:|-----------:|
+| `low`  |     45.7933 |    44.6897 |
+| `high` |     47.3703 |    42.5219 |
+
+The two networks disagree: more irrigation is better under the published
+one and worse under the other. With no probabilities on the hypotheses
+the belief is a scenario set, and the rules that need none apply. With
+weights there is an expectation, and a value of finding out which
+network is right.
+
+``` julia
+weighted = normal_form((; published=by_action(habitat), doubtful=by_action(doubtful));
+                       outcome=count, prior=[3 // 4, 1 // 4], baseline=:low)
+md_table(["quantity", "value"],
+         [["maximin, no weights", decide(rivals.problem, Maximin()).chosen],
+          ["minimax regret, no weights", decide(rivals.problem, MinimaxRegret()).chosen],
+          ["best expected, weights 3/4 and 1/4",
+           decide(weighted.problem, MaxExpectedUtility()).chosen],
+          ["its gain over low irrigation (sites of 100)",
+           maximum(expected_gain_over_baseline(weighted.problem))],
+          ["value of knowing which network is right (sites of 100)",
+           evpi(weighted.problem)]]; digits=3)
+```
+
+| quantity                                               |  value |
+|:-------------------------------------------------------|-------:|
+| maximin, no weights                                    |  `low` |
+| minimax regret, no weights                             |  `low` |
+| best expected, weights 3/4 and 1/4                     | `high` |
+| its gain over low irrigation (sites of 100)            |  0.641 |
+| value of knowing which network is right (sites of 100) |  0.542 |
+
 ## What to take away
 
 - `normal_form(model; states, baseline)` turns a single-decision
@@ -293,6 +422,11 @@ larger state.
   priors.
 - The state must carry everything the utility depends on. A variable can
   be an experiment on the state or part of it; its value is the same.
+- A set of Bayesian networks, one for each action, is a decision problem
+  too: `normal_form(network; decision, states, outcome, observed)` reads
+  it off one network with a management node, and gives an experiment for
+  every observed variable. Networks for rival hypotheses give a table
+  whose states are the hypotheses.
 - One decision only, small diagrams only, and floating-point numbers.
   Sequential problems are for `adaptive_management` ([Learning while
   managing](../19_adaptive_management/19_adaptive_management.md)).

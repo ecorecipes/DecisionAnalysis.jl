@@ -564,7 +564,46 @@ variables the utility depends on. The diagram is evaluated by enumerating its jo
 distribution once per action, so this is for small diagrams, and the numbers are
 floating point, as in InfluenceDiagrams.jl. Utilities are whatever the diagram's
 utility nodes hold; this package takes the payoff's unit as given.
+
+    normal_form(network; decision, states, outcome, observed=(), baseline=nothing) -> NamedTuple
+    normal_form((; action = network, ...); states, outcome, observed=(), baseline=nothing)
+    normal_form((; hypothesis = (; action = network, ...), ...); outcome, prior=nothing, baseline=nothing)
+
+**From Bayesian networks.** An influence diagram becomes a Bayesian network once its
+decision is made, so a decision problem is also a set of networks, one for each action.
+The networks are `BayesModel`s of BayesianNetworks.jl
+(`github.com/ecorecipes/BayesianNetworks.jl`), which is not a dependency of this package:
+load it first.
+
+- **One network with a management node**: `decision` names the node, its states are the
+  actions, and each action's network is the intervention `do(decision = action)`.
+- **A named collection**, one network per action, for networks built or elicited
+  separately.
+- **Hypotheses**: a named collection of such collections. The states are then the
+  hypotheses (rival networks, or several experts' networks), the payoff is each action's
+  expected outcome under each, and the belief is `prior` over them, or a
+  [`ScenarioSet`](@ref) when there is none, so that only the rules that need no
+  probabilities apply.
+
+`states` names the variables that form the state, and `observed` those that could be
+seen before deciding. Neither may depend on the action: their joint distribution must be
+the same in every network, which is checked (`ArgumentError` otherwise; a variable
+downstream of the decision fails it). `outcome` gives the payoff, a network having no
+utility of its own: `variable => values`, one number for each state (a vector, or a named
+tuple by state), or `(variables...) => array` with one axis per variable, or a list of
+such terms, which are added. A term may include the decision node, for what an action
+uses up. The payoff is `Q[a, θ] = E[outcome | action a, state θ]`.
+
+The result is `(; problem, experiment, experiments, actions, states, observed)`
+(and `decision` for the first form): `experiments` holds one [`Experiment`](@ref) for each
+observed variable alone, so that `evsi(problem, experiments.X)` for every `X` says which
+variable is worth monitoring, and `experiment` is all of them together (`nothing` with
+none). As for a diagram, the state must carry everything an observation says about the
+outcome. The networks are evaluated by enumeration (`max_states`), in floating point.
 """
 function normal_form(model; kw...)
-    return throw(MissingExtensionError(:normal_form, :InfluenceDiagrams))
+    # A collection of networks, or one: the other bridge.
+    networks = model isa NamedTuple || nameof(typeof(model)) === :BayesModel
+    return throw(MissingExtensionError(:normal_form,
+                                       networks ? :BayesianNetworks : :InfluenceDiagrams))
 end

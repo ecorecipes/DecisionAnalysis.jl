@@ -13,6 +13,16 @@
     end
     @test err isa MissingExtensionError
     @test occursin("using InfluenceDiagrams", sprint(showerror, err))
+    # A collection of networks belongs to the other bridge, which is not loaded either.
+    @test Base.get_extension(DecisionAnalysis, :DecisionAnalysisBayesianNetworksExt) ===
+          nothing
+    networks = try
+        normal_form((; none=1, act=2); states=:X, outcome=:Y => [0, 1])
+    catch e
+        e
+    end
+    @test networks isa MissingExtensionError
+    @test occursin("using BayesianNetworks", sprint(showerror, networks))
     # No environment of the package itself may hold Catlab, GATlab or ACSets.
     for file in ("Project.toml", joinpath("docs", "Project.toml"))
         text = read(joinpath(@__DIR__, "..", file), String)
