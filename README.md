@@ -4,7 +4,7 @@
 [![Build Status](https://github.com/ecorecipes/DecisionAnalysis.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ecorecipes/DecisionAnalysis.jl/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Standard decision analysis on the output of any model, with no category theory required: a payoff table,
+Standard decision analysis on the output of any model: a payoff table,
 a belief about its states, rules for choosing, Savage regret, and the value of information. Finite
 problems are exact: give the package `Rational` inputs and every number it returns is a rational. Model
 output held as draws and simulator runs is analysed by sample-based estimators of the same quantities,

@@ -1,11 +1,17 @@
 # DecisionAnalysis.jl
 
-Standard decision analysis on finite problems, with no category theory required: a
+Standard decision analysis on finite problems: a
 payoff table, a belief about its states, rules for choosing, Savage regret, and the
 value of information. Finite problems are exact: give the package `Rational` inputs
 and every number it returns is a rational. Draws and simulator runs are analysed by
 sample-based estimators of the same quantities, each with its Monte Carlo standard
 error in a separate field.
+
+The **tutorials** build up from a first decision table to value of information from
+model runs, starting with
+[a first decision table](tutorials/01_first_decision_table.md). The **case studies**
+reproduce published analyses in ecology and in human epidemiology. Both are in the
+menu, followed by the certificates and the API reference.
 
 | object | meaning |
 |---|---|
@@ -248,11 +254,3 @@ julia> solution = solve_program(program);
 julia> solution.status, solution.objective, solution.exact
 (:optimal, 0//1, true)
 ```
-
-## Scope of version 0.1
-
-Finite problems, exactly; sample-based beliefs, outcome tables and model adapters,
-utilities with a risk attitude and over several attributes, Monte Carlo value of
-information with its standard errors, decision sensitivity, and single-decision
-influence diagrams through an optional extension. Discounting, moment-matching EVSI,
-multilevel Monte Carlo and sequential problems are not in this version.

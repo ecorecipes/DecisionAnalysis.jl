@@ -26,16 +26,17 @@ end
 
 # The API reference is split over several pages: one page of every docstring was close
 # to Documenter's size limit for a page of HTML.
-pages = Any["Home" => "index.md", "Certificates" => "certificates.md",
-            "API Reference" => ["Beliefs, payoff tables and problems" => "api/problems.md",
-                                "Aggregators, regret and rules" => "api/rules.md",
-                                "Experiments and exact value of information" => "api/information.md",
-                                "Designs, waiting and sequential decisions" => "api/sequential.md",
-                                "Sample-based analysis" => "api/samples.md",
-                                "Model-based methods, study designs and estimation" => "api/methods.md",
-                                "Scenario designs" => "api/scenarios.md",
-                                "Risk attitude and multi-attribute utilities" => "api/utilities.md",
-                                "Linear programmes, reports, certificates and exceptions" => "api/programmes.md"]]
+reference = Any["Certificates" => "certificates.md",
+                "API Reference" => ["Beliefs, payoff tables and problems" => "api/problems.md",
+                                    "Aggregators, regret and rules" => "api/rules.md",
+                                    "Experiments and exact value of information" => "api/information.md",
+                                    "Designs, waiting and sequential decisions" => "api/sequential.md",
+                                    "Sample-based analysis" => "api/samples.md",
+                                    "Model-based methods, study designs and estimation" => "api/methods.md",
+                                    "Scenario designs" => "api/scenarios.md",
+                                    "Risk attitude and multi-attribute utilities" => "api/utilities.md",
+                                    "Linear programmes, reports, certificates and exceptions" => "api/programmes.md"]]
+pages = Any["Home" => "index.md"]
 tutorials = tutorial_pages()
 # The case studies replicate published analyses and get a heading of their own, so that
 # nobody takes their numbers for the illustrations of the tutorials. They are grouped by
@@ -50,6 +51,9 @@ case_studies = Any[]
 isempty(ecology) || push!(case_studies, "Ecology" => ecology)
 isempty(epidemiology) || push!(case_studies, "Human epidemiology" => epidemiology)
 isempty(case_studies) || push!(pages, "Case studies" => case_studies)
+# Certificates and the API reference come last: the manual leads with the tutorials
+# and the case studies.
+append!(pages, reference)
 
 # Source links need a commit to point at. A checkout without commits (a fresh
 # scaffold, a tarball) builds without them instead of failing.

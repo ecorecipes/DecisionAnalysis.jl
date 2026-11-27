@@ -1,7 +1,7 @@
 """
     DecisionAnalysis
 
-Standard decision analysis on finite problems, with no category theory required: a
+Standard decision analysis on finite problems: a
 payoff table, a belief about its states, rules for choosing, Savage regret, and the
 value of information, all exact when the inputs are rational.
 
