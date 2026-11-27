@@ -630,7 +630,7 @@ regression = evpi(DecisionProblem(problem.payoff,
 ```
 
     ┌ Warning: The evpi estimate by SplineRegression, 3.50015, is above the EVPI of the same sample, 1.64364, by more than twice its standard error. No information is worth more than perfect information, so the fitted values are not conditional means here (too few draws for the fit, or a misspecified regression) and the estimate should not be used. The standard error does not show this. Use fewer knots or parameters, StrongOakley() or Grouping(; bins), or more draws.
-    └ @ DecisionAnalysis ~/Projects/decisiontheory/DecisionAnalysis.jl/src/voi_sample.jl:623
+    └ @ DecisionAnalysis ~/Projects/decisiontheory/DecisionAnalysis.jl/src/voi_sample.jl:764
 
     (noise_correlation_between_actions = 0.3046910749975807,)
 

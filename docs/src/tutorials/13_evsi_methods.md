@@ -269,7 +269,7 @@ best = argmax([b.value for b in net])
 (trials=sizes[best], net_benefit=net[best].value, standard_error=net[best].standard_error)
 ```
 
-    (trials = 2, net_benefit = 14.902861355693503, standard_error = 1.405480939763762)
+    (trials = 2, net_benefit = 14.902861355693503, standard_error = 1.4054809397637604)
 
 A small study pays for itself and a large one does not: the EVSI curve
 flattens while the cost keeps rising. With a single pond no study is

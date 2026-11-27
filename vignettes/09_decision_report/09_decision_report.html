@@ -640,7 +640,7 @@ a seventh of the expected utility of acting now.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>report.evpi, report.experiments, report.partitions</span></code></pre></div>
 <pre><code>(52//1, NamedTuple[(name = :swab, evsi = 311//10, cost = 0, net = 311//10, can_change_decision = true), (name = :visual_check, evsi = 0//1, cost = 0, net = 0//1, can_change_decision = false)], NamedTuple[(name = :presence, evppi = 52//1)])</code></pre>
 <div class="sourceCode" id="cb9"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>report.robust_evpi, report.pareto.chosen</span></code></pre></div>
-<pre><code>(RobustVOI(evpi under GammaMaximin: 45//1; envelope [40//1, 66//1]), [:antifungal_baths, :disinfect_pond])</code></pre>
+<pre><code>(RobustVOI(evpi under GammaMaximin: 45//1; envelope [40//1, 66//1], upper end at the prior Rational{BigInt}[11//25, 53//200, 59//200]), [:antifungal_baths, :disinfect_pond])</code></pre>
 <div class="sourceCode" id="cb11"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bullet</span>(report.assumptions)</span></code></pre></div>
 <ul>
 <li>Payoffs are conditional expected utilities of each action in each

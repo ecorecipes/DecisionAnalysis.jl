@@ -251,9 +251,9 @@ md_table(["years", "beliefs evaluated"],
 | 1     |                 1 |
 | 2     |                24 |
 | 3     |               300 |
-| 4     |              2585 |
-| 5     |             16888 |
-| 6     |             86831 |
+| 4     |              2584 |
+| 5     |             16886 |
+| 6     |             86832 |
 
 Ten years of this problem need about ten million beliefs and most of a
 minute. Longer horizons need a coarser observation (fewer nests watched,

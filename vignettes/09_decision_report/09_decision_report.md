@@ -281,7 +281,7 @@ report.evpi, report.experiments, report.partitions
 report.robust_evpi, report.pareto.chosen
 ```
 
-    (RobustVOI(evpi under GammaMaximin: 45//1; envelope [40//1, 66//1]), [:antifungal_baths, :disinfect_pond])
+    (RobustVOI(evpi under GammaMaximin: 45//1; envelope [40//1, 66//1], upper end at the prior Rational{BigInt}[11//25, 53//200, 59//200]), [:antifungal_baths, :disinfect_pond])
 
 ``` julia
 bullet(report.assumptions)

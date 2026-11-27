@@ -581,7 +581,7 @@ guides the decision at 25 ponds.</p>
 </table>
 <div class="sourceCode" id="cb9"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>best <span class="op">=</span> <span class="fu">argmax</span>([b.value for b <span class="kw">in</span> net])</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>(trials<span class="op">=</span>sizes[best], net_benefit<span class="op">=</span>net[best].value, standard_error<span class="op">=</span>net[best].standard_error)</span></code></pre></div>
-<pre><code>(trials = 2, net_benefit = 14.902861355693503, standard_error = 1.405480939763762)</code></pre>
+<pre><code>(trials = 2, net_benefit = 14.902861355693503, standard_error = 1.4054809397637604)</code></pre>
 <p>A small study pays for itself and a large one does not: the EVSI
 curve flattens while the cost keeps rising. With a single pond no study
 is worth its newts.</p>

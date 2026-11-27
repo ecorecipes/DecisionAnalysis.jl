@@ -1287,7 +1287,7 @@ common random numbers.</p>
 <span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>                  linear)</span>
 <span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>(noise_correlation_between_actions<span class="op">=</span>rho,)</span></code></pre></div>
 <pre><code>┌ Warning: The evpi estimate by SplineRegression, 3.50015, is above the EVPI of the same sample, 1.64364, by more than twice its standard error. No information is worth more than perfect information, so the fitted values are not conditional means here (too few draws for the fit, or a misspecified regression) and the estimate should not be used. The standard error does not show this. Use fewer knots or parameters, StrongOakley() or Grouping(; bins), or more draws.
-└ @ DecisionAnalysis ~/Projects/decisiontheory/DecisionAnalysis.jl/src/voi_sample.jl:623
+└ @ DecisionAnalysis ~/Projects/decisiontheory/DecisionAnalysis.jl/src/voi_sample.jl:764
 
 (noise_correlation_between_actions = 0.3046910749975807,)</code></pre>
 <div class="sourceCode" id="cb36"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">voi_table</span>([<span class="st">&quot;EVPI, plain sample average&quot;</span> <span class="op">=&gt;</span> plain,</span>
