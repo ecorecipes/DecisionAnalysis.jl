@@ -1,0 +1,213 @@
+---
+title: "From an influence diagram to a decision table"
+author: "Simon Frost"
+format: gfm
+engine: julia
+---
+
+## Motivation
+
+The earlier tutorials start from a payoff table. Many decision problems are first
+drawn as an **influence diagram**: chance variables, one decision, what the decision
+sees when it is taken, and a utility. The diagram and the table are two descriptions
+of the same problem, and `normal_form` turns the first into the second:
+
+- the **actions** are the options of the decision;
+- the **state** is the chance variable the payoff depends on, with its probabilities
+  as the belief;
+- the **payoff** `Q[a, θ]` is the expected utility of action `a` in state `θ`;
+- what the decision observes becomes an **experiment**, `L[z, θ] = P(z | θ)`.
+
+Once the problem is a table, everything in this package applies to it: the other
+decision rules, regret, the value of each possible result, sets of priors.
+
+The diagrams are built and solved by
+[InfluenceDiagrams.jl](https://github.com/ecorecipes/InfluenceDiagrams.jl), which is
+not a dependency of this package. `normal_form` is available once it is loaded. It
+handles diagrams with **one decision**, by enumerating the joint distribution, so it
+is for small diagrams, and its numbers are floating point.
+
+## A published example: the umbrella
+
+InfluenceDiagrams.jl ships the umbrella problem with the numbers of Shachter (1986).
+The weather is sunny with probability 0.7 and rainy otherwise, a forecast is seen
+before deciding whether to take an umbrella, and the utilities are the source's own
+(no unit is attached to them). Leaving the umbrella is the `baseline`: it is what
+happens if nothing is done.
+
+```{julia}
+using DecisionAnalysis
+using InfluenceDiagrams: InfluenceDiagrams
+const ID = InfluenceDiagrams
+include(joinpath("..", "_common.jl"))
+
+umbrella = ID.umbrella_model()
+form = normal_form(umbrella; states=:Weather, baseline=:leave)
+form.problem.payoff
+```
+
+```{julia}
+(decision=form.decision, state=form.states, observed=form.observed,
+ belief=round.(probabilities(form.problem.belief); digits=3))
+```
+
+The forecast is the experiment. Each column is a state, each row a forecast:
+
+```{julia}
+labelled_table("forecast", signal_labels(form.experiment), state_labels(form.problem),
+               form.experiment.likelihood)
+```
+
+The two packages share no code, so their answers check each other. The diagram's own
+solver gives the best expected utility with and without the forecast, and its
+structural values of information; the table gives the same numbers as `evsi` and
+`evpi`.
+
+```{julia}
+blind = ID.without_information(umbrella, :Umbrella, :Forecast)
+md_table(["quantity", "from the diagram", "from the table"],
+         [["expected utility with no forecast", ID.optimize(blind).expected_utility,
+           act_now_value(form.problem)],
+          ["expected utility with the forecast", ID.optimize(umbrella).expected_utility,
+           value_with_information(form.problem, form.experiment)],
+          ["value of the forecast", ID.expected_value_of_information(blind, :Forecast, :Umbrella),
+           evsi(form.problem, form.experiment)],
+          ["value of knowing the weather",
+           ID.expected_value_of_perfect_information(blind, :Umbrella; variables=[:Weather]),
+           evpi(form.problem)]]; digits=4)
+```
+
+These are the published values: 70 without the forecast, 77 with it, and 91 with
+the weather known, so the forecast is worth 7 and perfect information 21.
+
+The best policy is also the same. The diagram's solver returns an action for each
+forecast; `voi_profile` returns the best action after each result, with what that
+result is worth.
+
+```{julia}
+policy = ID.policy_table(ID.policies(ID.optimize(umbrella).strategy)[:Umbrella])
+profile = voi_profile(form.problem, form.experiment)
+md_table(["forecast", "probability", "diagram's policy", "best action from the table",
+          "value of this forecast"],
+         [[o.signal, o.probability, a, o.best, o.value]
+          for (o, a) in zip(profile.outcomes, policy)]; digits=3)
+```
+
+Only a forecast of rain changes what is done, and the whole value of the forecast
+comes from it.
+
+## What the table adds
+
+The diagram's solver maximises expected utility. With the table, the same problem
+can be read under other rules and from the side of regret.
+
+```{julia}
+md_table(["rule", "chosen"],
+         [[name, decide(form.problem, rule).chosen]
+          for (name, rule) in ["expected utility" => MaxExpectedUtility(),
+                               "maximin" => Maximin(), "minimax regret" => MinimaxRegret()]])
+```
+
+```{julia}
+regret_table(form.problem)
+```
+
+The weather's probability can be put in doubt too. Suppose the chance of rain is only
+known to lie between 0.2 and 0.5 (**illustrative**). The table goes with a credal
+set, and the value of perfect information becomes a range.
+
+```{julia}
+doubtful = DecisionProblem(form.problem.payoff,
+                           CredalSet(state_labels(form.problem), [[0.8, 0.2], [0.5, 0.5]]);
+                           baseline=:leave)
+robust_evpi(doubtful)
+```
+
+## A diagram of our own: the pond
+
+The pond of [Experiments and EVSI](../04_experiments_and_evsi/04_experiments_and_evsi.md)
+as a diagram: Bd is absent, at low prevalence or at high prevalence; a swab is
+negative or positive; the manager sees the swab and then does nothing, treats the
+frogs or disinfects the pond; the utility is uninfected minus infected frogs. **All
+numbers are illustrative**, and they are the ones of that tutorial.
+
+```{julia}
+states = [:absent, :low_prevalence, :high_prevalence]
+actions = [:no_intervention, :antifungal_baths, :disinfect_pond]
+diagram = ID.influence_diagram(:Bd => states, :Swab => [:negative, :positive],
+                               :Response => actions;
+                               mechanisms=[:Swab => :Bd], decisions=[:Response => :Swab],
+                               utilities=[:Frogs => (:Bd, :Response)])
+uninfected = [500 300 100; 470 380 250; 350 340 320]     # action by state
+infected = [0 150 250; 0 60 120; 0 10 20]
+pond = ID.InfluenceDiagramModel(diagram)
+pond = ID.bind_cpt(pond, [:Bd => [0.5, 0.3, 0.2],
+                          :Swab => [0.95 0.05; 0.4 0.6; 0.05 0.95]])     # state by result
+pond = ID.bind_utility(pond, :Frogs => Float64.(permutedims(uninfected .- infected)))
+pond_form = normal_form(pond; states=:Bd, baseline=:no_intervention)
+pond_form.problem.payoff
+```
+
+The table is the one the earlier tutorial wrote down directly, and the values agree
+with it and with the diagram's solver:
+
+```{julia}
+md_table(["quantity", "value"],
+         [["payoff table equals uninfected − infected", pond_form.problem.payoff.Q == uninfected .- infected],
+          ["best action with no swab", decide(pond_form.problem, MaxExpectedUtility()).chosen],
+          ["its gain over no intervention (frogs)", maximum(expected_gain_over_baseline(pond_form.problem))],
+          ["EVSI of the swab, from the table", evsi(pond_form.problem, pond_form.experiment)],
+          ["the same, from the diagram",
+           ID.expected_value_of_information(ID.without_information(pond, :Response, :Swab),
+                                            :Swab, :Response)],
+          ["EVPI", evpi(pond_form.problem)]]; digits=4)
+```
+
+```{julia}
+values = [act_now_value(pond_form.problem),
+          value_with_information(pond_form.problem, pond_form.experiment),
+          act_now_value(pond_form.problem) + evpi(pond_form.problem)]
+baseline_value = values[1] - maximum(expected_gain_over_baseline(pond_form.problem))
+plt = Plots.bar(["act now", "after the swab", "Bd known"], values .- baseline_value;
+                legend=false, linewidth=0.5, ylims=(0, 160),
+                ylabel="expected gain over no intervention (frogs)",
+                title="What the manager's information is worth (illustrative)")
+png_figure(plt)
+```
+
+## Which variables make the state
+
+`states` names the chance variables that form the state. It must hold everything the
+utility depends on. By default it is every chance variable that could be observed
+before the decision, which here includes the swab: the swab is then part of the
+state, nothing is left to observe, and learning the swab alone is a partial value.
+
+```{julia}
+full = normal_form(pond; baseline=:no_intervention)
+swab_of_each_state = repeat([:negative, :positive]; inner=length(states))
+(states=full.states, experiment=full.experiment, joint_states=state_labels(full.problem))
+```
+
+```{julia}
+(evpi_of_the_joint_state=evpi(full.problem),
+ evppi_of_the_swab=evppi(full.problem, swab_of_each_state),
+ evsi_of_the_swab=evsi(pond_form.problem, pond_form.experiment))
+```
+
+The value of the swab is the same either way: an EVSI when the swab is an experiment
+on the state, an EVPPI when it is one coordinate of a larger state.
+
+## What to take away
+
+- `normal_form(model; states, baseline)` turns a single-decision influence diagram into
+  a `DecisionProblem` and the decision's information into an `Experiment`. It needs
+  InfluenceDiagrams.jl loaded.
+- The diagram's structural values of information are `evsi` and `evpi` on the table,
+  and the two packages, which share no code, agree on the published umbrella problem.
+- The table opens the diagram to what the diagram's solver does not do: other
+  decision rules, regret, the value of each result, sets of priors.
+- The state must carry everything the utility depends on. A variable can be an
+  experiment on the state or part of it; its value is the same.
+- One decision only, small diagrams only, and floating-point numbers. Sequential
+  problems are for `adaptive_management`
+  ([Learning while managing](../19_adaptive_management/19_adaptive_management.md)).

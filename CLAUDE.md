@@ -26,9 +26,11 @@ source) is a weak dependency for `GAMRegression` (`ext/DecisionAnalysisGAMExt.jl
 `Chytridiomycosis` appears only in the vignette environment, by URL (with DynamicalResilience, which it needs). `InfluenceDiagrams`
 (ecorecipes/InfluenceDiagrams.jl) is a weak dependency for `normal_form`
 (`ext/DecisionAnalysisInfluenceDiagramsExt.jl`) and **nothing more**: it brings GATlab and ACSets (not
-Catlab), so it is in `[weakdeps]` only, never in `[extras]` or the docs or vignette environments, and its
+Catlab), so it is in `[weakdeps]` only, never in `[extras]` or the docs environment, and its
 tests have an environment of their own, `test/influence_diagrams/`, which lists it and its three sibling
-packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
+packages by URL and runs only with `DECISIONANALYSIS_ID=1`. The vignette environment does hold it, with
+those three siblings (the user's decision of 2026-11-27, for vignette 21, the one page on `normal_form`);
+the docs environment still must not, and needs nothing: it publishes the rendered Markdown.
 
 ## Invariants that must not be broken
 
@@ -305,7 +307,7 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   `compare_voi.jl`, which prints our estimates beside those of `voi`, `requirements.txt`,
   `requirements-py27.txt` and a README with the versions used and the findings. The Python environments
   are `validation/.venv` and, for `improb` (Python 2.7), `validation/.venv27` (both ignored).
-- `vignettes/NN_name/NN_name.qmd`: thirty-four Quarto vignettes (Julia engine): tutorials 1 to 20, case studies in ecology 21 to 28 and in human epidemiology 29 to 34, so that each group is a contiguous block (a new tutorial or ecology case study means renumbering what follows). Tutorials 1 to 15 run basic to advanced (1 to 10 the
+- `vignettes/NN_name/NN_name.qmd`: thirty-five Quarto vignettes (Julia engine): tutorials 1 to 21, case studies in ecology 22 to 29 and in human epidemiology 30 to 35, so that each group is a contiguous block (a new tutorial or ecology case study means renumbering what follows). Tutorials 1 to 15 run basic to advanced (1 to 10 the
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
   multi-attribute utilities on the toy simulator), 16 is the ecological example of the methods that follow `voi` and of scenario designs (a stage-structured frog population), 17 `survey_or_act` on synthetic parcels, 18 `value_of_waiting` on an invented outbreak, 19 `adaptive_management` on an invented colony, 20 the same with a state that moves (`transitions`, and the `:vectors` and `:points` methods) on an invented reserve, and fourteen case studies, each a replication of a published analysis, grouped by field in the

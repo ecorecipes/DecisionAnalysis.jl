@@ -407,8 +407,10 @@ md_table(["action", "probability that it is best", "standard error"],
 | `treat`  |                        0.44 |           0.03 |
 | `remove` |                        0.02 |           0.01 |
 
-The action with the largest expected payoff need not be the one most
-often best, and neither number says by how much an action wins or loses.
+Here no intervention is the best action in more draws than treatment is,
+although treatment has the larger expected payoff: where it wins, it
+wins by more. The probability of being best says nothing about by how
+much.
 
 ### Rules on a sample
 
@@ -476,17 +478,6 @@ md_table(["from w", "to w", "best action"],
 |:-------|-----:|------------:|
 | 0      |    3 |     `treat` |
 
-`one_way_thresholds` lists only the switches: the weight at which the
-best action changes, and the actions on either side.
-
-``` julia
-md_table(["threshold w", "best below", "best above"],
-         [[Float64(t.threshold), t.below, t.above]
-          for t in one_way_thresholds(base, -infected; from=0, to=3)])
-```
-
-threshold w \| best below \| best above \| \|:–\|–:\|–:\|
-
 ``` julia
 sweep = weight_sweep(w -> DecisionProblem(table, InfectionUtility(; weight=w); baseline=:none),
                      0:0.25:3)
@@ -499,7 +490,7 @@ end
 png_figure(plt)
 ```
 
-![](11_sample_beliefs_and_outcome_tables_files/figure-commonmark/cell-24-output-1.png)
+![](11_sample_beliefs_and_outcome_tables_files/figure-commonmark/cell-23-output-1.png)
 
 ## Value of information from a sample
 

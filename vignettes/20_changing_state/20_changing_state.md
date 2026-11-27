@@ -362,7 +362,7 @@ md_table(["quantity, 60 years", "value"],
 | treatments in the fixed plan               |     19 |
 
 The [next
-vignette](../27_ecology_chades_tiger/27_ecology_chades_tiger.md) uses it
+vignette](../28_ecology_chades_tiger/28_ecology_chades_tiger.md) uses it
 to reproduce a published 30-year analysis.
 
 ## More than two states

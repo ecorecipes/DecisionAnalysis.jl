@@ -274,8 +274,8 @@ end
 A “no” has a proof of its own. If the swab were a garbling of the pooled
 swabs it could never be worth more than them, so one decision problem in
 which it is worth strictly more settles the matter.
-`export_not_garbling_witness` finds such a problem and writes it with
-the two values:
+`export_not_garbling_witness` finds such a problem and writes it, as a
+payoff table and a prior:
 
 ``` julia
 not_garbling = joinpath(out, "swab_is_not_garbling_of_pooled.json")

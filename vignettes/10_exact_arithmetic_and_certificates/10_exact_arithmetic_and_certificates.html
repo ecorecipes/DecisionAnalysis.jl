@@ -422,7 +422,7 @@ likelihood) and writes it.</p>
 pooled swabs it could never be worth more than them, so one decision
 problem in which it is worth strictly more settles the matter.
 <code>export_not_garbling_witness</code> finds such a problem and writes
-it with the two values:</p>
+it, as a payoff table and a prior:</p>
 <div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>not_garbling <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;swab_is_not_garbling_of_pooled.json&quot;</span>)</span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">export_not_garbling_witness</span>(not_garbling, swab, pooled)</span>
 <span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(not_garbling, <span class="dt">String</span>))</span></code></pre></div>
