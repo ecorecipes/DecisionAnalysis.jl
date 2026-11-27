@@ -100,6 +100,18 @@ md_table(["hypothesis tested", "value", "% of EVPI, paper", "% of EVPI, this pac
           for (h, v) in zip(hypotheses, partial)]; digits=3)
 ```
 
+```{julia}
+ours = [Float64(100 * v / evpi(problem)) for v in partial]
+plt = bar(1:length(hypotheses), ours; label="this package", xrotation=30, linewidth=0.5,
+          xticks=(1:length(hypotheses), [replace(String(h), "_" => " ") for h in hypotheses]),
+          ylabel="% of EVPI", bottom_margin=12Plots.mm, legend=:top, ylims=(0, 62),
+          title="Value of a perfect test of one hypothesis")
+printed = [i for (i, h) in enumerate(hypotheses) if haskey(paper_share, h)]
+scatter!(plt, printed, [parse(Float64, paper_share[hypotheses[i]]) for i in printed];
+         label="paper (where printed)", color=:black, markersize=5)
+png_figure(plt)
+```
+
 The paper remarks that in this case the partial values sum to the EVPI. They do,
 exactly:
 

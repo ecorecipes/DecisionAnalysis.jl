@@ -265,6 +265,20 @@ md_table(["trials", "EVSI × ponds", "cost (newts)", "net benefit (newts)", "sta
 | 200    |         39.2 |          600 |              -560.8 |            2.2 |
 
 ``` julia
+shown = findall(<=(20), sizes)      # larger studies lose hundreds of newts
+plt = Plots.plot(sizes[shown], [Float64(net[k].value) for k in shown];
+                 yerror=[net[k].standard_error for k in shown], marker=:circle,
+                 legend=false, xscale=:log10,
+                 xticks=(sizes[shown], string.(sizes[shown])), xlabel="tank trials",
+                 ylabel="net benefit (newts; bars: ± 1 s.e.)",
+                 title="Net benefit of sampling, 25 ponds (illustrative)")
+Plots.hline!(plt, [0]; color=:black, linewidth=1)
+png_figure(plt)
+```
+
+![](13_evsi_methods_files/figure-commonmark/cell-9-output-1.png)
+
+``` julia
 best = argmax([b.value for b in net])
 (trials=sizes[best], net_benefit=net[best].value, standard_error=net[best].standard_error)
 ```

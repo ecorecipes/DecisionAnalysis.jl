@@ -473,6 +473,18 @@ or within error of best, in every group**, so knowing the group, the growth rate
 pond size would seldom change the action. The single-parameter methods are used with
 few blocks and one knot because there are only 100 draws.
 
+```{julia}
+rank = length(partial):-1:1
+plt = Plots.scatter([Float64(e.value) for (_, e) in partial], rank;
+                    xerror=[2 * e.standard_error for (_, e) in partial],
+                    yticks=(rank, first.(partial)), ylims=(0.5, length(partial) + 0.5),
+                    legend=false, markersize=5, size=(820, 380),
+                    xlabel="frogs (bars: ± 2 standard errors)",
+                    title="Partial values against the plain EVPI")
+Plots.vline!(plt, [0]; color=:black, linewidth=1)
+png_figure(plt)
+```
+
 The conclusion is different for a utility under which the best action does change
 between groups. Counting at day 120 with w = 1 is one:
 

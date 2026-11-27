@@ -329,6 +329,23 @@ md_table(["way of managing", "scenario 1: cost", "gain over never vaccinating",
 | active adaptive management | 3135 | 115 | 220.3 | 29.3 |
 | efficacy known from the start | 2890.3 | 359.6 | 209.6 | 40 |
 
+``` julia
+ways = ["no learning" => :no_learning, "passive" => :passive, "active" => :active,
+        "efficacy known" => :perfect]
+function panel(r, ylabel, title)
+    gains = [Float64(getfield(r, f) - r.baseline) for (_, f) in ways]
+    return bar(first.(ways), gains; legend=false, xrotation=25, linewidth=0.5,
+               ylims=(0, 1.1 * maximum(gains)), ylabel, title)
+end
+png_figure(plot(panel(flu, "cost avoided (units of one infection)", "Scenario 1"),
+                panel(fast, "days shorter", "Scenario 2"); layout=(1, 2), size=(760, 380),
+                bottom_margin=10Plots.mm))
+```
+
+![](32_epidemiology_atkins_vaccination_files/figure-commonmark/cell-10-output-1.png)
+
+Both panels are gains over never vaccinating, which is the baseline.
+
 In the second scenario the best fixed plan is to wait a week and then
 vaccinate, which the paper’s non-adaptive manager cannot choose. Passive
 management follows the same plan and, having vaccinated nobody in the

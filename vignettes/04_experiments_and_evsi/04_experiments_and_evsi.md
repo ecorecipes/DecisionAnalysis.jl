@@ -178,6 +178,17 @@ md_table(vcat("signal", "probability of signal", ["P($(s) given signal)" for s i
 | `negative` | 0.605 | 0.785 | 0.198 | 0.017 |
 | `positive` | 0.395 | 0.063 | 0.456 | 0.481 |
 
+``` julia
+beliefs = hcat(Float64.(probabilities(prior)),
+               [Float64.(probabilities(post)) for post in inversion.posteriors]...)
+plt = grouped_bars(states, vcat("prior", ["after " * String(z) for z in inversion.signals]),
+                   beliefs; ylabel="probability", xlabel="state",
+                   title="The belief before and after the swab (illustrative)")
+png_figure(plt)
+```
+
+![](04_experiments_and_evsi_files/figure-commonmark/cell-7-output-1.png)
+
 A negative result raises the probability that Bd is absent from 0.5 to
 about 0.79. A positive result nearly rules absence out. The table of
 joint probabilities `p(θ) × L[z, θ]` is in `inversion.joint`.
@@ -263,7 +274,7 @@ plt = plot(Float64.(ws),
 png_figure(plt)
 ```
 
-![](04_experiments_and_evsi_files/figure-commonmark/cell-10-output-1.png)
+![](04_experiments_and_evsi_files/figure-commonmark/cell-11-output-1.png)
 
 The value of the test changes with what is being valued. The kinks are
 the weights at which the best action for some signal changes.

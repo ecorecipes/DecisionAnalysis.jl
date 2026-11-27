@@ -314,10 +314,9 @@ on the experiments at all.
 
 ``` julia
 horizons = 2:2:10
-md_table(["years", "beliefs evaluated"],
-         [[h,
-           adaptive_management(problem, seen; horizon=h, transitions=moves,
-                               depth=0).beliefs_evaluated] for h in horizons])
+counts = [adaptive_management(problem, seen; horizon=h, transitions=moves,
+                              depth=0).beliefs_evaluated for h in horizons]
+md_table(["years", "beliefs evaluated"], [[h, c] for (h, c) in zip(horizons, counts)])
 ```
 
 | years | beliefs evaluated |
@@ -327,6 +326,14 @@ md_table(["years", "beliefs evaluated"],
 | 6     |              4767 |
 | 8     |             82309 |
 | 10    |           1263869 |
+
+``` julia
+png_figure(plot(horizons, counts; yscale=:log10, marker=:circle, legend=false,
+                xlabel="years", ylabel="beliefs evaluated (log scale)",
+                title="Size of the calculation against the horizon"))
+```
+
+![](20_changing_state_files/figure-commonmark/cell-14-output-1.png)
 
 With a moving state the beliefs reached by different histories rarely
 coincide, so their number grows with every year. This reserve, with two

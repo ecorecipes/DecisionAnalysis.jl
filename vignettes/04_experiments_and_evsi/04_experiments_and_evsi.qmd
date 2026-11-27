@@ -128,6 +128,15 @@ md_table(vcat("signal", "probability of signal", ["P($(s) given signal)" for s i
                                   inversion.posteriors)]; digits=3)
 ```
 
+```{julia}
+beliefs = hcat(Float64.(probabilities(prior)),
+               [Float64.(probabilities(post)) for post in inversion.posteriors]...)
+plt = grouped_bars(states, vcat("prior", ["after " * String(z) for z in inversion.signals]),
+                   beliefs; ylabel="probability", xlabel="state",
+                   title="The belief before and after the swab (illustrative)")
+png_figure(plt)
+```
+
 A negative result raises the probability that Bd is absent from 0.5 to about 0.79. A
 positive result nearly rules absence out. The table of joint probabilities
 `p(θ) × L[z, θ]` is in `inversion.joint`.

@@ -194,6 +194,23 @@ md_table(["α (weight on the lower expectation)", "choice"],
 | 3/4                                 |  `trap_mink` |
 | 1                                   |  `trap_mink` |
 
+The score of each action is a straight line in `α`, from its upper
+expectation at `α = 0` to its lower expectation at `α = 1`, and the
+choice changes where the highest line changes.
+
+``` julia
+αs = 0:(1 // 20):1
+plt = plot(; xlabel="α (weight on the lower expectation)", ylabel="α-maxmin score (voles)",
+           title="Score of each action against α (illustrative)")
+for (i, a) in enumerate(actions)
+    plot!(plt, Float64.(αs), [Float64(aggregate(AlphaMaxmin(α), problem)[i]) for α in αs];
+          label=String(a))
+end
+png_figure(plt)
+```
+
+![](07_uncertain_beliefs_files/figure-commonmark/cell-11-output-1.png)
+
 The gain over no control has a range too. Under a credal set
 `expected_gain_over_baseline` returns the lowest and the highest
 expected gain of each action over the set, as a named tuple

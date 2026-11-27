@@ -160,6 +160,25 @@ for the time to extirpation, and reducing the extent of nest predation
 for fecundity. (Under the convex curve every action has the same value
 of the growth rate to four decimals.)
 
+The four curves, over the range of a measure scaled to lie between 0
+and 1. The dashed line is the concave curve as the supporting
+information prints it (see below).
+
+``` julia
+xs = 0:0.005:1
+plt = Plots.plot(; xlabel="measure (growth rate, fecundity, or years / 25)",
+                 ylabel="value to the decision-maker",
+                 title="The paper's four value functions")
+for (curve, f) in curves
+    Plots.plot!(plt, xs, f.(xs); label=curve)
+end
+Plots.plot!(plt, xs, logistic(2.0, 1.0, 0.0).(xs); label="concave, as printed",
+            linestyle=:dash, color=:gray)
+png_figure(plt)
+```
+
+![](25_ecology_christensen_turtle_files/figure-commonmark/cell-5-output-1.png)
+
 Three things differ from the print, and the reasons are known.
 
 - **The paper’s EVPI is the difference of the two rounded values.** For

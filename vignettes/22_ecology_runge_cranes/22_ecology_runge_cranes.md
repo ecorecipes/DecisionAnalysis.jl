@@ -153,6 +153,20 @@ md_table(["hypothesis tested", "value", "% of EVPI, paper", "% of EVPI, this pac
 | `egg_salvage`         |  0.01 |                8 |                   8.487 |
 | `disturbance`         | 0.038 |               32 |                  32.177 |
 
+``` julia
+ours = [Float64(100 * v / evpi(problem)) for v in partial]
+plt = bar(1:length(hypotheses), ours; label="this package", xrotation=30, linewidth=0.5,
+          xticks=(1:length(hypotheses), [replace(String(h), "_" => " ") for h in hypotheses]),
+          ylabel="% of EVPI", bottom_margin=12Plots.mm, legend=:top, ylims=(0, 62),
+          title="Value of a perfect test of one hypothesis")
+printed = [i for (i, h) in enumerate(hypotheses) if haskey(paper_share, h)]
+scatter!(plt, printed, [parse(Float64, paper_share[hypotheses[i]]) for i in printed];
+         label="paper (where printed)", color=:black, markersize=5)
+png_figure(plt)
+```
+
+![](22_ecology_runge_cranes_files/figure-commonmark/cell-6-output-1.png)
+
 The paper remarks that in this case the partial values sum to the EVPI.
 They do, exactly:
 
@@ -225,7 +239,7 @@ end
 png_figure(plt)
 ```
 
-![](22_ecology_runge_cranes_files/figure-commonmark/cell-8-output-1.png)
+![](22_ecology_runge_cranes_files/figure-commonmark/cell-9-output-1.png)
 
 The paper gives this result as a figure and three sentences. Against
 values read from its Figure 3 by eye (to about 0.03):

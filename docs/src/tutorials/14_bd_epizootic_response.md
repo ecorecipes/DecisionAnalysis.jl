@@ -630,7 +630,7 @@ regression = evpi(DecisionProblem(problem.payoff,
 ```
 
     ┌ Warning: The evpi estimate by SplineRegression, 3.50015, is above the EVPI of the same sample, 1.64364, by more than twice its standard error. No information is worth more than perfect information, so the fitted values are not conditional means here (too few draws for the fit, or a misspecified regression) and the estimate should not be used. The standard error does not show this. Use fewer knots or parameters, StrongOakley() or Grouping(; bins), or more draws.
-    └ @ DecisionAnalysis ~/Projects/decisiontheory/DecisionAnalysis.jl/src/voi_sample.jl:764
+    └ @ DecisionAnalysis ~/Projects/decisiontheory/DecisionAnalysis.jl/src/voi_sample.jl:776
 
     (noise_correlation_between_actions = 0.3046910749975807,)
 
@@ -721,6 +721,20 @@ treatment of the frogs is best, or within error of best, in every
 group**, so knowing the group, the growth rate or the pond size would
 seldom change the action. The single-parameter methods are used with few
 blocks and one knot because there are only 100 draws.
+
+``` julia
+rank = length(partial):-1:1
+plt = Plots.scatter([Float64(e.value) for (_, e) in partial], rank;
+                    xerror=[2 * e.standard_error for (_, e) in partial],
+                    yticks=(rank, first.(partial)), ylims=(0.5, length(partial) + 0.5),
+                    legend=false, markersize=5, size=(820, 380),
+                    xlabel="frogs (bars: ± 2 standard errors)",
+                    title="Partial values against the plain EVPI")
+Plots.vline!(plt, [0]; color=:black, linewidth=1)
+png_figure(plt)
+```
+
+![](14_bd_epizootic_response_files/figure-commonmark/cell-29-output-1.png)
 
 The conclusion is different for a utility under which the best action
 does change between groups. Counting at day 120 with w = 1 is one:

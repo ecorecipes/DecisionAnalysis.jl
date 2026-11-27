@@ -304,6 +304,22 @@ md_table(["input", "share of the growth rate's variance", "EVPPI for the decisio
 | maturation | 0.12 | 1.1 |
 | log_fecundity | 0.28 | 0.91 |
 
+``` julia
+labels = [replace(String(name), "_" => " ") for (name, _) in partial]
+left = Plots.bar(labels, [Float64(shares.share[k, 1]) for k in eachindex(partial)];
+                 legend=false, xrotation=25, ylabel="share of variance", linewidth=0.5,
+                 ylims=(0, 1.1 * Float64(maximum(shares.share[:, 1]))),
+                 title="For the estimate")
+right = Plots.bar(labels, [Float64(e.value) for (_, e) in partial];
+                  yerror=[e.standard_error for (_, e) in partial], legend=false, linewidth=0.5,
+                  ylims=(0, 1.15 * maximum(Float64(e.value) for (_, e) in partial)),
+                  xrotation=25, ylabel="EVPPI (adults; bars: ± 1 s.e.)",
+                  title="For the decision")
+png_figure(Plots.plot(left, right; layout=(1, 2), size=(760, 380), bottom_margin=10Plots.mm))
+```
+
+![](16_estimation_studies_and_scenarios_files/figure-commonmark/cell-12-output-1.png)
+
 The two orders are not the same. Fecundity is the second largest source
 of uncertainty about the growth rate and the least valuable thing to
 learn for the decision; adult survival, third as a source of
@@ -460,7 +476,7 @@ Plots.hline!(plt, [0]; color=:grey, linestyle=:dash, label="")
 png_figure(plt)
 ```
 
-![](16_estimation_studies_and_scenarios_files/figure-commonmark/cell-17-output-1.png)
+![](16_estimation_studies_and_scenarios_files/figure-commonmark/cell-18-output-1.png)
 
 For a handful of ponds the study barely repays the animals it uses; for
 fifty, about seven females are worth sacrificing, and anything from five

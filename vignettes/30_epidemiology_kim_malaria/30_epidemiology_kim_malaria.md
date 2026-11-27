@@ -173,6 +173,17 @@ md_table(["case", "first parameter alone", "second parameter alone", "both"],
 | C: evolutionary speed, half life | 0 | 0 | 0.624 |
 | D: evolutionary speed, initial efficacy | 4.439 | 7.428 | 8.37 |
 
+``` julia
+M = reduce(vcat, [Float64[alone(k)... evpi(problems[k])] for k in keys(problems)])
+plt = grouped_bars(["A", "B", "C", "D"],
+                   ["first parameter alone", "second parameter alone", "both (EVPI)"], M;
+                   xlabel="case", ylabel="USD per person (the paper's valuation)",
+                   title="Each parameter alone, and the pair (ours)", legend=:topleft)
+png_figure(plt)
+```
+
+![](30_epidemiology_kim_malaria_files/figure-commonmark/cell-6-output-1.png)
+
 Parts do not add up to the whole. In case D the two values alone sum to
 more than the value of the pair, because what they tell overlaps. In
 cases A and C neither parameter alone is worth anything although the

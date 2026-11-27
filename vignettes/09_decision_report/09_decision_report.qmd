@@ -192,6 +192,27 @@ md_table(["action", "lowest expected gain", "highest expected gain"],
                                          credal_report.gain_range.upper)])
 ```
 
+The figure shows the same ranges. The dot is the expected gain at the single prior of
+the first report, which is one of the priors in the set. Antifungal baths gain over
+no intervention at every prior in the set. Disinfecting the pond has the wider range:
+it can gain more, and at one end of the set it loses.
+
+```{julia}
+lower = Float64.(credal_report.gain_range.lower)
+upper = Float64.(credal_report.gain_range.upper)
+plt = Plots.plot(; yticks=(1:3, String.(actions)), ylims=(0.5, 3.5), legend=:bottomright,
+                 xlabel="expected gain over no intervention (frogs)",
+                 title="Expected gain over the credal set (illustrative)")
+for i in 1:3
+    Plots.plot!(plt, [lower[i], upper[i]], [i, i]; color=1, linewidth=8,
+                label=(i == 1 ? "range over the credal set" : ""))
+end
+Plots.scatter!(plt, Float64.(report.expected_gain), 1:3; color=:black, markersize=6,
+               label="at the prior")
+Plots.vline!(plt, [0]; color=:black, linewidth=1, label="")
+png_figure(plt)
+```
+
 ## The weight on infected frogs
 
 The same report at `w = 0`, where only uninfected frogs count.
