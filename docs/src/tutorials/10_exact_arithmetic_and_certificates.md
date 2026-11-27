@@ -9,6 +9,8 @@ Simon Frost
 - [A decision certificate](#a-decision-certificate)
 - [A garbling witness](#a-garbling-witness)
 - [An E-admissibility witness](#an-e-admissibility-witness)
+- [The linear programmes behind the
+  witnesses](#the-linear-programmes-behind-the-witnesses)
 - [Checking the files with Lean](#checking-the-files-with-lean)
   - [A wrong claim is rejected](#a-wrong-claim-is-rejected)
 - [What is and is not certified](#what-is-and-is-not-certified)
@@ -269,6 +271,26 @@ end
 
     WitnessError: the first experiment is not a garbling of the second: there is no witness
 
+A “no” has a proof of its own. If the swab were a garbling of the pooled
+swabs it could never be worth more than them, so one decision problem in
+which it is worth strictly more settles the matter.
+`export_not_garbling_witness` finds such a problem and writes it with
+the two values:
+
+``` julia
+not_garbling = joinpath(out, "swab_is_not_garbling_of_pooled.json")
+export_not_garbling_witness(not_garbling, swab, pooled)
+print(read(not_garbling, String))
+```
+
+    {
+      "schema": "not-garbling-witness/1",
+      "experiment": [["173/200", "12/25", "47/200"], ["27/200", "13/25", "153/200"]],
+      "garbled": [["19/20", "2/5", "1/20"], ["1/20", "3/5", "19/20"]],
+      "payoff": [["1", "-1", "-1"], ["-1", "1", "1"]],
+      "prior": ["1/3", "1/3", "1/3"]
+    }
+
 ## An E-admissibility witness
 
 The claim “this action is optimal under some prior in the credal set” is
@@ -312,6 +334,63 @@ end
 ```
 
     WitnessError: no_intervention is not E-admissible: under every prior in the credal set some other action has a higher expected utility
+
+Here too the “no” can be proved: a mixture of the other actions that is
+strictly better than no intervention at every generating point of the
+credal set, and therefore under every prior in it.
+
+``` julia
+not_admissible = joinpath(out, "no_intervention_is_not_e_admissible.json")
+export_not_eadmissible_witness(not_admissible, robust, :no_intervention)
+print(read(not_admissible, String))
+```
+
+    {
+      "schema": "not-e-admissible-witness/1",
+      "actions": ["no_intervention", "antifungal_baths", "disinfect_pond"],
+      "states": ["absent", "low_prevalence", "high_prevalence"],
+      "payoff": [["500", "150", "-150"], ["470", "320", "130"], ["350", "330", "300"]],
+      "priors": [["1/2", "3/10", "1/5"], ["7/10", "1/5", "1/10"], ["3/10", "3/10", "2/5"]],
+      "action": 0,
+      "mixed_action": ["0", "1", "0"]
+    }
+
+## The linear programmes behind the witnesses
+
+Each witness is the solution of a linear programme, and the package
+gives the programmes themselves: a builder returns a `DecisionProgram`,
+which holds a JuMP model with named variables and constraints, and
+`solve_program` solves it, exactly when the inputs are rational.
+
+``` julia
+programmes = ["`eadmissibility_model(robust, :disinfect_pond)`" =>
+                  eadmissibility_model(robust, :disinfect_pond),
+              "`mixed_dominance_model(robust, :no_intervention)`" =>
+                  mixed_dominance_model(robust, :no_intervention),
+              "`evpi_envelope_model(robust)`" => evpi_envelope_model(robust),
+              "`garbling_model(pooled, swab)`" => garbling_model(pooled, swab),
+              "`separating_payoff_model(swab, pooled)`" => separating_payoff_model(swab, pooled),
+              "`deficiency_model(pooled, swab)`" => deficiency_model(pooled, swab)]
+md_table(["builder", "programme", "status", "objective", "exact"],
+         [begin
+              solution = solve_program(program)
+              [call, program.name, solution.status, solution.objective, solution.exact]
+          end for (call, program) in programmes])
+```
+
+| builder | programme | status | objective | exact |
+|:---|---:|---:|---:|---:|
+| `eadmissibility_model(robust, :disinfect_pond)` | `e_admissibility` | `optimal` | 0 | yes |
+| `mixed_dominance_model(robust, :no_intervention)` | `mixed_dominance` | `optimal` | 41 | yes |
+| `evpi_envelope_model(robust)` | `evpi_envelope` | `optimal` | 66 | yes |
+| `garbling_model(pooled, swab)` | `garbling` | `optimal` | 0 | yes |
+| `separating_payoff_model(swab, pooled)` | `separating_payoff` | `optimal` | 0.7 | yes |
+| `deficiency_model(pooled, swab)` | `deficiency` | `optimal` | 0.33 | yes |
+
+The dominance programme has a positive optimum because no intervention
+is beaten by a margin; the separating programme has one because the swab
+is not a garbling of the pooled swabs; the garbling programme is a
+feasibility problem and has no objective.
 
 ## Checking the files with Lean
 

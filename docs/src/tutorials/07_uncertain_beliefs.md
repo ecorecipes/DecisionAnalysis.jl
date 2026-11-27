@@ -264,6 +264,24 @@ md_table(["rule", "actions kept"], [[n, r.chosen] for (n, r) in sets])
 Translocation is ruled out by all three: its best expected outcome over
 the set, 487 voles, is below the 490 that trapping guarantees.
 
+The nesting is a theorem, and it can be watched on problems made at
+random. `random_credal_set` draws a credal set as `random_belief` draws
+one prior.
+
+``` julia
+using Random: Xoshiro
+rng = Xoshiro(7)
+nested = map(1:100) do _
+    p = DecisionProblem(random_payoff_table(rng, 5, 4; T=Rational{Int}),
+                        random_credal_set(rng, 4, 3; T=Rational{Int}))
+    e, m, i = (decide(p, rule).chosen for rule in (EAdmissible(), Maximal(), IntervalDominance()))
+    return issubset(e, m) && issubset(m, i)
+end
+(problems=length(nested), nested_in_all=all(nested))
+```
+
+    (problems = 100, nested_in_all = true)
+
 ### E-admissibility is not a check of the stated priors
 
 No expert, taken alone, chooses refuges: the table above shows the

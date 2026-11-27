@@ -135,6 +135,8 @@ disagree</a></li>
 <li><a href="#satisficing" id="toc-satisficing">Satisficing</a></li>
 <li><a href="#rules-that-look-at-the-tail" id="toc-rules-that-look-at-the-tail">Rules that look at the
 tail</a></li>
+<li><a href="#a-rule-is-a-summary-and-a-selector" id="toc-a-rule-is-a-summary-and-a-selector">A rule is a summary and a
+selector</a></li>
 <li><a href="#ties" id="toc-ties">Ties</a></li>
 <li><a href="#what-to-take-away" id="toc-what-to-take-away">What to take
 away</a></li>
@@ -546,15 +548,62 @@ exceeded with probability about 1 − α.</p>
 </table>
 <div class="sourceCode" id="cb10"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">first_choice</span>(<span class="fu">decide</span>(problem, <span class="fu">DecisionRule</span>(<span class="fu">CVaR</span>(<span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>))))</span></code></pre></div>
 <pre><code>:trap_mink</code></pre>
+<h1 id="a-rule-is-a-summary-and-a-selector">A rule is a summary and a
+selector</h1>
+<p>Every rule above has two parts: an aggregator that turns each
+action’s payoffs into one score, and a selector that picks from the
+scores. <code>Optimize()</code>, the default selector, takes the best
+score; <code>Threshold(level)</code> takes every action that reaches a
+level, which is what <code>Satisfice</code> does.
+<code>BestCase()</code> is the aggregator behind maximax, as
+<code>WorstCase()</code> is behind maximin.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;rule, written out&quot;</span>, <span class="st">&quot;the same as&quot;</span>, <span class="st">&quot;chosen&quot;</span>],</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>         [[<span class="st">&quot;`DecisionRule(BestCase())`&quot;</span>, <span class="st">&quot;`Maximax()`&quot;</span>,</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>           <span class="fu">decide</span>(problem, <span class="fu">DecisionRule</span>(<span class="fu">BestCase</span>())).chosen],</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;`DecisionRule(WorstCase(); selector=Optimize())`&quot;</span>, <span class="st">&quot;`Maximin()`&quot;</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>           <span class="fu">decide</span>(problem, <span class="fu">DecisionRule</span>(<span class="fu">WorstCase</span>(); selector<span class="op">=</span><span class="fu">Optimize</span>())).chosen],</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>          [<span class="st">&quot;`DecisionRule(WorstCase(); selector=Threshold(400))`&quot;</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>           <span class="st">&quot;`Satisfice(400; aggregator=WorstCase())`&quot;</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>           <span class="fu">decide</span>(problem, <span class="fu">DecisionRule</span>(<span class="fu">WorstCase</span>(); selector<span class="op">=</span><span class="fu">Threshold</span>(<span class="fl">400</span>))).chosen]])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">rule, written out</th>
+<th style="text-align: right;">the same as</th>
+<th style="text-align: right;">chosen</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>DecisionRule(BestCase())</code></td>
+<td style="text-align: right;"><code>Maximax()</code></td>
+<td style="text-align: right;"><code>no_control</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>DecisionRule(WorstCase(); selector=Optimize())</code></td>
+<td style="text-align: right;"><code>Maximin()</code></td>
+<td style="text-align: right;"><code>translocate</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>DecisionRule(WorstCase(); selector=Threshold(400))</code></td>
+<td style="text-align: right;"><code>Satisfice(400; aggregator=WorstCase())</code></td>
+<td style="text-align: right;"><code>translocate</code></td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb13"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(problem, <span class="fu">DecisionRule</span>(<span class="fu">BestCase</span>())).chosen <span class="op">==</span> <span class="fu">decide</span>(problem, <span class="fu">Maximax</span>()).chosen,</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(problem, <span class="fu">DecisionRule</span>(<span class="fu">WorstCase</span>(); selector<span class="op">=</span><span class="fu">Threshold</span>(<span class="fl">400</span>))).chosen <span class="op">==</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(problem, <span class="fu">Satisfice</span>(<span class="fl">400</span>; aggregator<span class="op">=</span><span class="fu">WorstCase</span>())).chosen</span></code></pre></div>
+<pre><code>(true, true)</code></pre>
 <h1 id="ties">Ties</h1>
 <p>When scores tie, every tied action is returned, in table order, and
 <code>first_choice</code> is the first of them. Nothing is random. A
 small artificial table shows it: the first two actions have the same
 expected payoff.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>tied <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>([<span class="op">:</span>a, <span class="op">:</span>b, <span class="op">:</span>c], [<span class="op">:</span>s1, <span class="op">:</span>s2], [<span class="fl">4</span> <span class="fl">0</span>; <span class="fl">0</span> <span class="fl">4</span>; <span class="fl">1</span> <span class="fl">1</span>]),</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>                       [<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>])</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> <span class="fu">decide</span>(tied, <span class="fu">MaxExpectedUtility</span>())</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>r.chosen, <span class="fu">first_choice</span>(r)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>tied <span class="op">=</span> <span class="fu">DecisionProblem</span>(<span class="fu">PayoffTable</span>([<span class="op">:</span>a, <span class="op">:</span>b, <span class="op">:</span>c], [<span class="op">:</span>s1, <span class="op">:</span>s2], [<span class="fl">4</span> <span class="fl">0</span>; <span class="fl">0</span> <span class="fl">4</span>; <span class="fl">1</span> <span class="fl">1</span>]),</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>                       [<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>])</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> <span class="fu">decide</span>(tied, <span class="fu">MaxExpectedUtility</span>())</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>r.chosen, <span class="fu">first_choice</span>(r)</span></code></pre></div>
 <pre><code>([:a, :b], :a)</code></pre>
 <h1 id="what-to-take-away">What to take away</h1>
 <ul>

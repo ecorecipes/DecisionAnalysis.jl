@@ -232,6 +232,17 @@ md_table(["w", "best action", "expected utility", "gain over no intervention"],
 | 2   |   `disinfect_pond` |              327 |                       157 |
 | 3   |   `disinfect_pond` |              320 |                       245 |
 
+`infection_payoff` is a weighted sum of two tables. `combine_payoffs` is
+the general form, for any number of tables with the same labels, each
+with its weight:
+
+``` julia
+combine_payoffs(uninfected => 1, infected => -1 // 2).Q ==
+infection_payoff(; uninfected, infected, weight=1 // 2).Q
+```
+
+    true
+
 ``` julia
 ws = 0:(1 // 20):3
 lines = [Float64(aggregate(Expectation(), weighted(w))[i])
@@ -243,7 +254,7 @@ plt = plot(Float64.(ws), lines; label=permutedims(String.(actions)),
 png_figure(plt)
 ```
 
-![](08_several_objectives_files/figure-commonmark/cell-11-output-1.png)
+![](08_several_objectives_files/figure-commonmark/cell-12-output-1.png)
 
 At `w = 0` and `w = 1` the baths are best. Disinfection takes over once
 an infected frog counts for more than about 1.66 uninfected ones:

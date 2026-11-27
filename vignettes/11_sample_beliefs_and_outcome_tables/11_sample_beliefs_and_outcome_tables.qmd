@@ -90,6 +90,13 @@ weighted = SampleBelief((; contact=[0.2, 0.5, 0.9], weight=[1, 1, 6]); weights=:
 (probabilities(weighted), effective_sample_size(weighted))
 ```
 
+`draw_weights` returns the normalised weights of anything that holds draws, a sample
+belief or an outcome table:
+
+```{julia}
+draw_weights(weighted)
+```
+
 ## An outcome table
 
 `outcomes` runs the model over draws × actions × replicates. Each draw is propagated on
@@ -133,6 +140,13 @@ precomputed = OutcomeTable(runs; draw=:point, action=:arm, replicate=:rep,
 
 ```{julia}
 failed_runs(precomputed)
+```
+
+`replicate_counts` gives the number of usable runs in each cell, action by draw. A
+payoff averages those and no others:
+
+```{julia}
+replicate_counts(precomputed)
 ```
 
 ## Utilities counted in animals
@@ -202,6 +216,20 @@ md_table(["action", "expected gain over no intervention", "standard error", "sim
 
 Treatment gains about two newts on average, and the gain is several standard errors from
 zero.
+
+A different summary is how often each action is the best one. `probability_optimal`
+gives the share of the draws in which no other action pays more, with its standard
+error; this is what cost-effectiveness analysis plots as an acceptability curve.
+
+```{julia}
+md_table(["action", "probability that it is best", "standard error"],
+         [[o.action, Float64(o.probability), o.standard_error]
+          for o in probability_optimal(problem)])
+```
+
+Here no intervention is the best action in more draws than treatment is, although
+treatment has the larger expected payoff: where it wins, it wins by more. The
+probability of being best says nothing about by how much.
 
 ### Rules on a sample
 

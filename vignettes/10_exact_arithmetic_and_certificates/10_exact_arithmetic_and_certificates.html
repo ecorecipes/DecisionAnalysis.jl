@@ -141,6 +141,8 @@ decision certificate</a></li>
 <li><a href="#a-garbling-witness" id="toc-a-garbling-witness">A garbling
 witness</a></li>
 <li><a href="#an-e-admissibility-witness" id="toc-an-e-admissibility-witness">An E-admissibility witness</a></li>
+<li><a href="#the-linear-programmes-behind-the-witnesses" id="toc-the-linear-programmes-behind-the-witnesses">The linear
+programmes behind the witnesses</a></li>
 <li><a href="#checking-the-files-with-lean" id="toc-checking-the-files-with-lean">Checking the files with Lean</a>
 <ul>
 <li><a href="#a-wrong-claim-is-rejected" id="toc-a-wrong-claim-is-rejected">A wrong claim is rejected</a></li>
@@ -416,21 +418,36 @@ likelihood) and writes it.</p>
 <span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
 <span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
 <pre><code>WitnessError: the first experiment is not a garbling of the second: there is no witness</code></pre>
+<p>A “no” has a proof of its own. If the swab were a garbling of the
+pooled swabs it could never be worth more than them, so one decision
+problem in which it is worth strictly more settles the matter.
+<code>export_not_garbling_witness</code> finds such a problem and writes
+it with the two values:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>not_garbling <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;swab_is_not_garbling_of_pooled.json&quot;</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">export_not_garbling_witness</span>(not_garbling, swab, pooled)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(not_garbling, <span class="dt">String</span>))</span></code></pre></div>
+<pre><code>{
+  &quot;schema&quot;: &quot;not-garbling-witness/1&quot;,
+  &quot;experiment&quot;: [[&quot;173/200&quot;, &quot;12/25&quot;, &quot;47/200&quot;], [&quot;27/200&quot;, &quot;13/25&quot;, &quot;153/200&quot;]],
+  &quot;garbled&quot;: [[&quot;19/20&quot;, &quot;2/5&quot;, &quot;1/20&quot;], [&quot;1/20&quot;, &quot;3/5&quot;, &quot;19/20&quot;]],
+  &quot;payoff&quot;: [[&quot;1&quot;, &quot;-1&quot;, &quot;-1&quot;], [&quot;-1&quot;, &quot;1&quot;, &quot;1&quot;]],
+  &quot;prior&quot;: [&quot;1/3&quot;, &quot;1/3&quot;, &quot;1/3&quot;]
+}</code></pre>
 <h1 id="an-e-admissibility-witness">An E-admissibility witness</h1>
 <p>The claim “this action is optimal under some prior in the credal set”
 is proved by exhibiting the prior and the weights that place it in the
 set.</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>credal <span class="op">=</span> <span class="fu">CredalSet</span>(states, [[<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>],</span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">7</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">10</span>],</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">2</span> <span class="op">//</span> <span class="fl">5</span>]])</span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>robust <span class="op">=</span> <span class="fu">DecisionProblem</span>(problem.payoff, credal; baseline<span class="op">=:</span>no_intervention)</span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(robust, <span class="fu">EAdmissible</span>()).chosen</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>credal <span class="op">=</span> <span class="fu">CredalSet</span>(states, [[<span class="fl">1</span> <span class="op">//</span> <span class="fl">2</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>],</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">7</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">5</span>, <span class="fl">1</span> <span class="op">//</span> <span class="fl">10</span>],</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>                            [<span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">3</span> <span class="op">//</span> <span class="fl">10</span>, <span class="fl">2</span> <span class="op">//</span> <span class="fl">5</span>]])</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>robust <span class="op">=</span> <span class="fu">DecisionProblem</span>(problem.payoff, credal; baseline<span class="op">=:</span>no_intervention)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a><span class="fu">decide</span>(robust, <span class="fu">EAdmissible</span>()).chosen</span></code></pre></div>
 <pre><code>2-element Vector{Symbol}:
  :antifungal_baths
  :disinfect_pond</code></pre>
-<div class="sourceCode" id="cb24"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>admissible <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;disinfect_is_e_admissible.json&quot;</span>)</span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="fu">export_eadmissible_witness</span>(admissible, robust, <span class="op">:</span>disinfect_pond)</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(admissible, <span class="dt">String</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>admissible <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;disinfect_is_e_admissible.json&quot;</span>)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="fu">export_eadmissible_witness</span>(admissible, robust, <span class="op">:</span>disinfect_pond)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(admissible, <span class="dt">String</span>))</span></code></pre></div>
 <pre><code>{
   &quot;schema&quot;: &quot;e-admissible-witness/1&quot;,
   &quot;payoff&quot;: [[&quot;500&quot;, &quot;150&quot;, &quot;-150&quot;], [&quot;470&quot;, &quot;320&quot;, &quot;130&quot;], [&quot;350&quot;, &quot;330&quot;, &quot;300&quot;]],
@@ -440,42 +457,136 @@ set.</p>
   &quot;action&quot;: 2
 }</code></pre>
 <p>No intervention is not E-admissible, so it has no witness:</p>
-<div class="sourceCode" id="cb26"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">export_eadmissible_witness</span>(<span class="cn">devnull</span>, robust, <span class="op">:</span>no_intervention)</span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
+<div class="sourceCode" id="cb28"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">export_eadmissible_witness</span>(<span class="cn">devnull</span>, robust, <span class="op">:</span>no_intervention)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="cf">catch</span> err</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">sprint</span>(showerror, err))</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a><span class="cf">end</span></span></code></pre></div>
 <pre><code>WitnessError: no_intervention is not E-admissible: under every prior in the credal set some other action has a higher expected utility</code></pre>
+<p>Here too the “no” can be proved: a mixture of the other actions that
+is strictly better than no intervention at every generating point of the
+credal set, and therefore under every prior in it.</p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>not_admissible <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;no_intervention_is_not_e_admissible.json&quot;</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="fu">export_not_eadmissible_witness</span>(not_admissible, robust, <span class="op">:</span>no_intervention)</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">read</span>(not_admissible, <span class="dt">String</span>))</span></code></pre></div>
+<pre><code>{
+  &quot;schema&quot;: &quot;not-e-admissible-witness/1&quot;,
+  &quot;actions&quot;: [&quot;no_intervention&quot;, &quot;antifungal_baths&quot;, &quot;disinfect_pond&quot;],
+  &quot;states&quot;: [&quot;absent&quot;, &quot;low_prevalence&quot;, &quot;high_prevalence&quot;],
+  &quot;payoff&quot;: [[&quot;500&quot;, &quot;150&quot;, &quot;-150&quot;], [&quot;470&quot;, &quot;320&quot;, &quot;130&quot;], [&quot;350&quot;, &quot;330&quot;, &quot;300&quot;]],
+  &quot;priors&quot;: [[&quot;1/2&quot;, &quot;3/10&quot;, &quot;1/5&quot;], [&quot;7/10&quot;, &quot;1/5&quot;, &quot;1/10&quot;], [&quot;3/10&quot;, &quot;3/10&quot;, &quot;2/5&quot;]],
+  &quot;action&quot;: 0,
+  &quot;mixed_action&quot;: [&quot;0&quot;, &quot;1&quot;, &quot;0&quot;]
+}</code></pre>
+<h1 id="the-linear-programmes-behind-the-witnesses">The linear
+programmes behind the witnesses</h1>
+<p>Each witness is the solution of a linear programme, and the package
+gives the programmes themselves: a builder returns a
+<code>DecisionProgram</code>, which holds a JuMP model with named
+variables and constraints, and <code>solve_program</code> solves it,
+exactly when the inputs are rational.</p>
+<div class="sourceCode" id="cb32"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>programmes <span class="op">=</span> [<span class="st">&quot;`eadmissibility_model(robust, :disinfect_pond)`&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">eadmissibility_model</span>(robust, <span class="op">:</span>disinfect_pond),</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>              <span class="st">&quot;`mixed_dominance_model(robust, :no_intervention)`&quot;</span> <span class="op">=&gt;</span></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">mixed_dominance_model</span>(robust, <span class="op">:</span>no_intervention),</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>              <span class="st">&quot;`evpi_envelope_model(robust)`&quot;</span> <span class="op">=&gt;</span> <span class="fu">evpi_envelope_model</span>(robust),</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>              <span class="st">&quot;`garbling_model(pooled, swab)`&quot;</span> <span class="op">=&gt;</span> <span class="fu">garbling_model</span>(pooled, swab),</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>              <span class="st">&quot;`separating_payoff_model(swab, pooled)`&quot;</span> <span class="op">=&gt;</span> <span class="fu">separating_payoff_model</span>(swab, pooled),</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>              <span class="st">&quot;`deficiency_model(pooled, swab)`&quot;</span> <span class="op">=&gt;</span> <span class="fu">deficiency_model</span>(pooled, swab)]</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a><span class="fu">md_table</span>([<span class="st">&quot;builder&quot;</span>, <span class="st">&quot;programme&quot;</span>, <span class="st">&quot;status&quot;</span>, <span class="st">&quot;objective&quot;</span>, <span class="st">&quot;exact&quot;</span>],</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>         [begin</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>              solution <span class="op">=</span> <span class="fu">solve_program</span>(program)</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>              [call, program.name, solution.status, solution.objective, solution.exact]</span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>          <span class="kw">end</span> for (call, program) <span class="kw">in</span> programmes])</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">builder</th>
+<th style="text-align: right;">programme</th>
+<th style="text-align: right;">status</th>
+<th style="text-align: right;">objective</th>
+<th style="text-align: right;">exact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>eadmissibility_model(robust, :disinfect_pond)</code></td>
+<td style="text-align: right;"><code>e_admissibility</code></td>
+<td style="text-align: right;"><code>optimal</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mixed_dominance_model(robust, :no_intervention)</code></td>
+<td style="text-align: right;"><code>mixed_dominance</code></td>
+<td style="text-align: right;"><code>optimal</code></td>
+<td style="text-align: right;">41</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>evpi_envelope_model(robust)</code></td>
+<td style="text-align: right;"><code>evpi_envelope</code></td>
+<td style="text-align: right;"><code>optimal</code></td>
+<td style="text-align: right;">66</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>garbling_model(pooled, swab)</code></td>
+<td style="text-align: right;"><code>garbling</code></td>
+<td style="text-align: right;"><code>optimal</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>separating_payoff_model(swab, pooled)</code></td>
+<td style="text-align: right;"><code>separating_payoff</code></td>
+<td style="text-align: right;"><code>optimal</code></td>
+<td style="text-align: right;">0.7</td>
+<td style="text-align: right;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>deficiency_model(pooled, swab)</code></td>
+<td style="text-align: right;"><code>deficiency</code></td>
+<td style="text-align: right;"><code>optimal</code></td>
+<td style="text-align: right;">0.33</td>
+<td style="text-align: right;">yes</td>
+</tr>
+</tbody>
+</table>
+<p>The dominance programme has a positive optimum because no
+intervention is beaten by a margin; the separating programme has one
+because the swab is not a garbling of the pooled swabs; the garbling
+programme is a feasibility problem and has no objective.</p>
 <h1 id="checking-the-files-with-lean">Checking the files with Lean</h1>
 <p>The Lean project in <code>proofs/</code> builds an executable,
 <code>check_certificate</code>, that reads one of these files,
 recomputes every claim over the rationals, and exits with code 0 when it
 accepts, 1 when it rejects, and 2 when the file cannot be decoded. It is
 run as</p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> proofs</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> exe cache get                 <span class="co"># once: prebuilt Mathlib</span></span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> build check_certificate       <span class="co"># once</span></span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> exe check_certificate ../vignettes/10_exact_arithmetic_and_certificates/_out/bd_w1.json</span></code></pre></div>
+<div class="sourceCode" id="cb33"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> proofs</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> exe cache get                 <span class="co"># once: prebuilt Mathlib</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> build check_certificate       <span class="co"># once</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="ex">lake</span> exe check_certificate ../vignettes/10_exact_arithmetic_and_certificates/_out/bd_w1.json</span></code></pre></div>
 <p>The cell below runs the built executable when it is present, and says
 so when it is not. The output recorded in the rendered copies of this
 vignette was produced with the executable built.</p>
-<div class="sourceCode" id="cb29"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>checker <span class="op">=</span> <span class="fu">joinpath</span>(<span class="pp">@__DIR__</span>, <span class="st">&quot;..&quot;</span>, <span class="st">&quot;..&quot;</span>, <span class="st">&quot;proofs&quot;</span>, <span class="st">&quot;.lake&quot;</span>, <span class="st">&quot;build&quot;</span>, <span class="st">&quot;bin&quot;</span>,</span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>                   <span class="st">&quot;check_certificate&quot;</span>)</span>
-<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">lean_check</span>(file)</span>
-<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">println</span>(<span class="st">&quot;check_certificate &quot;</span>, <span class="fu">basename</span>(file))</span>
-<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> !<span class="fu">isfile</span>(checker)</span>
-<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">println</span>(<span class="st">&quot;  not run: build the checker first (see proofs/README.md)&quot;</span>)</span>
-<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="cn">nothing</span></span>
-<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
-<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>    buffer <span class="op">=</span> <span class="fu">IOBuffer</span>()</span>
-<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    process <span class="op">=</span> <span class="fu">run</span>(<span class="fu">pipeline</span>(<span class="fu">ignorestatus</span>(<span class="ss">`$checker $file`</span>); <span class="cn">stdout</span><span class="op">=</span>buffer, <span class="cn">stderr</span><span class="op">=</span>buffer))</span>
-<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">foreach</span>(line <span class="op">-&gt;</span> <span class="fu">println</span>(<span class="st">&quot;  &quot;</span>, line), <span class="fu">split</span>(<span class="fu">chomp</span>(<span class="fu">String</span>(<span class="fu">take!</span>(buffer))), <span class="ch">&#39;\n&#39;</span>))</span>
-<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">println</span>(<span class="st">&quot;  exit code: &quot;</span>, process.exitcode)</span>
-<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cn">nothing</span></span>
-<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
-<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(certificate)</span></code></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>checker <span class="op">=</span> <span class="fu">joinpath</span>(<span class="pp">@__DIR__</span>, <span class="st">&quot;..&quot;</span>, <span class="st">&quot;..&quot;</span>, <span class="st">&quot;proofs&quot;</span>, <span class="st">&quot;.lake&quot;</span>, <span class="st">&quot;build&quot;</span>, <span class="st">&quot;bin&quot;</span>,</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>                   <span class="st">&quot;check_certificate&quot;</span>)</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">lean_check</span>(file)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">println</span>(<span class="st">&quot;check_certificate &quot;</span>, <span class="fu">basename</span>(file))</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> !<span class="fu">isfile</span>(checker)</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">println</span>(<span class="st">&quot;  not run: build the checker first (see proofs/README.md)&quot;</span>)</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="cn">nothing</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">end</span></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>    buffer <span class="op">=</span> <span class="fu">IOBuffer</span>()</span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>    process <span class="op">=</span> <span class="fu">run</span>(<span class="fu">pipeline</span>(<span class="fu">ignorestatus</span>(<span class="ss">`$checker $file`</span>); <span class="cn">stdout</span><span class="op">=</span>buffer, <span class="cn">stderr</span><span class="op">=</span>buffer))</span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">foreach</span>(line <span class="op">-&gt;</span> <span class="fu">println</span>(<span class="st">&quot;  &quot;</span>, line), <span class="fu">split</span>(<span class="fu">chomp</span>(<span class="fu">String</span>(<span class="fu">take!</span>(buffer))), <span class="ch">&#39;\n&#39;</span>))</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">println</span>(<span class="st">&quot;  exit code: &quot;</span>, process.exitcode)</span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cn">nothing</span></span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-17"><a href="#cb34-17" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(certificate)</span></code></pre></div>
 <pre><code>check_certificate bd_w1.json
   schema: decision-certificate/1
   actions: 3, states: 3
@@ -495,7 +606,7 @@ vignette was produced with the executable built.</p>
   accepted: yes
   theorem Certificate.certificate_spec: applies
   exit code: 0</code></pre>
-<div class="sourceCode" id="cb31"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(<span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w0.json&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(<span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w0.json&quot;</span>))</span></code></pre></div>
 <pre><code>check_certificate bd_w0.json
   schema: decision-certificate/1
   actions: 3, states: 3
@@ -515,7 +626,7 @@ vignette was produced with the executable built.</p>
   accepted: yes
   theorem Certificate.certificate_spec: applies
   exit code: 0</code></pre>
-<div class="sourceCode" id="cb33"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(garbling)</span></code></pre></div>
+<div class="sourceCode" id="cb38"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(garbling)</span></code></pre></div>
 <pre><code>check_certificate pooled_is_garbling_of_swab.json
   schema: garbling-witness/1
   states: 3, signals: 2, garbled signals: 2
@@ -526,7 +637,7 @@ vignette was produced with the executable built.</p>
   accepted: yes
   theorem Certificate.RawGarbling.accepts_sound: applies
   exit code: 0</code></pre>
-<div class="sourceCode" id="cb35"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(admissible)</span></code></pre></div>
+<div class="sourceCode" id="cb40"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(admissible)</span></code></pre></div>
 <pre><code>check_certificate disinfect_is_e_admissible.json
   schema: e-admissible-witness/1
   actions: 3, states: 3, extreme points: 3, action: 2
@@ -536,13 +647,13 @@ vignette was produced with the executable built.</p>
 <h2 id="a-wrong-claim-is-rejected">A wrong claim is rejected</h2>
 <p>To see the checker refuse, change one claim by hand. Here the EVSI in
 the certificate is replaced by a rounder number.</p>
-<div class="sourceCode" id="cb37"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>text <span class="op">=</span> <span class="fu">read</span>(certificate, <span class="dt">String</span>)</span>
-<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>claimed <span class="op">=</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">evsi</span><span class="sc">\&quot;</span><span class="st">: </span><span class="sc">\&quot;</span><span class="st">&quot;</span> <span class="op">*</span> <span class="fu">exact</span>(<span class="fu">evsi</span>(problem, swab)) <span class="op">*</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">&quot;</span></span>
-<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a><span class="fu">occursin</span>(claimed, text)</span></code></pre></div>
+<div class="sourceCode" id="cb42"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>text <span class="op">=</span> <span class="fu">read</span>(certificate, <span class="dt">String</span>)</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>claimed <span class="op">=</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">evsi</span><span class="sc">\&quot;</span><span class="st">: </span><span class="sc">\&quot;</span><span class="st">&quot;</span> <span class="op">*</span> <span class="fu">exact</span>(<span class="fu">evsi</span>(problem, swab)) <span class="op">*</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">&quot;</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a><span class="fu">occursin</span>(claimed, text)</span></code></pre></div>
 <pre><code>true</code></pre>
-<div class="sourceCode" id="cb39"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>tampered <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w1_tampered.json&quot;</span>)</span>
-<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write</span>(tampered, <span class="fu">replace</span>(text, claimed <span class="op">=&gt;</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">evsi</span><span class="sc">\&quot;</span><span class="st">: </span><span class="sc">\&quot;</span><span class="st">31</span><span class="sc">\&quot;</span><span class="st">&quot;</span>))</span>
-<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(tampered)</span></code></pre></div>
+<div class="sourceCode" id="cb44"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>tampered <span class="op">=</span> <span class="fu">joinpath</span>(out, <span class="st">&quot;bd_w1_tampered.json&quot;</span>)</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write</span>(tampered, <span class="fu">replace</span>(text, claimed <span class="op">=&gt;</span> <span class="st">&quot;</span><span class="sc">\&quot;</span><span class="st">evsi</span><span class="sc">\&quot;</span><span class="st">: </span><span class="sc">\&quot;</span><span class="st">31</span><span class="sc">\&quot;</span><span class="st">&quot;</span>))</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a><span class="fu">lean_check</span>(tampered)</span></code></pre></div>
 <pre><code>check_certificate bd_w1_tampered.json
   schema: decision-certificate/1
   actions: 3, states: 3

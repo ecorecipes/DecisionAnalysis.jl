@@ -14,6 +14,7 @@ Simon Frost
   - [How many females](#how-many-females)
 - [Scenario design: when there is no distribution to draw
   from](#scenario-design-when-there-is-no-distribution-to-draw-from)
+  - [A forecast needs probabilities](#a-forecast-needs-probabilities)
   - [Many uncertainties, few
     scenarios](#many-uncertainties-few-scenarios)
 - [What to take away](#what-to-take-away)
@@ -358,6 +359,25 @@ adaptive splines (`MARSRegression`, the method `voi` reaches through
 because fecundity is one of four inputs; what matters is that no method
 is far from the others.
 
+`regression_check` looks at one fit from the inside. A value of
+information needs the fitted values to be conditional means, so the
+residuals must average to zero wherever the fitted value is. The draws
+are cut into groups by fitted value, and each group’s mean residual is
+compared with its standard error.
+
+``` julia
+check = regression_check(problem, :log_fecundity, SplineRegression())
+(groups=length(check.bins), largest_z=round(check.worst; digits=2),
+ r_squared=round(check.r_squared; digits=3))
+```
+
+    (groups = 20, largest_z = 1.16, r_squared = 0.139)
+
+A largest `z` of two or so among this many groups is what chance gives;
+several standard errors would show a fit that misses the shape. Passing
+this check does not rule out overfitting, which is what the held-out
+comparison above is for.
+
 The model is cheap, so the regression can also be checked against the
 definition itself: for each of 3,000 values of fecundity, average the
 payoffs over 1,000 values of the other rates.
@@ -476,7 +496,7 @@ Plots.hline!(plt, [0]; color=:grey, linestyle=:dash, label="")
 png_figure(plt)
 ```
 
-![](16_estimation_studies_and_scenarios_files/figure-commonmark/cell-18-output-1.png)
+![](16_estimation_studies_and_scenarios_files/figure-commonmark/cell-19-output-1.png)
 
 For a handful of ponds the study barely repays the animals it uses; for
 fifty, about seven females are worth sacrificing, and anything from five
@@ -585,6 +605,50 @@ uncertainties on its axes the ones that matter to the decision? (Of the
 six such designs that Runge et al. review, none showed a reversal.) The
 two rules that need no probabilities disagree here, which is itself a
 finding: the choice depends on the attitude to the worst case.
+
+### A forecast needs probabilities
+
+`design_belief` says what a design knows about its states. For the
+design above it is a scenario set: possible states and nothing more. A
+**forecasting** design has no decision axis, and every uncertainty axis
+(a `ScenarioAxis`) carries probabilities of its levels.
+`scenario_forecast` then mixes the scenarios’ projections into one
+forecast and splits its variance into the part between scenarios and the
+part within them. Suppose each level is given probability one half
+(**illustrative**).
+
+``` julia
+forecast = ScenarioDesign(uncertainty_axis(:juvenile_survival, bounds(:juvenile_survival);
+                                           weights=[1 // 2, 1 // 2]),
+                          uncertainty_axis(:log_fecundity, bounds(:log_fecundity);
+                                           weights=[1 // 2, 1 // 2]); purpose=:forecasting)
+level(s, name) = getproperty(bounds(name), getproperty(s, name))
+adults_in(s) = adults_after(merge(centre, (; juvenile_survival=level(s, :juvenile_survival),
+                                           log_fecundity=level(s, :log_fecundity))), :none)
+projected = scenario_forecast(forecast, adults_in.(scenarios(forecast)))
+md_table(["quantity", "value"],
+         [["class of the design above", design_class(design)],
+          ["its belief", nameof(typeof(design_belief(design)))],
+          ["class of this design", design_class(forecast)],
+          ["its belief", nameof(typeof(design_belief(forecast)))],
+          ["forecast: mean adults in five years, no intervention", projected.mean],
+          ["variance between scenarios", projected.between],
+          ["variance within scenarios", projected.within]]; digits=2)
+```
+
+| quantity | value |
+|:---|---:|
+| class of the design above | `value_of_information` |
+| its belief | `ScenarioSet` |
+| class of this design | `uncertainty` |
+| its belief | `FiniteBelief` |
+| forecast: mean adults in five years, no intervention | 78.14 |
+| variance between scenarios | 3655.02 |
+| variance within scenarios | 0 |
+
+The model is deterministic, so all the variance is between scenarios.
+Without the probabilities the four projections stay four conditional
+statements, and `scenario_forecast` refuses to combine them.
 
 ### Many uncertainties, few scenarios
 

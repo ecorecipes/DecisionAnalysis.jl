@@ -72,6 +72,14 @@ md_table(["lottery", "exponential CE", "power CE"],
           ["0 or 80 (doubled)", certainty_equivalent(cara, [0, 80]), certainty_equivalent(crra, [0, 80])]])
 ```
 
+A certainty equivalent is the expected utility carried back to the scale of the
+outcome, which is what `inverse_utility` does:
+
+```{julia}
+expected_utility = (cara(0) + cara(40)) / 2
+inverse_utility(cara, expected_utility), certainty_equivalent(cara, [0, 40])
+```
+
 ## The pond, valued without risk attitude
 
 The problem is that of vignette 11. A fungal disease has reached a pond of newts and the

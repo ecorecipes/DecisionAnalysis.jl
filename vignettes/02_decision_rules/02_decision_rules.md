@@ -7,6 +7,8 @@ Simon Frost
 - [Why they disagree](#why-they-disagree)
 - [Satisficing](#satisficing)
 - [Rules that look at the tail](#rules-that-look-at-the-tail)
+- [A rule is a summary and a
+  selector](#a-rule-is-a-summary-and-a-selector)
 - [Ties](#ties)
 - [What to take away](#what-to-take-away)
 - [Next](#next)
@@ -245,6 +247,40 @@ first_choice(decide(problem, DecisionRule(CVaR(1 // 5))))
 ```
 
     :trap_mink
+
+## A rule is a summary and a selector
+
+Every rule above has two parts: an aggregator that turns each action’s
+payoffs into one score, and a selector that picks from the scores.
+`Optimize()`, the default selector, takes the best score;
+`Threshold(level)` takes every action that reaches a level, which is
+what `Satisfice` does. `BestCase()` is the aggregator behind maximax, as
+`WorstCase()` is behind maximin.
+
+``` julia
+md_table(["rule, written out", "the same as", "chosen"],
+         [["`DecisionRule(BestCase())`", "`Maximax()`",
+           decide(problem, DecisionRule(BestCase())).chosen],
+          ["`DecisionRule(WorstCase(); selector=Optimize())`", "`Maximin()`",
+           decide(problem, DecisionRule(WorstCase(); selector=Optimize())).chosen],
+          ["`DecisionRule(WorstCase(); selector=Threshold(400))`",
+           "`Satisfice(400; aggregator=WorstCase())`",
+           decide(problem, DecisionRule(WorstCase(); selector=Threshold(400))).chosen]])
+```
+
+| rule, written out | the same as | chosen |
+|:---|---:|---:|
+| `DecisionRule(BestCase())` | `Maximax()` | `no_control` |
+| `DecisionRule(WorstCase(); selector=Optimize())` | `Maximin()` | `translocate` |
+| `DecisionRule(WorstCase(); selector=Threshold(400))` | `Satisfice(400; aggregator=WorstCase())` | `translocate` |
+
+``` julia
+decide(problem, DecisionRule(BestCase())).chosen == decide(problem, Maximax()).chosen,
+decide(problem, DecisionRule(WorstCase(); selector=Threshold(400))).chosen ==
+decide(problem, Satisfice(400; aggregator=WorstCase())).chosen
+```
+
+    (true, true)
 
 ## Ties
 

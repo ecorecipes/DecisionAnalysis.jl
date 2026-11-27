@@ -118,6 +118,21 @@ feasible_actions(problem)
      :deepen_ponds
      :dig_scrapes
 
+`feasible_payoff` is the table with only those rows, which is the table
+every rule works on:
+
+``` julia
+feasible_payoff(problem)
+```
+
+**PayoffTable{Int64}: 3 actions × 3 states**
+
+| action            | `dry` | `average` | `wet` |
+|:------------------|------:|----------:|------:|
+| `no_intervention` |   200 |      1200 |  2000 |
+| `deepen_ponds`    |   900 |      1400 |  1500 |
+| `dig_scrapes`     |   300 |      1700 |  2400 |
+
 ## Expected number of individuals
 
 The expected number of toadlets under an action is the
@@ -196,7 +211,7 @@ png_figure(grouped_bars(G.states, G.actions, permutedims(G.Q);
                         title="Gain over no intervention, by state (illustrative)"))
 ```
 
-![](01_first_decision_table_files/figure-commonmark/cell-9-output-1.png)
+![](01_first_decision_table_files/figure-commonmark/cell-10-output-1.png)
 
 ## When the state is known
 

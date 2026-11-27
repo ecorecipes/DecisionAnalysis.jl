@@ -212,6 +212,18 @@ weighted = SampleBelief((; contact=[0.2, 0.5, 0.9], weight=[1, 1, 6]); weights=:
 
     (Rational{Int64}[1//8, 1//8, 3//4], 32//19)
 
+`draw_weights` returns the normalised weights of anything that holds
+draws, a sample belief or an outcome table:
+
+``` julia
+draw_weights(weighted)
+```
+
+    3-element Vector{Rational{Int64}}:
+     1//8
+     1//8
+     3//4
+
 ## An outcome table
 
 `outcomes` runs the model over draws × actions × replicates. Each draw
@@ -269,6 +281,17 @@ failed_runs(precomputed)
 
     1-element Vector{@NamedTuple{action::Symbol, draw::Symbol, replicate::Symbol, status::String}}:
      (action = :treat, draw = Symbol("2"), replicate = Symbol("3"), status = "timeout")
+
+`replicate_counts` gives the number of usable runs in each cell, action
+by draw. A payoff averages those and no others:
+
+``` julia
+replicate_counts(precomputed)
+```
+
+    2×3 Matrix{Int64}:
+     4  4  4
+     4  3  4
 
 ## Utilities counted in animals
 
@@ -367,6 +390,26 @@ md_table(["action", "expected gain over no intervention", "standard error", "sim
 Treatment gains about two newts on average, and the gain is several
 standard errors from zero.
 
+A different summary is how often each action is the best one.
+`probability_optimal` gives the share of the draws in which no other
+action pays more, with its standard error; this is what
+cost-effectiveness analysis plots as an acceptability curve.
+
+``` julia
+md_table(["action", "probability that it is best", "standard error"],
+         [[o.action, Float64(o.probability), o.standard_error]
+          for o in probability_optimal(problem)])
+```
+
+| action   | probability that it is best | standard error |
+|:---------|----------------------------:|---------------:|
+| `none`   |                        0.54 |           0.03 |
+| `treat`  |                        0.44 |           0.03 |
+| `remove` |                        0.02 |           0.01 |
+
+The action with the largest expected payoff need not be the one most
+often best, and neither number says by how much an action wins or loses.
+
 ### Rules on a sample
 
 The rules of the earlier vignettes apply unchanged. A sample is a single
@@ -433,6 +476,17 @@ md_table(["from w", "to w", "best action"],
 |:-------|-----:|------------:|
 | 0      |    3 |     `treat` |
 
+`one_way_thresholds` lists only the switches: the weight at which the
+best action changes, and the actions on either side.
+
+``` julia
+md_table(["threshold w", "best below", "best above"],
+         [[Float64(t.threshold), t.below, t.above]
+          for t in one_way_thresholds(base, -infected; from=0, to=3)])
+```
+
+threshold w \| best below \| best above \| \|:–\|–:\|–:\|
+
 ``` julia
 sweep = weight_sweep(w -> DecisionProblem(table, InfectionUtility(; weight=w); baseline=:none),
                      0:0.25:3)
@@ -445,7 +499,7 @@ end
 png_figure(plt)
 ```
 
-![](11_sample_beliefs_and_outcome_tables_files/figure-commonmark/cell-20-output-1.png)
+![](11_sample_beliefs_and_outcome_tables_files/figure-commonmark/cell-24-output-1.png)
 
 ## Value of information from a sample
 

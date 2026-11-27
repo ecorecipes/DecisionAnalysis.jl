@@ -178,6 +178,31 @@ md_table(["action", "expectation", "CVaR at 1/5", "lower quantile at 1/5"],
 first_choice(decide(problem, DecisionRule(CVaR(1 // 5))))
 ```
 
+## A rule is a summary and a selector
+
+Every rule above has two parts: an aggregator that turns each action's payoffs into
+one score, and a selector that picks from the scores. `Optimize()`, the default
+selector, takes the best score; `Threshold(level)` takes every action that reaches a
+level, which is what `Satisfice` does. `BestCase()` is the aggregator behind maximax,
+as `WorstCase()` is behind maximin.
+
+```{julia}
+md_table(["rule, written out", "the same as", "chosen"],
+         [["`DecisionRule(BestCase())`", "`Maximax()`",
+           decide(problem, DecisionRule(BestCase())).chosen],
+          ["`DecisionRule(WorstCase(); selector=Optimize())`", "`Maximin()`",
+           decide(problem, DecisionRule(WorstCase(); selector=Optimize())).chosen],
+          ["`DecisionRule(WorstCase(); selector=Threshold(400))`",
+           "`Satisfice(400; aggregator=WorstCase())`",
+           decide(problem, DecisionRule(WorstCase(); selector=Threshold(400))).chosen]])
+```
+
+```{julia}
+decide(problem, DecisionRule(BestCase())).chosen == decide(problem, Maximax()).chosen,
+decide(problem, DecisionRule(WorstCase(); selector=Threshold(400))).chosen ==
+decide(problem, Satisfice(400; aggregator=WorstCase())).chosen
+```
+
 ## Ties
 
 When scores tie, every tied action is returned, in table order, and `first_choice` is

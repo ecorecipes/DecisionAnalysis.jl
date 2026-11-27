@@ -361,6 +361,18 @@ md_table(["counted at", "from w", "to w", "best action"],
           for (when, (u, i)) in evaluation for r in regions_at(u, i)]; digits=3)
 ```
 
+`one_way_thresholds` lists only the switches, with the best action on either side:
+
+```{julia}
+function thresholds_at(uninfected, infected)
+    base = DecisionProblem(individuals_payoff(table, uninfected), belief; baseline=:none)
+    return one_way_thresholds(base, -individuals_payoff(table, infected); from=0, to=3)
+end
+md_table(["counted at", "threshold w", "best below", "best above"],
+         [[when, Float64(t.threshold), t.below, t.above]
+          for (when, (u, i)) in evaluation for t in thresholds_at(u, i)]; digits=3)
+```
+
 ```{julia}
 function gains_at(u, i, w)
     return gain_of(InfectionUtility(; uninfected=u, infected=i, weight=w))

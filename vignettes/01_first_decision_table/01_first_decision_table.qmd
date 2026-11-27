@@ -82,6 +82,13 @@ problem = DecisionProblem(payoff, belief;
 feasible_actions(problem)
 ```
 
+`feasible_payoff` is the table with only those rows, which is the table every rule
+works on:
+
+```{julia}
+feasible_payoff(problem)
+```
+
 ## Expected number of individuals
 
 The expected number of toadlets under an action is the probability-weighted mean of its

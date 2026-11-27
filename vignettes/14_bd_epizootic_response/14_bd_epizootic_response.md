@@ -556,6 +556,23 @@ md_table(["counted at", "from w", "to w", "best action"],
 | day 120        |  1.277 |     3 |  `cull_frogs_d56_f75` |
 | day 365        |      0 |     3 | `clean_frogs_d14_f75` |
 
+`one_way_thresholds` lists only the switches, with the best action on
+either side:
+
+``` julia
+function thresholds_at(uninfected, infected)
+    base = DecisionProblem(individuals_payoff(table, uninfected), belief; baseline=:none)
+    return one_way_thresholds(base, -individuals_payoff(table, infected); from=0, to=3)
+end
+md_table(["counted at", "threshold w", "best below", "best above"],
+         [[when, Float64(t.threshold), t.below, t.above]
+          for (when, (u, i)) in evaluation for t in thresholds_at(u, i)]; digits=3)
+```
+
+| counted at | threshold w |            best below |           best above |
+|:-----------|------------:|----------------------:|---------------------:|
+| day 120    |       1.277 | `clean_frogs_d14_f75` | `cull_frogs_d56_f75` |
+
 ``` julia
 function gains_at(u, i, w)
     return gain_of(InfectionUtility(; uninfected=u, infected=i, weight=w))
@@ -606,7 +623,7 @@ end
 png_figure(plt)
 ```
 
-![](14_bd_epizootic_response_files/figure-commonmark/cell-24-output-1.png)
+![](14_bd_epizootic_response_files/figure-commonmark/cell-25-output-1.png)
 
 ## The value of perfect information, in frogs
 
@@ -734,7 +751,7 @@ Plots.vline!(plt, [0]; color=:black, linewidth=1)
 png_figure(plt)
 ```
 
-![](14_bd_epizootic_response_files/figure-commonmark/cell-29-output-1.png)
+![](14_bd_epizootic_response_files/figure-commonmark/cell-30-output-1.png)
 
 The conclusion is different for a utility under which the best action
 does change between groups. Counting at day 120 with w = 1 is one:

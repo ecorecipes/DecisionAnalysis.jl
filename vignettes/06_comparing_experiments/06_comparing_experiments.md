@@ -174,6 +174,37 @@ one pair is ordered. Pooled swabs are a garbling of the swab. No other
 design can imitate any other: the swab, the eDNA test and the visual
 check are pairwise incomparable.
 
+`garbling_result` answers the same question and says more: whether the
+answer is exact and, for an exact “no”, a decision problem that proves
+it, one in which the first design is worth strictly more than the
+second. A garbling can never be worth more, so one such problem settles
+it.
+
+``` julia
+no = garbling_result(swab, pooled)
+(is_garbling=no.is_garbling, exact=no.exact)
+```
+
+    (is_garbling = false, exact = true)
+
+``` julia
+no.separating.payoff
+```
+
+**PayoffTable{Rational{BigInt}}: 2 actions × 3 states**
+
+| action            | `absent` | `low_prevalence` | `high_prevalence` |
+|:------------------|---------:|-----------------:|------------------:|
+| `act_on_negative` |        1 |               -1 |                -1 |
+| `act_on_positive` |       -1 |                1 |                 1 |
+
+``` julia
+(value_after_the_swab=value_with_information(no.separating, swab),
+ value_after_pooled_swabs=value_with_information(no.separating, pooled))
+```
+
+    (value_after_the_swab = 2//3, value_after_pooled_swabs = 13//30)
+
 ## What ordering implies, and what incomparability implies
 
 For the ordered pair the conclusion needs no payoff table: pooled swabs
@@ -201,7 +232,7 @@ png_figure(grouped_bars(["w = 0", "w = 1"], first.(designs), permutedims(value);
                         title="Value of four survey designs (illustrative)"))
 ```
 
-![](06_comparing_experiments_files/figure-commonmark/cell-11-output-1.png)
+![](06_comparing_experiments_files/figure-commonmark/cell-14-output-1.png)
 
 At `w = 0` the eDNA test is worth more than the swab. At `w = 1` the
 swab is worth more than the eDNA test. Neither design is better in
@@ -298,6 +329,25 @@ md_table(["w", "EVSI of eDNA − EVSI of swab", "bound B × δ(swab, eDNA)",
 
 The bounds hold and are loose, as worst-case bounds over all priors
 usually are.
+
+The range of the whole table is the easiest constant to state and not
+the smallest that works. `deficiency_value_bound` uses the largest
+regret, the most that any action falls short of the best one in any
+state, which is never larger than the range.
+
+``` julia
+md_table(["w", "range of the table", "largest range of one action", "largest regret",
+          "bound with the range", "bound with the largest regret"],
+         [[w, payoff_range(bd_problem(w)), largest_action_range(bd_problem(w)),
+           largest_regret(bd_problem(w)), value_gap_bound(w, swab, edna),
+           deficiency_value_bound(bd_problem(w), deficiency(swab, edna))] for w in (0, 1)];
+         digits=3)
+```
+
+| w | range of the table | largest range of one action | largest regret | bound with the range | bound with the largest regret |
+|:---|---:|---:|---:|---:|---:|
+| 0 | 400 | 400 | 220 | 66.667 | 36.667 |
+| 1 | 650 | 650 | 450 | 108.333 | 75 |
 
 ## What to take away
 

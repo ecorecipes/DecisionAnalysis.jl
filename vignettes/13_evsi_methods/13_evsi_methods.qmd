@@ -99,6 +99,30 @@ md_table(["trials", "EVSI", "standard error", "from the data sets", "from the dr
           for (n, e) in by_importance]; digits=3)
 ```
 
+The two functions above are written by hand. For the common designs the package has
+them: a study design is an object, `simulate_study` draws one data set from it as its
+sufficient statistics, and `study_loglikelihood` scores a data set under a draw.
+
+```{julia}
+tank_trials = NormalStudy(:log_contact; n=5, sd=sigma)
+θ = (; log_contact=draws.log_contact[1])
+data = simulate_study(Xoshiro(4), tank_trials, θ)
+other = (; log_contact=θ.log_contact + 0.5)
+by_hand(y, θ) = -5 * (y - θ.log_contact)^2 / (2 * sigma^2)
+(data=data,
+ loglikelihood_difference=study_loglikelihood(tank_trials, data, θ) -
+                          study_loglikelihood(tank_trials, data, other),
+ by_hand=by_hand(data.xbar, θ) - by_hand(data.xbar, other))
+```
+
+The other designs work in the same way. A `TwoArmBinomialStudy` has two counts, one
+for each arm (the probabilities here are made up to show the shape of the data):
+
+```{julia}
+simulate_study(Xoshiro(4), TwoArmBinomialStudy(:control, :treated; n=20),
+               (; control=0.6, treated=0.4))
+```
+
 The effective sample sizes are part of the estimate and are printed with it:
 
 ```{julia}
@@ -209,6 +233,21 @@ png_figure(plt)
 ```{julia}
 best = argmax([b.value for b in net])
 (trials=sizes[best], net_benefit=net[best].value, standard_error=net[best].standard_error)
+```
+
+`enbs` multiplied the value by the number of ponds. `population_value` does that
+scaling on its own, and can also count a decision that is taken again each year: with
+a `horizon` the value accrues over that many years, discounted at `discount`.
+
+```{julia}
+five_trials = curve[findfirst(==(5), sizes)]
+once = population_value(five_trials; population=ponds)
+decade = population_value(five_trials; population=ponds, horizon=10, discount=0.03)
+md_table(["EVSI of five trials", "newts", "standard error"],
+         [["one pond", Float64(five_trials.value), five_trials.standard_error],
+          ["25 ponds, decided once", Float64(once.value), once.standard_error],
+          ["25 ponds a year for ten years, discounted at 3% (illustrative)",
+           Float64(decade.value), decade.standard_error]])
 ```
 
 A small study pays for itself and a large one does not: the EVSI curve flattens while

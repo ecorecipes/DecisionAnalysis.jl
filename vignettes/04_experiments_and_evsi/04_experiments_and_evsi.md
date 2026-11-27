@@ -7,6 +7,7 @@ Simon Frost
 - [Bayes’ rule](#bayes-rule)
 - [Acting on the result](#acting-on-the-result)
 - [The value of sample information](#the-value-of-sample-information)
+  - [The value outcome by outcome](#the-value-outcome-by-outcome)
 - [How the value depends on the
   weight](#how-the-value-depends-on-the-weight)
 - [Information that is worth
@@ -260,6 +261,40 @@ value_by_posteriors(1) == value_with_information(bd_problem(1), swab)
 
     true
 
+### The value outcome by outcome
+
+EVSI is an average over what the swab might show. `voi_profile` gives
+the terms of that average: for each result, its probability, the best
+action after it, and what that result is worth, which is the gain from
+acting on it over the action the manager would have taken without the
+swab.
+
+``` julia
+profile = voi_profile(bd_problem(1), swab)
+md_table(["result", "probability", "best action after it", "value of this result",
+          "changes the action"],
+         [[o.signal, o.probability, o.best, o.value, o.changes_decision]
+          for o in profile.outcomes]; digits=3)
+```
+
+| result | probability | best action after it | value of this result | changes the action |
+|:---|---:|---:|---:|---:|
+| `negative` | 0.605 | `antifungal_baths` | 0 | \- |
+| `positive` | 0.395 | `disinfect_pond` | 78.734 | yes |
+
+``` julia
+(act_now=profile.act_now_action, evsi=profile.evsi,
+ standard_deviation=round(Float64(profile.standard_deviation); digits=2),
+ probability_of_no_value=profile.probability_zero)
+```
+
+    (act_now = :antifungal_baths, evsi = 311//10, standard_deviation = 38.49, probability_of_no_value = 121//200)
+
+The values average to the EVSI. A result that leaves the action as it
+was is worth nothing, so the whole value comes from the results that
+change it; the last number is the probability that the swab changes
+nothing.
+
 ## How the value depends on the weight
 
 ``` julia
@@ -274,7 +309,7 @@ plt = plot(Float64.(ws),
 png_figure(plt)
 ```
 
-![](04_experiments_and_evsi_files/figure-commonmark/cell-11-output-1.png)
+![](04_experiments_and_evsi_files/figure-commonmark/cell-13-output-1.png)
 
 The value of the test changes with what is being valued. The kinks are
 the weights at which the best action for some signal changes.
