@@ -137,7 +137,11 @@ end
         # regression as voi's (differences from the first action, GCV) and agrees to 1e-10.
         @test evppi(normal, :p1, GAMRegression()).value ≈ r["p1_gam"] rtol = 1e-6
         @test evppi(normal, :p2, GAMRegression()).value ≈ r["p2_gam"] rtol = 1e-6
-        gp = GaussianProcessRegression(; max_points=2000)
+        # The hyperparameters are estimated on all 2000 draws, so this comparison does
+        # not depend on a subsample. (On a subsample the fit is usually linear, as the
+        # truth is, but some subsamples choose a short length scale and give 0.074 to
+        # 0.077 for p1: the default, 500 points and seed 1, is one of them.)
+        gp = GaussianProcessRegression(; max_points=2000, hyper_points=2000)
         @test evppi(normal, :p1, gp).value ≈ r["p1_gp"] rtol = 0.03
         @test evppi(normal, :p2, gp).value ≈ r["p2_gp"] rtol = 0.03
         # Both parameters are everything: every method returns the plain EVPI.

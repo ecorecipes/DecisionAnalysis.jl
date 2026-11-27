@@ -169,8 +169,8 @@ sides. "s.e." is the standard error reported by this package.
 | EVPPI p1, GAM (GAM.jl; `mgcv`) | 0.069330048 | 0.069330048 | 0.0157 | 1e-12 |
 | EVPPI p2, GAM | 0.35994357 | 0.35994357 | 0.0207 | 3e-11 |
 | EVPPI p1, built-in spline against `voi`'s GAM | 0.075750719 | 0.069330048 | 0.0155 | 6.4e-3 |
-| EVPPI p1, Gaussian process | 0.069330044 | 0.069938964 | 0.0157 | −6.1e-4 |
-| EVPPI p2, Gaussian process | 0.35828473 | 0.35994195 | 0.0208 | −1.7e-3 |
+| EVPPI p1, Gaussian process, hyperparameters from all 2000 points | 0.069330047 | 0.069938964 | 0.0157 | −6.1e-4 |
+| EVPPI p2, Gaussian process, hyperparameters from all 2000 points | 0.35994357 | 0.35994195 | 0.0207 | 1.6e-6 |
 | EVPPI p1 and p2, GAM tensor | 0.44106433 | 0.44106433 | 0.0201 | 3e-13 |
 | EVPPI p1 and p2, Gaussian process | 0.44106433 | 0.44106433 | 0.0201 | 7e-11 |
 | EVSI of 10 observations of p1, regression (closed form 0.0723251) | 0.0651 | 0.0584 | 0.0151 | 0.0067 |
@@ -186,9 +186,9 @@ chooses its Gaussian process for five focal parameters, as `evppi` does here.
 | Quantity | Ours | `voi` | Our s.e. | Difference |
 |:--|--:|--:|--:|--:|
 | EVPI | 0.51015865 | 0.51015865 | 0.0228 | 9e-14 |
-| EVPPI p1, x3 to x6, default (Gaussian process, 1500 points) | 0.17197393 | 0.17022975 | 0.0221 | 1.7e-3 |
-| EVPPI p1, x3 to x6, Gaussian process on all 2000 points | 0.17254114 | 0.17022975 | 0.0224 | 2.3e-3 |
-| EVPPI p2, x3 to x6, Gaussian process | 0.43864524 | 0.43706357 | 0.0235 | 1.6e-3 |
+| EVPPI p1, x3 to x6, default (Gaussian process, 1500 points) | 0.17982042 | 0.17022975 | 0.0225 | 9.6e-3 |
+| EVPPI p1, x3 to x6, Gaussian process on all 2000 points | 0.1700165 | 0.17022975 | 0.0221 | −2.1e-4 |
+| EVPPI p2, x3 to x6, Gaussian process | 0.43696468 | 0.43706357 | 0.0236 | −9.9e-5 |
 | EVPPI all six, Gaussian process | 0.51015865 | 0.51015865 | 0.0228 | 3e-11 |
 
 The chemotherapy example bundled with `voi` (10,000 draws, 14 parameters; net benefit in
@@ -205,11 +205,11 @@ pounds at 20,000 pounds per QALY; a validation target only).
 | EVPPI `logor_side_effects`, Sadatsafavi, 1 separator | 333.50404 | 333.50404 | 5.58 | 5e-8 |
 | EVPPI `logor_side_effects`, Sadatsafavi, 2 separators | 333.50404 | 333.50404 | 5.58 | 2e-8 |
 | EVPPI `logor_side_effects`, GAM | 332.05596 | 331.86758 | 5.56 | 0.19 |
-| EVPPI `logor_side_effects`, Gaussian process, first 1500 draws | 328.47937 | 329.81334 | 14.3 | −1.33 |
+| EVPPI `logor_side_effects`, Gaussian process, first 1500 draws | 327.85169 | 329.81334 | 14.3 | −1.96 |
 | EVPPI `u_hospital`, Sadatsafavi, 1 separator | 6.9508085 | 6.9508085 | 4.44 | 4e-8 |
 | EVPPI `u_hospital`, GAM | 4.7256313 | 4.6710089 | 3.31 | 0.055 |
 | EVPPI of the pair, GAM tensor | 333.85329 | 333.87573 | 5.57 | −0.022 |
-| EVPPI of five parameters, Gaussian process, first 1500 draws | 339.22751 | 339.35972 | 14.1 | −0.13 |
+| EVPPI of five parameters, Gaussian process, first 1500 draws | 339.22943 | 339.35972 | 14.1 | −0.13 |
 
 ### Sample-based estimators against SAVI's test data
 
@@ -363,8 +363,9 @@ What the comparisons found:
      at 109 (77.1); run to 1e-12 `mgcv` gives 77.57, and GAM.jl at 1e-11 gives 77.44.
      Our extension therefore runs GAM.jl at 1e-11, and the REML reference in
      `savi_reference.json` is `mgcv` at 1e-12: the single parameters then agree within
-     0.2% and two of the three pairs within 0.1%; our Gaussian process against `voi`'s within 1.3%
-   and within 0.1 of a standard error. No change was needed.
+     0.2% and two of the three pairs within 0.1%; our Gaussian process against `voi`'s within 0.9%
+   where it conditions on all the draws, and within 0.45 of a standard error at its
+   defaults (see finding 6).
 4. **EVSI** estimates differ by Monte Carlo error only: each side simulates its own
    data. All are within about one standard error of each other and of the closed forms.
    `voi` has no Gaussian approximation in the sense of Jalal and Alarid-Escudero; ours
@@ -421,6 +422,25 @@ What the comparisons found:
    like limits of `voi`, not of this package; the Gaussian-process rows therefore use
    the first 1500 draws on both sides. Ours takes a seeded random subsample
    (`max_points`, default 1500) and predicts at every draw.
+
+   **Our Gaussian-process estimate depends on its subsamples, more than its standard
+   error says.** Found when a tutorial's five-parameter estimate came out as 1.93 on
+   Julia 1.12 and 1.45 on Julia 1.13 with no change to the code. Two causes. The
+   subsamples were chosen with `shuffle!`, which Julia does not keep the same between
+   versions; they now come from a SplitMix64 generator in the package and are the same
+   everywhere. And the estimate moved with the subsample used for the hyperparameters:
+   1.45 to 1.98 over eight seeds at 250 points, against a standard error of 0.11. The
+   search was not at fault (longer runs and restarts end at the same likelihood); the
+   likelihood on 250 points is nearly flat when the focal parameters explain little of
+   the payoff. On a made-up problem with a known answer, 500 points cut the spread
+   between seeds from 0.107 to 0.036 at 600 draws and from 0.118 to 0.080 at 5000 (the
+   rest comes from conditioning on 1500 of the draws); with a strong signal the spread
+   was 0.02 either way. The default is now 500 points, and the tutorial's range over
+   seeds is 1.72 to 1.92. The same effect is visible above: on the normal model the fit
+   is linear, as the truth is, for most subsamples (0.0693 for p1) and 0.074 to 0.077
+   for a few, which is why those rows estimate the hyperparameters on all the draws;
+   and the default on the six-parameter model is 0.0096 from `voi` (0.4 standard
+   errors) where the fit on all points is 0.0002 away.
 7. **Conventions that differ**, now stated in the docstrings: `Hurwicz(α)` puts `α` on
    the best outcome (some texts put it on the worst); `CVaR(α)` and `Quantile(α)` are
    for utilities, the negatives of the expected shortfall and value at risk of

@@ -264,6 +264,14 @@ md_table(["focal parameters", "method chosen", "EVPPI (newts)", "standard error"
 The method column shows the rule at work: four parameters go to the spline and five or
 six to the Gaussian process. An explicit method always overrides it.
 
+The Gaussian-process estimate also depends on which draws were used to choose the
+length scales, and its standard error does not include that. Here the five parameters
+explain little of the payoff (the habitat, which is not among them, explains most), so
+the dependence is visible: other values of `seed` give estimates from about 1.7 to
+1.9 for the five parameters. With 250 draws for the length scales instead of the
+default 500 the range was 1.45 to 1.98. When the answer matters, compare two or three
+seeds.
+
 ## A check against closed forms
 
 The estimators are tested against exact enumeration on finite problems in the package's

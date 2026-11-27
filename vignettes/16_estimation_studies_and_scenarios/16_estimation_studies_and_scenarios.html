@@ -634,13 +634,13 @@ draws left out and scores it on those:</p>
 <tbody>
 <tr>
 <td style="text-align: left;">linear</td>
-<td style="text-align: right;">0.113</td>
+<td style="text-align: right;">0.114</td>
 <td style="text-align: right;">0.888</td>
 <td style="text-align: right;">0.08</td>
 </tr>
 <tr>
 <td style="text-align: left;">spline</td>
-<td style="text-align: right;">0.136</td>
+<td style="text-align: right;">0.134</td>
 <td style="text-align: right;">0.909</td>
 <td style="text-align: right;">0.069</td>
 </tr>
@@ -652,7 +652,7 @@ draws left out and scores it on those:</p>
 </tr>
 <tr>
 <td style="text-align: left;">blocks</td>
-<td style="text-align: right;">0.114</td>
+<td style="text-align: right;">0.12</td>
 <td style="text-align: right;">0.959</td>
 <td style="text-align: right;">0.089</td>
 </tr>
@@ -754,9 +754,9 @@ ways.</p>
 </tr>
 <tr>
 <td style="text-align: left;">moment matching</td>
-<td style="text-align: right;">0.843</td>
-<td style="text-align: right;">0.282</td>
-<td style="text-align: right;">0.903</td>
+<td style="text-align: right;">0.752</td>
+<td style="text-align: right;">0.281</td>
+<td style="text-align: right;">0.979</td>
 <td style="text-align: right;">0.176</td>
 </tr>
 </tbody>
@@ -773,7 +773,7 @@ between zero and one:</p>
 <div class="sourceCode" id="cb17"><pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>(five_females<span class="op">=</span>five[<span class="kw">end</span>][<span class="fl">2</span>].details.variance_ratio,</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a> eighty_females<span class="op">=</span>eighty[<span class="kw">end</span>][<span class="fl">2</span>].details.variance_ratio,</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a> expected<span class="op">=</span>(five<span class="op">=</span><span class="fl">5</span> <span class="op">/</span> (prior_worth <span class="op">+</span> <span class="fl">5</span>), eighty<span class="op">=</span><span class="fl">80</span> <span class="op">/</span> (prior_worth <span class="op">+</span> <span class="fl">80</span>)))</span></code></pre></div>
-<pre><code>(five_females = 0.9143605738644096, eighty_females = 1.4746394685168742, expected = (five = 0.7101449275362319, eighty = 0.9751243781094526))</code></pre>
+<pre><code>(five_females = 0.7583280433918498, eighty_females = 1.072728020434664, expected = (five = 0.7101449275362319, eighty = 0.9751243781094526))</code></pre>
 <p>At five females it is above the share expected for a normal mean, and
 at eighty it is above one, which no study can be: the estimate is then
 capped at the EVPPI (<code>details.capped</code>), and what is reported

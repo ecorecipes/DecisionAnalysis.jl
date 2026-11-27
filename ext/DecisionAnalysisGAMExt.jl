@@ -14,7 +14,10 @@ using GAM: GAM
 # information is not: at GAM.jl's default tolerance (1e-7, on the relative change of
 # the score) the search stops where an estimate can still be 6% from the one at the
 # optimum. The tolerance here is where the estimates stop moving; the fits are of a
-# linear model, so the extra iterations cost little.
+# linear model, so the extra iterations cost little. Still needed with the GAM.jl that
+# no longer stops at the first flat step of the score: at its defaults all but one of
+# the REML comparisons in test/test_savi.jl pass, and that one gives 0.94 where mgcv
+# gives 0.14.
 const _CONTROL = GAM.gam_control(; epsilon=1e-11, outer_maxit=2000)
 
 # The formula `y ~ ...` and the data columns, with safe names. The formula is built

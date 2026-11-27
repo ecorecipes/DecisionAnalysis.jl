@@ -641,8 +641,8 @@ interaction</td>
 </tr>
 <tr>
 <td style="text-align: left;">contact and newts, Gaussian process</td>
-<td style="text-align: right;">1.685</td>
-<td style="text-align: right;">0.088</td>
+<td style="text-align: right;">1.651</td>
+<td style="text-align: right;">0.087</td>
 <td style="text-align: right;">0</td>
 <td style="text-align: right;">-</td>
 </tr>
@@ -735,7 +735,7 @@ the illustration</strong> and is not part of the toy model.</p>
 <td style="text-align: left;">five parameters (default: Gaussian
 process)</td>
 <td style="text-align: right;">GaussianProcessRegression</td>
-<td style="text-align: right;">1.45</td>
+<td style="text-align: right;">1.717</td>
 <td style="text-align: right;">0.109</td>
 </tr>
 <tr>
@@ -747,8 +747,8 @@ process)</td>
 <tr>
 <td style="text-align: left;">all six</td>
 <td style="text-align: right;">GaussianProcessRegression</td>
-<td style="text-align: right;">2.142</td>
-<td style="text-align: right;">0.113</td>
+<td style="text-align: right;">1.938</td>
+<td style="text-align: right;">0.108</td>
 </tr>
 <tr>
 <td style="text-align: left;">the four added ones only (spline, by
@@ -762,6 +762,14 @@ default)</td>
 <p>The method column shows the rule at work: four parameters go to the
 spline and five or six to the Gaussian process. An explicit method
 always overrides it.</p>
+<p>The Gaussian-process estimate also depends on which draws were used
+to choose the length scales, and its standard error does not include
+that. Here the five parameters explain little of the payoff (the
+habitat, which is not among them, explains most), so the dependence is
+visible: other values of <code>seed</code> give estimates from about 1.7
+to 1.9 for the five parameters. With 250 draws for the length scales
+instead of the default 500 the range was 1.45 to 1.98. When the answer
+matters, compare two or three seeds.</p>
 <h1 id="a-check-against-closed-forms">A check against closed forms</h1>
 <p>The estimators are tested against exact enumeration on finite
 problems in the package’s test suite. A second check is a model with a
@@ -900,15 +908,15 @@ contributions.</p>
 <tbody>
 <tr>
 <td style="text-align: left;">EVPPI(p1, x3..x6), Gaussian process</td>
-<td style="text-align: right;">0.2212</td>
-<td style="text-align: right;">0.0176</td>
+<td style="text-align: right;">0.2042</td>
+<td style="text-align: right;">0.0175</td>
 <td style="text-align: right;">0</td>
 <td style="text-align: right;">-</td>
 <td style="text-align: right;">0.1996</td>
 </tr>
 <tr>
 <td style="text-align: left;">EVPPI(p2, x3..x6), Gaussian process</td>
-<td style="text-align: right;">0.4976</td>
+<td style="text-align: right;">0.495</td>
 <td style="text-align: right;">0.0177</td>
 <td style="text-align: right;">0</td>
 <td style="text-align: right;">-</td>

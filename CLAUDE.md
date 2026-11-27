@@ -213,7 +213,10 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
   A regression backend subtypes `AbstractRegression` and implements `fitted_conditional_means`.
 - `src/gaussian_process.jl`: `GaussianProcessRegression`, a small internal Gaussian process (linear mean,
   squared-exponential kernel, nugget, hyperparameters by marginal likelihood with a deterministic
-  Nelder-Mead search, seeded subsamples), for five or more focal parameters.
+  Nelder-Mead search, seeded subsamples), for five or more focal parameters. Seeded subsamples and
+  folds use `_SplitMix64` and `_shuffle!` from this file, never `shuffle!` or `randperm`, whose
+  results change between Julia versions. The estimate depends on the subsample and its standard error
+  does not include that (validation/README.md, finding 6).
 - `src/mars.jl`: `MARSRegression`, multivariate adaptive regression splines written from Friedman (1991):
   greedy pairs of hinges at a grid of weighted quantiles, pruned by generalised cross-validation, one basis
   for all actions.

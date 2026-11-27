@@ -144,6 +144,18 @@ end
               evppi(problem, focal,
                     GaussianProcessRegression(; max_points=400, seed=2)).value
 
+        # The subsamples are the same on every Julia version: the generator is
+        # SplitMix64, checked against its published first outputs from seed 0, and
+        # the shuffle is pinned.
+        generator = DecisionAnalysis._SplitMix64(0)
+        @test [DecisionAnalysis._next!(generator) for _ in 1:3] ==
+              [0xe220a8397b1dcdaf, 0x6e789e6aa1b965f4, 0x06c45d188009454f]
+        @test DecisionAnalysis._shuffle!(DecisionAnalysis._SplitMix64(1), collect(1:10)) ==
+              [10, 1, 2, 5, 9, 3, 4, 8, 7, 6]
+        @test sort!(DecisionAnalysis._shuffle!(DecisionAnalysis._SplitMix64(7),
+                                               collect(1:1000))) == 1:1000
+        @test GaussianProcessRegression().hyper_points == 500
+
         # Noise is not fitted: with the other parameters as noise, the estimate stays
         # well below the EVPI of the sample. (Length scales below the spacing of the
         # points would make the process pass for noise and reproduce the payoffs; the

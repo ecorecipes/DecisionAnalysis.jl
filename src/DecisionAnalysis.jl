@@ -66,7 +66,7 @@ module DecisionAnalysis
 using JuMP: JuMP
 using LinearAlgebra: ColumnNorm, Diagonal, I, Symmetric, cholesky, dot, eigen, issuccess,
                      logdet, qr, tr
-using Random: AbstractRNG, Xoshiro, randn!, shuffle!
+using Random: AbstractRNG, Xoshiro, randn!
 using SpecialFunctions: erfc
 using Statistics: mean
 using Logging: NullLogger, with_logger

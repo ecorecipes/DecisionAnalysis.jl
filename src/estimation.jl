@@ -439,7 +439,7 @@ Compare regression methods for an [`evppi`](@ref) (or an [`evsi`](@ref) by summa
 statistics) by how well each predicts **draws it was not fitted to**. No method is
 reliable everywhere, and the estimate's own standard error does not show a bad fit
 (Jackson et al. 2022), so the comparison is by `folds`-fold cross-validation: the draws
-are split at random (`Xoshiro(seed)`), each part in turn is given zero weight in the
+are split at random (from `seed`, the same split on every Julia version), each part in turn is given zero weight in the
 fit, and its payoffs' differences from the act-now action are predicted from the rest.
 
 `methods` is a named collection or a list of regressions ([`SplineRegression`](@ref),
@@ -471,7 +471,7 @@ function compare_regressions(problem::DecisionProblem, columns, methods; folds::
     end
     n = length(w)
     2 <= folds <= n || throw(ArgumentError("folds must lie between 2 and $n, got $folds"))
-    fold = [mod1(i, Int(folds)) for i in 1:n][shuffle!(Xoshiro(seed), collect(1:n))]
+    fold = [mod1(i, Int(folds)) for i in 1:n][_shuffle!(_SplitMix64(seed), collect(1:n))]
     wf = Float64.(w)
     Qf = Float64.(Q)
     _, a = _act_now(Q, w)

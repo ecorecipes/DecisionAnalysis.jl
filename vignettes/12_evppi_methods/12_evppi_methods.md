@@ -285,7 +285,7 @@ voi_table(groups)
 | contact and habitat, spline with interaction | 1.81 | 0.085 | 0 | \- |
 | contact and habitat, GAM.jl | 1.683 | 0.085 | 0 | \- |
 | contact and newts, spline | 1.662 | 0.086 | 0 | \- |
-| contact and newts, Gaussian process | 1.685 | 0.088 | 0 | \- |
+| contact and newts, Gaussian process | 1.651 | 0.087 | 0 | \- |
 | all three: the regression EVPI | 1.717 | 0.085 | 0 | \- |
 | EVPI, plain sample average | 1.914 | 0.082 | 0 | 0.269 |
 
@@ -358,14 +358,23 @@ md_table(["focal parameters", "method chosen", "EVPPI (newts)", "standard error"
 
 | focal parameters | method chosen | EVPPI (newts) | standard error |
 |:---|---:|---:|---:|
-| five parameters (default: Gaussian process) | GaussianProcessRegression | 1.45 | 0.109 |
+| five parameters (default: Gaussian process) | GaussianProcessRegression | 1.717 | 0.109 |
 | the same five, additive spline | SplineRegression | 1.795 | 0.109 |
-| all six | GaussianProcessRegression | 2.142 | 0.113 |
+| all six | GaussianProcessRegression | 1.938 | 0.108 |
 | the four added ones only (spline, by default) | SplineRegression | 0.429 | 0.147 |
 
 The method column shows the rule at work: four parameters go to the
 spline and five or six to the Gaussian process. An explicit method
 always overrides it.
+
+The Gaussian-process estimate also depends on which draws were used to
+choose the length scales, and its standard error does not include that.
+Here the five parameters explain little of the payoff (the habitat,
+which is not among them, explains most), so the dependence is visible:
+other values of `seed` give estimates from about 1.7 to 1.9 for the five
+parameters. With 250 draws for the length scales instead of the default
+500 the range was 1.45 to 1.98. When the answer matters, compare two or
+three seeds.
 
 ## A check against closed forms
 
@@ -436,8 +445,8 @@ voi_table(gp_checks; digits=4, truth=[closed(1 + 1), closed(4 + 1)])
 
 | estimate | value | standard error | act-now bias | cell-noise bias | reference |
 |:---|---:|---:|---:|---:|---:|
-| EVPPI(p1, x3..x6), Gaussian process | 0.2212 | 0.0176 | 0 | \- | 0.1996 |
-| EVPPI(p2, x3..x6), Gaussian process | 0.4976 | 0.0177 | 0 | \- | 0.4798 |
+| EVPPI(p1, x3..x6), Gaussian process | 0.2042 | 0.0175 | 0 | \- | 0.1996 |
+| EVPPI(p2, x3..x6), Gaussian process | 0.495 | 0.0177 | 0 | \- | 0.4798 |
 
 These estimators are also compared with the R package `voi` on the same
 draws: its `so` and `sal` methods agree with `StrongOakley` and

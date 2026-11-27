@@ -331,10 +331,10 @@ md_table(["method", "variance of held-out draws explained", "EVPPI", "standard e
 
 | method | variance of held-out draws explained | EVPPI | standard error |
 |:-------|-------------------------------------:|------:|---------------:|
-| linear |                                0.113 | 0.888 |           0.08 |
-| spline |                                0.136 | 0.909 |          0.069 |
+| linear |                                0.114 | 0.888 |           0.08 |
+| spline |                                0.134 | 0.909 |          0.069 |
 | mars   |                                0.136 |  0.94 |          0.075 |
-| blocks |                                0.114 | 0.959 |          0.089 |
+| blocks |                                 0.12 | 0.959 |          0.089 |
 
 The methods agree on the value to within its standard error, and the
 adaptive splines (`MARSRegression`, the method `voi` reaches through
@@ -393,7 +393,7 @@ md_table(["method", "EVSI, 5 females", "standard error", "EVSI, 80 females", "st
 |:---|---:|---:|---:|---:|
 | regression on the study’s mean | 0.671 | 0.061 | 0.893 | 0.063 |
 | Gaussian approximation | 0.687 | 0.05 | 0.891 | 0.067 |
-| moment matching | 0.843 | 0.282 | 0.903 | 0.176 |
+| moment matching | 0.752 | 0.281 | 0.979 | 0.176 |
 
 Five dissections are already worth about three quarters of what
 fecundity is worth to the decision (its EVPPI, about 0.9 adults). The
@@ -411,7 +411,7 @@ between zero and one:
  expected=(five=5 / (prior_worth + 5), eighty=80 / (prior_worth + 80)))
 ```
 
-    (five_females = 0.9143605738644096, eighty_females = 1.4746394685168742, expected = (five = 0.7101449275362319, eighty = 0.9751243781094526))
+    (five_females = 0.7583280433918498, eighty_females = 1.072728020434664, expected = (five = 0.7101449275362319, eighty = 0.9751243781094526))
 
 At five females it is above the share expected for a normal mean, and at
 eighty it is above one, which no study can be: the estimate is then

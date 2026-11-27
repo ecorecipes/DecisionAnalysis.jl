@@ -4,7 +4,7 @@
 # g[a, i] of the estimator at the top of `voi_sample.jl`.
 
 """
-    GaussianProcessRegression(; max_points=1500, hyper_points=250, seed=1,
+    GaussianProcessRegression(; max_points=1500, hyper_points=500, seed=1,
                               min_nugget=1e-8, min_length_scale=1)
 
 Regression by a **Gaussian process**, the method for five or more focal parameters
@@ -24,12 +24,21 @@ Nelder-Mead search from a fixed start. The fitted conditional means are the
 posterior mean of `β₀ + βᵀ x + f(x)` at every draw.
 
 The cost of a Gaussian process grows with the cube of the number of points, so two
-subsamples of the draws are used, both chosen with a `Xoshiro(seed)`:
+subsamples of the draws are used, both chosen from `seed` by a generator that gives
+the same subsamples on every Julia version and platform:
 
 - `hyper_points`: the number of draws used to estimate the hyperparameters;
 - `max_points`: the largest number of draws the process is conditioned on. With more
   draws than this, the process is fitted to a subsample and **predicts the
   conditional means of all the draws**, so every draw still enters the estimate.
+
+**The estimate depends on the subsamples, and its standard error does not include
+that.** The dependence is small when the columns explain much of the payoff and can
+be as large as the standard error when they explain little, because the length scales
+are then poorly determined by a few hundred points. Compare two or three values of
+`seed` to see it; a larger `hyper_points` reduces it at a cost that grows with the cube
+(the default of 500 takes about three times as long as 250, the value Strong, Oakley
+and Brennan use, and roughly halved the spread between seeds where it was largest).
 
 A draw's weight divides its noise variance; draws of weight zero are not used in the
 fit. `min_nugget` is the smallest nugget the search may choose (relative to the
@@ -58,7 +67,7 @@ struct GaussianProcessRegression <: AbstractRegression
     min_nugget::Float64
     min_length_scale::Float64
     function GaussianProcessRegression(; max_points::Integer=1500,
-                                       hyper_points::Integer=250, seed::Integer=1,
+                                       hyper_points::Integer=500, seed::Integer=1,
                                        min_nugget::Real=1e-8, min_length_scale::Real=1)
         max_points >= 10 ||
             throw(ArgumentError("max_points must be at least 10, got $max_points"))
@@ -72,6 +81,32 @@ struct GaussianProcessRegression <: AbstractRegression
         return new(max_points, min(hyper_points, max_points), seed, Float64(min_nugget),
                    Float64(min_length_scale))
     end
+end
+
+# A seeded shuffle that is the same on every Julia version and platform. `shuffle!` is
+# not: Julia may change how it draws from a generator between versions, and then a
+# subsample chosen with it, and every estimate computed from that subsample, changes
+# with no change to this package. SplitMix64 (Steele, Lea and Flood 2014) drives a
+# Fisher-Yates shuffle; the index is the high word of a 128-bit product, whose
+# departure from uniform is below 2^-64 times the length.
+mutable struct _SplitMix64
+    state::UInt64
+    _SplitMix64(seed::Integer) = new(seed % UInt64)
+end
+
+function _next!(g::_SplitMix64)
+    z = (g.state += 0x9e3779b97f4a7c15)
+    z = (z ⊻ (z >> 30)) * 0xbf58476d1ce4e5b9
+    z = (z ⊻ (z >> 27)) * 0x94d049bb133111eb
+    return z ⊻ (z >> 31)
+end
+
+function _shuffle!(g::_SplitMix64, v::AbstractVector)
+    for i in length(v):-1:2
+        j = 1 + Int((UInt128(_next!(g)) * UInt128(i)) >> 64)
+        v[i], v[j] = v[j], v[i]
+    end
+    return v
 end
 
 # Squared-exponential correlations between the rows of X and of Y, after dividing each
@@ -195,14 +230,14 @@ function fitted_conditional_means(method::GaussianProcessRegression, columns::Na
     G = repeat(means, 1, n)
     p == 0 && return G
     usable = findall(>(0), wf)
-    rng = Xoshiro(method.seed)
+    rng = _SplitMix64(method.seed)
     fit = length(usable) <= method.max_points ? usable :
-          sort!(shuffle!(rng, copy(usable))[1:(method.max_points)])
+          sort!(_shuffle!(rng, copy(usable))[1:(method.max_points)])
     length(fit) > p + 3 ||
         throw(ArgumentError("a Gaussian process on $p columns needs more than " *
                             "$(p + 3) draws of positive weight, got $(length(fit))"))
     hyper = length(fit) <= method.hyper_points ? collect(eachindex(fit)) :
-            sort!(shuffle!(rng, collect(eachindex(fit)))[1:(method.hyper_points)])
+            sort!(_shuffle!(rng, collect(eachindex(fit)))[1:(method.hyper_points)])
     Xf = X[fit, :]
     Hf = hcat(ones(length(fit)), Xf)
     # A draw's weight divides its noise variance (relative to the mean weight).

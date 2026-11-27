@@ -44,9 +44,11 @@ row("EVPI", evpi(normal, SampleAverage()), r["evpi"])
 row("EVPPI p1, GAM", evppi(normal, :p1, GAMRegression()), r["p1_gam"])
 row("EVPPI p2, GAM", evppi(normal, :p2, GAMRegression()), r["p2_gam"])
 row("EVPPI p1, spline", evppi(normal, :p1, SplineRegression()), r["p1_gam"])
-row("EVPPI p1, GP", evppi(normal, :p1, GaussianProcessRegression(; max_points=2000)),
+row("EVPPI p1, GP",
+    evppi(normal, :p1, GaussianProcessRegression(; max_points=2000, hyper_points=2000)),
     r["p1_gp"])
-row("EVPPI p2, GP", evppi(normal, :p2, GaussianProcessRegression(; max_points=2000)),
+row("EVPPI p2, GP",
+    evppi(normal, :p2, GaussianProcessRegression(; max_points=2000, hyper_points=2000)),
     r["p2_gp"])
 row("EVPPI p1, so 20 blocks", evppi(normal, :p1, StrongOakley(; blocks=20)), r["p1_so_20"])
 row("EVPPI p2, so 20 blocks", evppi(normal, :p2, StrongOakley(; blocks=20)), r["p2_so_20"])
@@ -58,7 +60,8 @@ row("EVPPI p2, sal 2", evppi(normal, :p2, Sadatsafavi(; separators=2)), r["p2_sa
 row("EVPPI p1+p2, GAM tensor", evppi(normal, (:p1, :p2), GAMRegression(; tensor=true)),
     r["p1_p2_gam"])
 row("EVPPI p1+p2, GP",
-    evppi(normal, (:p1, :p2), GaussianProcessRegression(; max_points=2000)), r["p1_p2_gp"])
+    evppi(normal, (:p1, :p2),
+          GaussianProcessRegression(; max_points=2000, hyper_points=2000)), r["p1_p2_gp"])
 # EVSI of m observations of p1 with known sd 1; closed forms 0.0723251 and 0.0821176.
 using Random
 for m in (10, 100)
