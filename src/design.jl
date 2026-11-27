@@ -179,7 +179,7 @@ function expected_variance_reduction(problem::DecisionProblem,
     fit = _require_fit(_method_for(method, columns))
     wf = Float64.(w)
     gf = Float64.(g)
-    G, _ = _fit(fit, columns, reshape(gf, 1, :), w)
+    G, _ = _fit_screened(fit, columns, reshape(gf, 1, :), w)
     centre = dot(wf, gf)
     total = sum(wf .* (gf .- centre) .^ 2)
     between = sum(wf[i] * (Float64(G[1, i]) - centre)^2 for i in eachindex(wf))

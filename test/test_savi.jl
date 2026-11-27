@@ -113,6 +113,29 @@ end
     g = rand(rng, ["x", "y"], n)
     @test isempty(evppi(problem((; a, g)), (:a, :g),
                         SplineRegression()).details.redundant_parameters)
+
+    # The same screen wherever a regression is fitted, not only in `evppi`: a constant
+    # or duplicated focal parameter changes nothing.
+    plain, wide = problem((; a, b)), problem((; a, c=fill(2.0, n), d=2 .* a .+ 1, b))
+    spline = SplineRegression()
+    @test DecisionAnalysis._fit_screened(spline, (; a, d=2 .* a .+ 1), Q,
+                                         plain.belief.weights) ==
+          DecisionAnalysis._fit(spline, (; a), Q, plain.belief.weights)
+    quantity = a .^ 2 .+ b
+    for method in
+        (nothing, spline, GaussianProcessRegression(; max_points=300, hyper_points=100))
+        @test expected_variance_reduction(wide.belief, (:a, :c, :d); quantity, method) ==
+              expected_variance_reduction(plain.belief, :a; quantity, method)
+        @test expected_variance_reduction(wide, (:a, :c, :d); quantity, method) ==
+              expected_variance_reduction(plain, :a; quantity, method)
+    end
+    @test regression_check(wide, (:a, :c, :d), spline) ==
+          regression_check(plain, :a, spline)
+    @test compare_regressions(wide, (:a, :c, :d), [spline, GAMRegression()]) ==
+          compare_regressions(plain, :a, [spline, GAMRegression()])
+    # A method that is not a regression still gets the columns as they are.
+    @test first(DecisionAnalysis._fit_columns(StrongOakley(), (; a, c=fill(2.0, n)))) ==
+          (; a, c=fill(2.0, n))
 end
 
 @testset "probability that an action is best" begin

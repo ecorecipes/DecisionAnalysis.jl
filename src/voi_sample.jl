@@ -736,11 +736,23 @@ function _screen_columns(columns::NamedTuple)
 end
 const _REDUNDANT_TOL = 1e-8
 
+# The columns `method` is fitted on and the names left out: screened for a regression,
+# as given for a method that fits no smooth function of them.
+function _fit_columns(method, columns::NamedTuple)
+    return method isa Union{AbstractRegression,_Shrunk} ? _screen_columns(columns) :
+           (columns, Symbol[])
+end
+
+# `_fit` on the screened columns: what every caller outside `_estimate` uses, so that a
+# constant or duplicated focal parameter is left out wherever a regression is fitted.
+function _fit_screened(method, columns::NamedTuple, Q, w)
+    return _fit(method, first(_fit_columns(method, columns)), Q, w)
+end
+
 function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTuple,
                    Q::AbstractMatrix, w::AbstractVector; bootstrap::Integer, seed::Integer,
                    cells=nothing, extra=(;))
-    used, redundant = method isa Union{AbstractRegression,_Shrunk} ?
-                      _screen_columns(columns) : (columns, Symbol[])
+    used, redundant = _fit_columns(method, columns)
     G, info = _fit(method, used, Q, w)
     value, v0, a = _voi_from_fit(G, Q, w)
     # A constant fit is worth nothing; the sum above gives zero only to rounding.

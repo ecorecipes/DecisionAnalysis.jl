@@ -22,7 +22,7 @@ end
 function _explained_variance(method::AbstractVOIMethod, columns::NamedTuple,
                              g::Vector{Float64}, w::AbstractVector)
     wf = Float64.(w)
-    G, _ = _fit(method, columns, reshape(g, 1, :), w)
+    G, _ = _fit_screened(method, columns, reshape(g, 1, :), w)
     centre = dot(wf, g)
     total = sum(wf .* (g .- centre) .^ 2)
     between = sum(wf[i] * (Float64(G[1, i]) - centre)^2 for i in eachindex(wf))
@@ -56,6 +56,9 @@ The result is as for the other methods, `(; prior_variance,
 expected_posterior_variance, reduction, share)`. Under squared-error loss the
 reduction *is* the value of the information, in the units of the quantity squared; a
 weighted sum of several outputs is one quantity, `quantity = c₁ g₁ + c₂ g₂`.
+
+As in [`evppi`](@ref), a regression is not fitted on a focal parameter that is
+constant or a linear function of the ones named before it.
 """
 function expected_variance_reduction(belief::SampleBelief,
                                      focal::Union{Symbol,Tuple{Vararg{Symbol}}}; quantity,
@@ -394,7 +397,7 @@ function _regression_check(problem, columns, method, bins)
     method isa SampleAverage &&
         throw(ArgumentError("SampleAverage fits nothing to check"))
     Q, w, cols = _check_columns(problem, columns)
-    G, _ = _fit(method, cols, Q, w)
+    G, _ = _fit_screened(method, cols, Q, w)
     wf = Float64.(w)
     Qf, Gf = Float64.(Q), Float64.(G)
     _, a = _act_now(Q, w)
@@ -439,8 +442,9 @@ Compare regression methods for an [`evppi`](@ref) (or an [`evsi`](@ref) by summa
 statistics) by how well each predicts **draws it was not fitted to**. No method is
 reliable everywhere, and the estimate's own standard error does not show a bad fit
 (Jackson et al. 2022), so the comparison is by `folds`-fold cross-validation: the draws
-are split at random (from `seed`, the same split on every Julia version), each part in turn is given zero weight in the
-fit, and its payoffs' differences from the act-now action are predicted from the rest.
+are split at random (from `seed`, the same split on every Julia version), each part
+in turn is given zero weight in the fit, and its payoffs' differences from the act-now
+action are predicted from the rest.
 
 `methods` is a named collection or a list of regressions ([`SplineRegression`](@ref),
 [`MARSRegression`](@ref), [`GaussianProcessRegression`](@ref), [`GAMRegression`](@ref))
@@ -485,7 +489,7 @@ function compare_regressions(problem::DecisionProblem, columns, methods; folds::
             held = fold .== k
             training = ifelse.(held, 0.0, wf)
             training ./= sum(training)
-            G, _ = _fit(method, cols, Q, training)
+            G, _ = _fit_screened(method, cols, Q, training)
             predicted = Float64.(G) .- permutedims(Float64.(G[a, :]))
             error += sum(wf[i] * (observed[b, i] - predicted[b, i])^2
                          for b in axes(Q, 1), i in findall(held))

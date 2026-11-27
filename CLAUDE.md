@@ -111,7 +111,10 @@ packages by URL and runs only with `DECISIONANALYSIS_ID=1`.
 - **A regression is fitted on the focal parameters that carry something.** `_estimate` leaves out a numeric
   column that is constant or a linear function of the numeric columns before it (`_screen_columns`; an
   exact copy of a parameter moved an estimate by half a standard error before), keeps at least one, and
-  names what it left out in `details.redundant_parameters` and in the report. Only for regressions: the
+  names what it left out in `details.redundant_parameters` and in the report. Every other place that fits
+  a regression (`expected_variance_reduction`, `regression_check`, `compare_regressions`, moment-matching
+  `evsi`) goes through `_fit_screened`, which screens in the same way: never call `_fit` on unscreened
+  focal columns. Only for regressions: the
   cell-mean and single-parameter methods get the columns as given, and the default method is still chosen
   from the columns as named. SAVI (BSD 3-clause) screens in the same way; its 1000-draw test data are a
   fixture (`test/fixtures/savi/`, `test/test_savi.jl`), with reference values from mgcv.
