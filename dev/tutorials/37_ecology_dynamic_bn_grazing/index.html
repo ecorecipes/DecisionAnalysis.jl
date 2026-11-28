@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>Dynamic Bayesian networks, multi-objective grazing, and model discrimination · DecisionAnalysis.jl</title><meta name="title" content="Dynamic Bayesian networks, multi-objective grazing, and model discrimination · DecisionAnalysis.jl"/><meta property="og:title" content="Dynamic Bayesian networks, multi-objective grazing, and model discrimination · DecisionAnalysis.jl"/><meta property="twitter:title" content="Dynamic Bayesian networks, multi-objective grazing, and model discrimination · DecisionAnalysis.jl"/><meta name="description" content="Documentation for DecisionAnalysis.jl."/><meta property="og:description" content="Documentation for DecisionAnalysis.jl."/><meta property="twitter:description" content="Documentation for DecisionAnalysis.jl."/><meta property="og:url" content="https://ecorecipes.github.io/DecisionAnalysis.jl/tutorials/37_ecology_dynamic_bn_grazing/"/><meta property="twitter:url" content="https://ecorecipes.github.io/DecisionAnalysis.jl/tutorials/37_ecology_dynamic_bn_grazing/"/><link rel="canonical" href="https://ecorecipes.github.io/DecisionAnalysis.jl/tutorials/37_ecology_dynamic_bn_grazing/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">DecisionAnalysis.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../01_first_decision_table/">A first decision table</a></li><li><a class="tocitem" href="../02_decision_rules/">Decision rules side by side</a></li><li><a class="tocitem" href="../03_regret/">Regret</a></li><li><a class="tocitem" href="../04_experiments_and_evsi/">Experiments and the value of sample information</a></li><li><a class="tocitem" href="../05_partial_information/">Partial information: which uncertainty matters</a></li><li><a class="tocitem" href="../06_comparing_experiments/">Comparing experiments</a></li><li><a class="tocitem" href="../07_uncertain_beliefs/">Uncertain beliefs: sets of priors and scenarios</a></li><li><a class="tocitem" href="../08_several_objectives/">Several objectives</a></li><li><a class="tocitem" href="../09_decision_report/">The decision report</a></li><li><a class="tocitem" href="../10_exact_arithmetic_and_certificates/">Exact arithmetic and certificates</a></li><li><a class="tocitem" href="../11_sample_beliefs_and_outcome_tables/">Sample beliefs and outcome tables</a></li><li><a class="tocitem" href="../12_evppi_methods/">EVPPI from a sample: which parameter is worth learning</a></li><li><a class="tocitem" href="../13_evsi_methods/">EVSI from a sample: what a study is worth</a></li><li><a class="tocitem" href="../14_bd_epizootic_response/">Bd epizootic response on the Drawert et al. (2017) model</a></li><li><a class="tocitem" href="../15_risk_attitude_and_attributes/">Risk attitude and several attributes</a></li><li><a class="tocitem" href="../16_estimation_studies_and_scenarios/">Which vital rate to measure: estimation, study design and scenario design</a></li><li><a class="tocitem" href="../17_survey_or_act/">Survey first or act now, under a budget</a></li><li><a class="tocitem" href="../18_value_of_waiting/">Act now, or wait and learn?</a></li><li><a class="tocitem" href="../19_adaptive_management/">Learning while managing</a></li><li><a class="tocitem" href="../20_changing_state/">Managing a state that changes</a></li><li><a class="tocitem" href="../21_influence_diagrams/">From influence diagrams and Bayesian networks to a decision table</a></li></ul></li><li><span class="tocitem">Case studies</span><ul><li><input class="collapse-toggle" id="menuitem-3-1" type="checkbox" checked/><label class="tocitem" for="menuitem-3-1"><span class="docs-label">Ecology</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../22_ecology_shea_fmd/">Adaptive culling for foot-and-mouth disease (Shea et al. 2014)</a></li><li><a class="tocitem" href="../23_ecology_runge_cranes/">Learning by doing for whooping cranes (Runge et al. 2011)</a></li><li><a class="tocitem" href="../24_ecology_li_thistle/">Biological and operational uncertainty in weed control (Li et al. 2021)</a></li><li><a class="tocitem" href="../25_ecology_luhede_monitoring/">The value of imperfect water-quality monitoring (Luhede et al. 2024)</a></li><li><a class="tocitem" href="../26_ecology_christensen_turtle/">Value of information in recovery planning for a turtle (Christensen et al. 2026)</a></li><li><a class="tocitem" href="../27_ecology_bal_monitoring/">Which species to monitor, and how (Bal et al. 2018)</a></li><li><a class="tocitem" href="../28_ecology_chades_tiger/">When to stop managing or surveying a cryptic species (Chadès et al. 2008)</a></li><li><a class="tocitem" href="../29_ecology_regan_eradication/">When to stop looking for an invasive plant (Regan et al. 2006; Rout et al. 2009)</a></li><li><a class="tocitem" href="../36_ecology_canessa_bsal/">Mitigating Bsal invasion in fire salamanders under expert uncertainty and imperfect detection</a></li><li class="is-active"><a class="tocitem" href>Dynamic Bayesian networks, multi-objective grazing, and model discrimination</a><ul class="internal"><li><a class="tocitem" href="#Motivation"><span>Motivation</span></a></li><li><a class="tocitem" href="#1.-Multi-objective-grazing-influence-diagram"><span>1. Multi-objective grazing influence diagram</span></a></li><li><a class="tocitem" href="#2.-Mutual-information-versus-EVSI"><span>2. Mutual information versus EVSI</span></a></li><li><a class="tocitem" href="#3.-Model-discrimination-EVSI-across-rival-Bayesian-networks"><span>3. Model-discrimination EVSI across rival Bayesian networks</span></a></li><li><a class="tocitem" href="#4.-Dynamic-Bayesian-networks-to-sequential-adaptive-management"><span>4. Dynamic Bayesian networks to sequential adaptive management</span></a></li></ul></li><li><a class="tocitem" href="../38_ecology_coral_reef_restoration/">Coral reef restoration under warming bleaching schedules and deep uncertainty</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-2" type="checkbox"/><label class="tocitem" for="menuitem-3-2"><span class="docs-label">Human epidemiology</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../30_epidemiology_eze_icu/">ICU beds, and EVPXI against EVPPI (Eze et al. 2023)</a></li><li><a class="tocitem" href="../31_epidemiology_kim_malaria/">Which entomological uncertainty matters for malaria control (Kim et al. 2017)</a></li><li><a class="tocitem" href="../32_epidemiology_li_ebola/">Epidemiological and operational uncertainty in Ebola control (Li et al. 2019)</a></li><li><a class="tocitem" href="../33_epidemiology_atkins_vaccination/">Vaccinating before the efficacy is known (Atkins et al. 2020)</a></li><li><a class="tocitem" href="../34_epidemiology_devries_mink/">What surveillance is worth: closing mink farms (de Vries et al. 2021)</a></li><li><a class="tocitem" href="../35_epidemiology_shea_covid_models/">Seventeen models of reopening, and what knowing the right one is worth (Shea et al. 2023)</a></li></ul></li></ul></li><li><a class="tocitem" href="../../certificates/">Certificates</a></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../api/problems/">Beliefs, payoff tables and problems</a></li><li><a class="tocitem" href="../../api/rules/">Aggregators, regret and rules</a></li><li><a class="tocitem" href="../../api/information/">Experiments and exact value of information</a></li><li><a class="tocitem" href="../../api/sequential/">Designs, waiting and sequential decisions</a></li><li><a class="tocitem" href="../../api/samples/">Sample-based analysis</a></li><li><a class="tocitem" href="../../api/methods/">Model-based methods, study designs and estimation</a></li><li><a class="tocitem" href="../../api/scenarios/">Scenario designs</a></li><li><a class="tocitem" href="../../api/utilities/">Risk attitude and multi-attribute utilities</a></li><li><a class="tocitem" href="../../api/programmes/">Linear programmes, reports, certificates and exceptions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Case studies</a></li><li><a class="is-disabled">Ecology</a></li><li class="is-active"><a href>Dynamic Bayesian networks, multi-objective grazing, and model discrimination</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Dynamic Bayesian networks, multi-objective grazing, and model discrimination</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/ecorecipes/DecisionAnalysis.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/ecorecipes/DecisionAnalysis.jl/blob/main/docs/src/tutorials/37_ecology_dynamic_bn_grazing.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Dynamic-Bayesian-networks,-multi-objective-grazing,-and-model-discrimination"><a class="docs-heading-anchor" href="#Dynamic-Bayesian-networks,-multi-objective-grazing,-and-model-discrimination">Dynamic Bayesian networks, multi-objective grazing, and model discrimination</a><a id="Dynamic-Bayesian-networks,-multi-objective-grazing,-and-model-discrimination-1"></a><a class="docs-heading-anchor-permalink" href="#Dynamic-Bayesian-networks,-multi-objective-grazing,-and-model-discrimination" title="Permalink"></a></h1><p>Simon Frost</p><ul><li><a href="#motivation">Motivation</a></li><li><a href="#1-multi-objective-grazing-influence-diagram">1. Multi-objective grazing influence diagram</a></li><li><a href="#2-mutual-information-versus-evsi">2. Mutual information versus EVSI</a></li><li><a href="#3-model-discrimination-evsi-across-rival-bayesian-networks">3. Model-discrimination EVSI across rival Bayesian networks</a></li><li><a href="#4-dynamic-bayesian-networks-to-sequential-adaptive-management">4. Dynamic Bayesian networks to sequential adaptive management</a></li></ul><h2 id="Motivation"><a class="docs-heading-anchor" href="#Motivation">Motivation</a><a id="Motivation-1"></a><a class="docs-heading-anchor-permalink" href="#Motivation" title="Permalink"></a></h2><p>Ecological decisions are often built in graphical-model packages before anyone writes a payoff table: static Bayesian networks (<code>BayesianNetworks.jl</code>), influence diagrams with multiple utility nodes (<code>InfluenceDiagrams.jl</code>), and lag-1 dynamic Bayesian networks (DBNs) that represent ecosystem feedback over time.</p><p>This vignette demonstrates four horizontal bridges in <code>DecisionAnalysis.jl</code> built on the reference ecological models shipped with <code>InfluenceDiagrams.jl</code> and <code>BayesianNetworks.jl</code>:</p><ol><li><strong>Multi-objective influence diagrams</strong>  (<code>normal_form(diagram; multi_objective=true)</code>), separating  conservation benefit from management cost for <code>ParetoFront</code> and  two-way sensitivity analysis;</li><li><strong>Mutual information versus EVSI</strong>, comparing  <code>BayesianNetworkInference.sensitivity</code> (Marcot 2012) directly  against <code>DecisionAnalysis.evsi</code>;</li><li><strong>Model-discrimination EVSI</strong> across rival Bayesian networks  (<code>normal_form(hypotheses; observed=...)</code>);</li><li><strong>Dynamic Bayesian networks to sequential adaptive management</strong>  (<code>normal_form(::DynamicBayesModel)</code> → <code>adaptive_management</code>),  cross-checked with <code>FiniteKernels.FiniteKernel</code> and  <code>ResilienceCore.MarkovKernel</code> transitions.</li></ol><p>All numbers in the reference models are those shipped with <code>InfluenceDiagrams.jl</code> and <code>BayesianNetworks.jl</code> (SPEC §43, §45, §46); every decision analysis below is <strong>illustrative</strong>.</p><h2 id="1.-Multi-objective-grazing-influence-diagram"><a class="docs-heading-anchor" href="#1.-Multi-objective-grazing-influence-diagram">1. Multi-objective grazing influence diagram</a><a id="1.-Multi-objective-grazing-influence-diagram-1"></a><a class="docs-heading-anchor-permalink" href="#1.-Multi-objective-grazing-influence-diagram" title="Permalink"></a></h2><p><code>InfluenceDiagrams.reference_grazing_model()</code> models rangeland grazing management (<code>:exclude</code>, <code>:reduce</code>, <code>:maintain</code>) under uncertain <code>Climate</code> and <code>CurrentVegetation</code>, with two separate utility nodes: <code>ConservationBenefit</code> (0 or 100 for low or high biodiversity) and <code>ManagementCost</code> (−40, −15 or 0). Passing <code>multi_objective=true</code> to <code>normal_form</code> uses <code>BayesianNetworkInference.VariableElimination</code> and keeps each utility node as its own <code>PayoffTable</code>.</p><pre><code class="language-julia hljs">using DecisionAnalysis
+using InfluenceDiagrams: InfluenceDiagrams
+using BayesianNetworks: BayesianNetworks
+using BayesianNetworkInference: BayesianNetworkInference
+using FiniteKernels: FiniteKernels
+include(joinpath(&quot;..&quot;, &quot;_common.jl&quot;))
+
+const ID = InfluenceDiagrams
+const BN = BayesianNetworks
+const BNI = BayesianNetworkInference
+
+grazing = ID.reference_grazing_model()
+nf_mo = normal_form(grazing; states=[:Climate, :CurrentVegetation],
+                    multi_objective=true, baseline=:maintain)
+
+# Inspect expected score on each objective separately and the Pareto front.
+eu_ben = aggregate(Expectation(), DecisionProblem(nf_mo.objectives.ConservationBenefit,
+                                                  nf_mo.problem.belief))
+eu_cost = aggregate(Expectation(), DecisionProblem(nf_mo.objectives.ManagementCost,
+                                                   nf_mo.problem.belief))
+pf = decide(nf_mo.objectives, nf_mo.problem.belief, ParetoFront())
+
+md_table([&quot;action&quot;, &quot;E[ConservationBenefit]&quot;, &quot;E[ManagementCost]&quot;, &quot;summed EU&quot;,
+          &quot;Pareto-efficient?&quot;],
+         [[a, eu_ben[i], eu_cost[i], eu_ben[i] + eu_cost[i], a in pf.chosen]
+          for (i, a) in enumerate(action_labels(nf_mo.problem.payoff))]; digits=2)</code></pre><table><tr><th style="text-align: left">action</th><th style="text-align: right">E[ConservationBenefit]</th><th style="text-align: right">E[ManagementCost]</th><th style="text-align: right">summed EU</th><th style="text-align: right">Pareto-efficient?</th></tr><tr><td style="text-align: left"><code>exclude</code></td><td style="text-align: right">42.42</td><td style="text-align: right">-40</td><td style="text-align: right">2.42</td><td style="text-align: right">yes</td></tr><tr><td style="text-align: left"><code>reduce</code></td><td style="text-align: right">39.84</td><td style="text-align: right">-15</td><td style="text-align: right">24.84</td><td style="text-align: right">yes</td></tr><tr><td style="text-align: left"><code>maintain</code></td><td style="text-align: right">36.52</td><td style="text-align: right">0</td><td style="text-align: right">36.52</td><td style="text-align: right">yes</td></tr></table><p>All three actions sit on the Pareto front because excluding or reducing grazing raises expected biodiversity at a direct management cost. With the reference weights (1:1), <code>:maintain</code> wins in every state, so information has zero value; scaling the biodiversity benefit relative to cost reveals where the optimal policy switches.</p><pre><code class="language-julia hljs"># Two-way policy regions varying the weight on ConservationBenefit (w1) and an additive
+# bonus for excluding grazing in dry years (w2), illustrative.
+base_zero = DecisionProblem(PayoffTable(action_labels(nf_mo.problem.payoff),
+                                        state_labels(nf_mo.problem),
+                                        zeros(3, length(state_labels(nf_mo.problem)))),
+                            nf_mo.problem.belief; baseline=:maintain)
+ben_tbl = nf_mo.objectives.ConservationBenefit
+cost_tbl = nf_mo.objectives.ManagementCost
+tw = two_way_policy_regions(base_zero, ben_tbl, cost_tbl;
+                            range1=(0.5, 6.0), range2=(0.2, 2.0), grid=(25, 25))
+
+md_table([&quot;action&quot;, &quot;share of (benefit weight, cost weight) grid&quot;],
+         [[a, share] for (a, share) in pairs(tw.shares)]; digits=3)</code></pre><table><tr><th style="text-align: left">action</th><th style="text-align: right">share of (benefit weight, cost weight) grid</th></tr><tr><td style="text-align: left"><code>exclude</code></td><td style="text-align: right">0.099</td></tr><tr><td style="text-align: left"><code>reduce</code></td><td style="text-align: right">0.198</td></tr><tr><td style="text-align: left"><code>maintain</code></td><td style="text-align: right">0.702</td></tr></table><pre><code class="language-julia hljs">acts = action_labels(nf_mo.problem.payoff)
+idx_map = Dict(a =&gt; i for (i, a) in enumerate(acts))
+Z = [idx_map[a] for a in tw.action_grid]
+plt_tw = Plots.heatmap(tw.t1, tw.t2, Z&#39;;
+                       xlabel=&quot;weight on ConservationBenefit&quot;,
+                       ylabel=&quot;weight on ManagementCost&quot;,
+                       title=&quot;Optimal grazing action across objective weights (illustrative)&quot;,
+                       colorbar=false, c=:viridis)
+for (i, a) in enumerate(acts)
+    coords = [(tw.t1[r], tw.t2[c]) for r in axes(Z, 1), c in axes(Z, 2)
+              if Z[r, c] == i]
+    isempty(coords) &amp;&amp; continue
+    mx = sum(first, coords) / length(coords)
+    my = sum(last, coords) / length(coords)
+    Plots.annotate!(plt_tw, mx, my, Plots.text(String(a), :white, :bold, 10))
+end
+png_figure(plt_tw)</code></pre><p><img src="../37_ecology_dynamic_bn_grazing_files/figure-commonmark/cell-4-output-1.png" alt/></p><h2 id="2.-Mutual-information-versus-EVSI"><a class="docs-heading-anchor" href="#2.-Mutual-information-versus-EVSI">2. Mutual information versus EVSI</a><a id="2.-Mutual-information-versus-EVSI-1"></a><a class="docs-heading-anchor-permalink" href="#2.-Mutual-information-versus-EVSI" title="Permalink"></a></h2><p>In ecological Bayesian-network practice, variables are commonly ranked by <strong>mutual information</strong> (entropy reduction on the target node, Marcot</p><ol><li>using <code>BayesianNetworkInference.mutual_information</code>. Yet</li></ol><p>information theory alone ignores the actions and payoffs: a variable with high mutual information can still have <strong>zero</strong> expected value of sample information (<code>evsi</code>) if the same action remains optimal after every possible observation.</p><pre><code class="language-julia hljs">habitat = BN.reference_habitat_model()
+
+# Compare mutual information with Occupancy against EVSI under two illustrative irrigation
+# effort penalties: a small penalty (-5) where :high always dominates, and a balanced
+# penalty (-14) where knowing Climate or GrazingPressure changes the decision.
+mi_climate = BNI.mutual_information(habitat, :Climate, :Occupancy)
+mi_grazing = BNI.mutual_information(habitat, :GrazingPressure, :Occupancy)
+
+nf_low = normal_form(habitat; decision=:Irrigation, states=(:Climate, :GrazingPressure),
+                     outcome=[:Occupancy =&gt; [0, 100], :Irrigation =&gt; (low=0, high=-5)],
+                     observed=(), baseline=:low)
+nf_low_c = normal_form(habitat; decision=:Irrigation, states=:Climate,
+                       outcome=[:Occupancy =&gt; [0, 100], :Irrigation =&gt; (low=0, high=-5)],
+                       baseline=:low)
+nf_low_g = normal_form(habitat; decision=:Irrigation, states=:GrazingPressure,
+                       outcome=[:Occupancy =&gt; [0, 100], :Irrigation =&gt; (low=0, high=-5)],
+                       baseline=:low)
+
+nf_bal_c = normal_form(habitat; decision=:Irrigation, states=:Climate,
+                       outcome=[:Occupancy =&gt; [0, 100], :Irrigation =&gt; (low=0, high=-14)],
+                       baseline=:low)
+nf_bal_g = normal_form(habitat; decision=:Irrigation, states=:GrazingPressure,
+                       outcome=[:Occupancy =&gt; [0, 100], :Irrigation =&gt; (low=0, high=-14)],
+                       baseline=:low)
+
+md_table([&quot;variable&quot;, &quot;mutual info with Occupancy (bits)&quot;,
+          &quot;VOI at penalty −5&quot;, &quot;VOI at penalty −14&quot;],
+         [[&quot;Climate&quot;, mi_climate, evpi(nf_low_c.problem), evpi(nf_bal_c.problem)],
+          [&quot;GrazingPressure&quot;, mi_grazing, evpi(nf_low_g.problem),
+           evpi(nf_bal_g.problem)]]; digits=4)</code></pre><table><tr><th style="text-align: left">variable</th><th style="text-align: right">mutual info with Occupancy (bits)</th><th style="text-align: right">VOI at penalty −5</th><th style="text-align: right">VOI at penalty −14</th></tr><tr><td style="text-align: left">Climate</td><td style="text-align: right">0.0031</td><td style="text-align: right">0.2851</td><td style="text-align: right">0</td></tr><tr><td style="text-align: left">GrazingPressure</td><td style="text-align: right">0.0036</td><td style="text-align: right">0</td><td style="text-align: right">0</td></tr></table><p>At an irrigation penalty of <span>$-5$</span>, <code>GrazingPressure</code> carries <strong>higher</strong> mutual information about <code>Occupancy</code> (0.0036 bits) than <code>Climate</code> (0.0031 bits), yet its decision value is exactly <strong>zero</strong>, while learning <code>Climate</code> yields positive value (0.285 points) because climate flips the optimal irrigation choice. At a steep penalty of <span>$-14$</span>, low irrigation dominates in every state, so both variables have zero decision value despite unchanged mutual information.</p><h2 id="3.-Model-discrimination-EVSI-across-rival-Bayesian-networks"><a class="docs-heading-anchor" href="#3.-Model-discrimination-EVSI-across-rival-Bayesian-networks">3. Model-discrimination EVSI across rival Bayesian networks</a><a id="3.-Model-discrimination-EVSI-across-rival-Bayesian-networks-1"></a><a class="docs-heading-anchor-permalink" href="#3.-Model-discrimination-EVSI-across-rival-Bayesian-networks" title="Permalink"></a></h2><p>When two ecological groups disagree on the network’s conditional probability tables, <code>normal_form</code> accepts a nested collection of hypothesis networks together with pre-decision <code>observed</code> variables, returning the exact model-discrimination <code>Experiment</code> for <code>evsi</code>.</p><pre><code class="language-julia hljs"># Two rival hypotheses: the published habitat network vs. a drier, low-response alternative.
+h_published = habitat
+h_dry = BN.bind_cpt(habitat,
+                    [:Climate =&gt; [0.65, 0.25, 0.10],
+                     :Occupancy =&gt; [0.65 0.35; 0.45 0.55]])
+
+by_action(m) = (; low=BN.do_intervention(m, :Irrigation =&gt; :low),
+                high=BN.do_intervention(m, :Irrigation =&gt; :high))
+
+nf_hyp = normal_form((; published=by_action(h_published),
+                      dry_alternative=by_action(h_dry));
+                     outcome=[:Occupancy =&gt; [0, 100], :Irrigation =&gt; (low=0, high=-3)],
+                     observed=(:Climate, :GrazingPressure),
+                     prior=[1 // 2, 1 // 2], baseline=:low)
+
+md_table([&quot;information source&quot;, &quot;value (occupancy-equivalent points)&quot;],
+         [[&quot;EVPI (know which model is right)&quot;, evpi(nf_hyp.problem)],
+          [&quot;EVSI of observing Climate&quot;, evsi(nf_hyp.problem, nf_hyp.experiments.Climate)],
+          [&quot;EVSI of observing GrazingPressure&quot;,
+           evsi(nf_hyp.problem, nf_hyp.experiments.GrazingPressure)],
+          [&quot;EVSI of observing both&quot;, evsi(nf_hyp.problem, nf_hyp.experiment)]];
+         digits=3)</code></pre><table><tr><th style="text-align: left">information source</th><th style="text-align: right">value (occupancy-equivalent points)</th></tr><tr><td style="text-align: left">EVPI (know which model is right)</td><td style="text-align: right">0.543</td></tr><tr><td style="text-align: left">EVSI of observing Climate</td><td style="text-align: right">0.116</td></tr><tr><td style="text-align: left">EVSI of observing GrazingPressure</td><td style="text-align: right">0</td></tr><tr><td style="text-align: left">EVSI of observing both</td><td style="text-align: right">0.116</td></tr></table><p><code>GrazingPressure</code> has the same marginal distribution under both hypotheses, so its model-discrimination EVSI is exactly zero; observing <code>Climate</code> shifts belief between the two models and captures a substantial share of the structural EVPI.</p><h2 id="4.-Dynamic-Bayesian-networks-to-sequential-adaptive-management"><a class="docs-heading-anchor" href="#4.-Dynamic-Bayesian-networks-to-sequential-adaptive-management">4. Dynamic Bayesian networks to sequential adaptive management</a><a id="4.-Dynamic-Bayesian-networks-to-sequential-adaptive-management-1"></a><a class="docs-heading-anchor-permalink" href="#4.-Dynamic-Bayesian-networks-to-sequential-adaptive-management" title="Permalink"></a></h2><p><code>BayesianNetworks.vegetation_herbivore_model(; management=true)</code> defines a lag-1 dynamic Bayesian network in which <code>Management</code> (<code>:none</code>, <code>:cull</code>) reduces <code>Herbivores</code>, which in turn improves <code>Vegetation</code> (<code>:sparse</code>, <code>:dense</code>) in the following year. Extending the DBN with an imperfect annual field survey <code>Survey</code> (conditioned on <code>Vegetation</code> and <code>Management</code>) lets <code>normal_form</code> extract <code>(problem, experiments, transitions)</code> directly for <code>adaptive_management</code>.</p><pre><code class="language-julia hljs"># Build a lag-1 vegetation-herbivore DBN with an action-dependent noisy Survey node.
+init_bn = BN.bayesnet(:Vegetation =&gt; [:sparse, :dense],
+                      :Herbivores =&gt; [:low, :high],
+                      :Management =&gt; [:none, :cull],
+                      :Survey =&gt; [:sparse_est, :dense_est];
+                      mechanisms=[:Herbivores =&gt; (:Vegetation, :Management),
+                                  :Survey =&gt; (:Vegetation, :Management)])
+trans_bn = BN.bayesnet(:Vegetation =&gt; [:sparse, :dense],
+                       :Herbivores =&gt; [:low, :high],
+                       :Management =&gt; [:none, :cull],
+                       :Survey =&gt; [:sparse_est, :dense_est],
+                       BN.lagged(:Vegetation, 1) =&gt; [:sparse, :dense],
+                       BN.lagged(:Herbivores, 1) =&gt; [:low, :high];
+                       mechanisms=[:Vegetation =&gt; (BN.lagged(:Vegetation, 1),
+                                                   BN.lagged(:Herbivores, 1)),
+                                   :Herbivores =&gt; (:Vegetation, :Management),
+                                   :Survey =&gt; (:Vegetation, :Management)],
+                       closed=false)
+BN.add_mechanism!(trans_bn, :Management)
+
+dm_ref = BN.vegetation_herbivore_model(; management=true)
+# Survey accuracy improves when field teams are already on site culling (illustrative).
+surv_cpt = zeros(2, 2, 2) # (Vegetation, Management, Survey)
+surv_cpt[1, 1, :] = [0.65, 0.35]
+surv_cpt[1, 2, :] = [0.90, 0.10]
+surv_cpt[2, 1, :] = [0.35, 0.65]
+surv_cpt[2, 2, :] = [0.10, 0.90]
+
+dm = BN.DynamicBayesModel(BN.DynamicBayesNet(init_bn, trans_bn; lags=1))
+dm = BN.bind_cpt(dm, [:Vegetation =&gt; [0.4, 0.6],
+                      :Management =&gt; [0.8, 0.2],
+                      :Herbivores =&gt; permutedims(BN.kernel(dm_ref, :Herbivores; slice=:initial).table, (2, 3, 1)),
+                      :Survey =&gt; surv_cpt]; slice=:initial)
+dm = BN.bind_cpt(dm, [:Vegetation =&gt; permutedims(BN.kernel(dm_ref, :Vegetation; slice=:transition).table, (2, 3, 1)),
+                      :Management =&gt; [0.8, 0.2],
+                      :Herbivores =&gt; permutedims(BN.kernel(dm_ref, :Herbivores; slice=:transition).table, (2, 3, 1)),
+                      :Survey =&gt; surv_cpt]; slice=:transition)
+
+nf_dbn = normal_form(dm; decision=:Management, states=:Vegetation, observed=:Survey,
+                     outcome=[:Vegetation =&gt; [0, 100], :Management =&gt; (none=0, cull=-10)],
+                     signal_of=:current, baseline=:none)
+
+am = adaptive_management(nf_dbn.problem, nf_dbn.experiments;
+                         transitions=nf_dbn.transitions,
+                         signal_of=nf_dbn.signal_of, horizon=10, discount=0.95,
+                         method=:vectors)
+
+# Cross-check: lifting transitions through FiniteKernels and ResilienceCore.MarkovKernel
+# yields the exact same sequential values.
+V_space = FiniteKernels.FiniteSpace(FiniteKernels.FiniteAxis(:Vegetation,
+                                                             state_labels(nf_dbn.problem)))
+fk_trans = (;
+    none=FiniteKernels.FiniteKernel(V_space, V_space, nf_dbn.transitions.none),
+    cull=FiniteKernels.FiniteKernel(V_space, V_space, nf_dbn.transitions.cull),
+)
+mk_trans = (;
+    none=FiniteKernels.ResilienceCore.linearise(fk_trans.none),
+    cull=FiniteKernels.ResilienceCore.linearise(fk_trans.cull),
+)
+am_mk = adaptive_management(nf_dbn.problem, nf_dbn.experiments;
+                            transitions=mk_trans, signal_of=nf_dbn.signal_of,
+                            horizon=10, discount=0.95, method=:vectors)
+
+md_table([&quot;sequential strategy (10-year horizon, γ = 0.95)&quot;, &quot;expected value&quot;,
+          &quot;gain over baseline&quot;],
+         [[&quot;No learning (open-loop plan)&quot;, am.no_learning,
+           am.no_learning - am.baseline],
+          [&quot;Passive adaptive management&quot;, am.passive, am.passive - am.baseline],
+          [&quot;Active adaptive management&quot;, am.active, am.active - am.baseline],
+          [&quot;Active via ResilienceCore.MarkovKernel&quot;, am_mk.active,
+           am_mk.active - am_mk.baseline],
+          [&quot;Perfect annual state observation&quot;, am.perfect, am.perfect - am.baseline]];
+         digits=2)</code></pre><table><tr><th style="text-align: left">sequential strategy (10-year horizon, γ = 0.95)</th><th style="text-align: right">expected value</th><th style="text-align: right">gain over baseline</th></tr><tr><td style="text-align: left">No learning (open-loop plan)</td><td style="text-align: right">462.99</td><td style="text-align: right">1.83</td></tr><tr><td style="text-align: left">Passive adaptive management</td><td style="text-align: right">463.07</td><td style="text-align: right">1.92</td></tr><tr><td style="text-align: left">Active adaptive management</td><td style="text-align: right">463.09</td><td style="text-align: right">1.94</td></tr><tr><td style="text-align: left">Active via ResilienceCore.MarkovKernel</td><td style="text-align: right">463.09</td><td style="text-align: right">1.94</td></tr><tr><td style="text-align: left">Perfect annual state observation</td><td style="text-align: right">467.73</td><td style="text-align: right">6.57</td></tr></table><pre><code class="language-julia hljs">horizons = 1:10
+vals = [adaptive_management(nf_dbn.problem, nf_dbn.experiments;
+                            transitions=nf_dbn.transitions,
+                            signal_of=nf_dbn.signal_of, horizon=h, discount=0.95,
+                            method=:vectors) for h in horizons]
+plt_dbn = Plots.plot(horizons, [v.no_learning for v in vals]; label=&quot;no learning&quot;,
+                     xlabel=&quot;horizon (years)&quot;, ylabel=&quot;discounted value&quot;,
+                     title=&quot;DBN adaptive management over increasing horizons (illustrative)&quot;)
+Plots.plot!(plt_dbn, horizons, [v.passive for v in vals]; label=&quot;passive&quot;)
+Plots.plot!(plt_dbn, horizons, [v.active for v in vals]; label=&quot;active&quot;)
+Plots.plot!(plt_dbn, horizons, [v.perfect for v in vals]; label=&quot;perfect&quot;,
+            linestyle=:dash)
+png_figure(plt_dbn)</code></pre><p><img src="../37_ecology_dynamic_bn_grazing_files/figure-commonmark/cell-8-output-1.png" alt/></p><p>The extracted DBN obeys <code>no_learning ≤ passive ≤ active ≤ perfect</code> at every horizon, and lifting the exact same dynamics through <code>FiniteKernels.FiniteKernel</code> and <code>ResilienceCore.MarkovKernel</code> agrees to machine precision.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../36_ecology_canessa_bsal/">« Mitigating Bsal invasion in fire salamanders under expert uncertainty and imperfect detection</a><a class="docs-footer-nextpage" href="../38_ecology_coral_reef_restoration/">Coral reef restoration under warming bleaching schedules and deep uncertainty »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 04:50">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
