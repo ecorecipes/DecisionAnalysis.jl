@@ -16,6 +16,8 @@
     # A collection of networks belongs to the other bridge, which is not loaded either.
     @test Base.get_extension(DecisionAnalysis, :DecisionAnalysisBayesianNetworksExt) ===
           nothing
+    @test Base.get_extension(DecisionAnalysis,
+                             :DecisionAnalysisBayesianNetworkInferenceExt) === nothing
     networks = try
         normal_form((; none=1, act=2); states=:X, outcome=:Y => [0, 1])
     catch e

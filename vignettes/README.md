@@ -1,7 +1,7 @@
 # Vignettes
 
-Thirty-five vignettes. Twenty-one are tutorials on illustrative examples (1 to 21; 1 to 15 are ordered
-from basic to advanced); the other fourteen are case studies (22 to 29 in ecology, 30 to
+Thirty-eight vignettes. Twenty-one are tutorials on illustrative examples (1 to 21; 1 to 15 are ordered
+from basic to advanced); the other seventeen are case studies (22 to 29 and 36 to 38 in ecology, 30 to
 35 in human epidemiology), in a section of their own below. Each
 lives in its own directory `NN_name/NN_name.qmd` and is rendered to GitHub-flavoured
 Markdown (`NN_name.md` plus the figures in `NN_name_files/`), self-contained HTML
@@ -54,6 +54,9 @@ report. The same comparisons, with the provenance and licence of every input, ar
 | 27 | [Which species to monitor, and how](27_ecology_bal_monitoring/27_ecology_bal_monitoring.md) | Bal et al. 2018, doi:10.1111/2041-210X.13037; species declining, of three | a payoff table from a model of 64 hypotheses and a budget split; `Experiment` for surveillance and for targeted monitoring with detection errors; `evsi` against the budget |
 | 28 | [When to stop managing or surveying a cryptic species](28_ecology_chades_tiger/28_ecology_chades_tiger.md) | Chadès et al. 2008, doi:10.1073/pnas.0805265105; USD per year (the paper's valuation) | `adaptive_management` with `transitions`, `signal_of=:next` and `method=:vectors`; `value_function` and the switching beliefs by years left; the long-run schedule against a 30-year horizon; the four ways of managing over 30 years |
 | 29 | [When to stop looking for an invasive plant](29_ecology_regan_eradication/29_ecology_regan_eradication.md) | Regan et al. 2006, doi:10.1111/j.1461-0248.2006.00920.x, and Rout et al. 2009, doi:10.1111/j.1365-2664.2009.01678.x; cost in units of one annual survey (the escape cost is the authors' valuation) | a closed-form rule and its discounted form; a stopping problem as `adaptive_management` with `transitions` and `method=:vectors` over 300 years; info-gap robustness of the stopping time |
+| 36 | [Mitigating Bsal invasion in fire salamanders under expert uncertainty and imperfect detection](36_ecology_canessa_bsal/36_ecology_canessa_bsal.md) | Canessa et al. 2018, doi:10.1111/1365-2664.13089 (via `Chytridiomycosis.jl`); salamanders on the 0.475-ha transect and density ratio | live 8-action × 1,000-draw Dryad ensemble; `StochasticDominance`; `ce_evpi`; `GAMRegression` (`edf`/`k_check`, `bam`); `prim_boxes` for $R_0 < 1$; `CredalSet`/`SmoothAmbiguity`/`prune_generators`; `OccupancyStudy` EVSI with PSIS $\hat{k}$ |
+| 37 | [Dynamic Bayesian networks, multi-objective grazing, and model discrimination](37_ecology_dynamic_bn_grazing/37_ecology_dynamic_bn_grazing.md) | Reference ecological models of `InfluenceDiagrams.jl` and `BayesianNetworks.jl` (illustrative) | multi-objective `normal_form` + `ParetoFront` + `two_way_policy_regions`; `BayesianNetworkInference.mutual_information` vs. `evsi`; rival-BN model-discrimination `evsi`; lag-1 `DynamicBayesModel` → `adaptive_management` cross-checked with `FiniteKernel` and `ResilienceCore.MarkovKernel` |
+| 38 | [Coral reef restoration under warming bleaching schedules and deep uncertainty](38_ecology_coral_reef_restoration/38_ecology_coral_reef_restoration.md) | Illustrative Mo'orea-inspired reef model (Kayal et al. 2018); living coral colonies per 10 m² | non-stationary warming `adaptive_management`; sample-based `value_of_waiting` with `CountStudy`; `ce_evpi`/`ce_evsi`; `info_gap_robustness`/`info_gap_opportuneness`; `decision_curve`; `evim` and `evmi` |
 
 ### Human epidemiology
 

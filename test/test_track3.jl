@@ -358,6 +358,11 @@ using Statistics: cov, mean, var
         pruned = prune_generators(cred_big)
         @test length(extreme_points(pruned)) == 3
         @test Set(extreme_points(pruned)) == Set([v1, v2, v3])
+        # Floating-point CredalSet with an interior barycentre (1/3, 1/3, 1/3) must also prune cleanly.
+        cred_f = CredalSet([:s1, :s2, :s3],
+                           [[0.7, 0.2, 0.1], [0.2, 0.6, 0.2], [0.1, 0.2, 0.7],
+                            [1 / 3, 1 / 3, 1 / 3]])
+        @test length(extreme_points(prune_generators(cred_f))) == 3
     end
 
     @testset "T3.6: time-varying adaptive_management, sample waiting/two-stage, evim, evmi, 2-way, decision_curve" begin

@@ -60,31 +60,40 @@ function _schedule_payoffs(problem::DecisionProblem,
     end
 end
 
+# Hook for extensions (e.g. FiniteKernels / ResilienceCore.MarkovKernel) to supply
+# column-stochastic transition matrices without adding core dependencies.
+_is_single_transition(x) = x isa AbstractMatrix
+_transition_matrix(::DecisionProblem, T::AbstractMatrix{<:Real}, ::AbstractString) = T
+function _transition_matrix(::DecisionProblem, T, who::AbstractString)
+    return throw(ArgumentError("$who must be a matrix of probabilities, got $(typeof(T))"))
+end
+
 # The transition matrix that goes with each feasible action; `nothing` everywhere when
 # the state does not move.
 function _checked_transition(problem::DecisionProblem, T, who::AbstractString)
-    T isa AbstractMatrix{<:Real} ||
+    M = _transition_matrix(problem, T, who)
+    M isa AbstractMatrix{<:Real} ||
         throw(ArgumentError("$who must be a matrix of probabilities, got $(typeof(T))"))
     n = length(problem.payoff.states)
-    size(T) == (n, n) ||
+    size(M) == (n, n) ||
         throw(ArgumentError("$who must be $n × $n (next state × present state), " *
-                            "got $(join(size(T), " × "))"))
-    defect = _stochastic_defect(T, _default_atol(eltype(T)))
+                            "got $(join(size(M), " × "))"))
+    defect = _stochastic_defect(M, _default_atol(eltype(M)))
     defect === nothing ||
         throw(ArgumentError("$who must have rows = next state and columns = present " *
                             "state, each column a probability vector, but $defect"))
-    return Matrix(T)
+    return Matrix(M)
 end
 function _action_transitions(problem::DecisionProblem, ::Nothing)
     return [nothing
             for _ in
                 feasible_actions(problem)]
 end
-function _action_transitions(problem::DecisionProblem, T::AbstractMatrix)
-    checked = _checked_transition(problem, T, "transitions")
-    return [checked for _ in feasible_actions(problem)]
-end
 function _action_transitions(problem::DecisionProblem, transitions)
+    if _is_single_transition(transitions)
+        checked = _checked_transition(problem, transitions, "transitions")
+        return [checked for _ in feasible_actions(problem)]
+    end
     named = Dict(_named_items(transitions, Any, "transition matrices"))
     for a in keys(named)
         a in problem.payoff.actions ||

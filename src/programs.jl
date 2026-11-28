@@ -473,7 +473,7 @@ function constrained_policy_model(problem::DecisionProblem; constraints=(), chan
 end
 
 """
-    generator_redundancy_model(credal::CredalSet, index::Integer) -> DecisionProgram
+    generator_redundancy_model(credal::CredalSet, index::Integer; atol=0) -> DecisionProgram
 
 The feasibility linear programme deciding whether generating point `index` of `credal`
 lies in the convex hull of the other generating points `{p_k : k ≠ index}`:
@@ -482,17 +482,21 @@ lies in the convex hull of the other generating points `{p_k : k ≠ index}`:
     subject to  Σ_{k ≠ index} λ_k = 1,             (simplex)
                 Σ_{k ≠ index} λ_k p_k = p_index.   (match[θ])
 
+When `atol > 0` (used internally for floating-point credal sets to absorb rounding),
+each `match[θ]` constraint is relaxed to `p_index[θ] - atol ≤ Σ λ_k p_k[θ] ≤ p_index[θ] + atol`.
 Feasible if and only if point `index` is redundant (not a strict vertex of the credal set).
 
-Shape: `K - 1` variables (`variables.λ`) and `1 + S` equality constraints
+Shape: `K - 1` variables (`variables.λ`) and `1 + S` constraints
 (`constraints.simplex`, `constraints.match`), plus lower bounds.
 """
-function generator_redundancy_model(credal::CredalSet, index::Integer)
+function generator_redundancy_model(credal::CredalSet, index::Integer; atol::Real=0)
     K = length(credal.points)
     1 <= index <= K ||
         throw(ArgumentError("index $index out of range 1:$K"))
     K >= 2 ||
         throw(ArgumentError("generator_redundancy_model needs at least 2 generating points"))
+    atol >= 0 && isfinite(atol) ||
+        throw(ArgumentError("atol must be finite and nonnegative, got $atol"))
     S = length(credal.states)
     T = _program_type(eltype(first(credal.points)))
     others = [credal.points[k] for k in 1:K if k != index]
@@ -501,15 +505,23 @@ function generator_redundancy_model(credal::CredalSet, index::Integer)
     model = JuMP.GenericModel{T}()
     λ = JuMP.@variable(model, [1:m], lower_bound=zero(T), base_name="λ")
     simplex = JuMP.@constraint(model, sum(λ) == one(T))
-    match = JuMP.@constraint(model, [s = 1:S],
-                             sum(T(others[k][s]) * λ[k] for k in 1:m) == T(target[s]))
+    match = if iszero(atol)
+        JuMP.@constraint(model, [s = 1:S],
+                         sum(T(others[k][s]) * λ[k] for k in 1:m) == T(target[s]))
+    else
+        δ = T(atol)
+        JuMP.@constraint(model, [s = 1:S],
+                         T(target[s]) - δ <= sum(T(others[k][s]) * λ[k] for k in 1:m) <=
+                         T(target[s]) + δ)
+    end
     return DecisionProgram(:generator_redundancy, model, (; λ), (; simplex, match))
 end
 
 function _is_redundant_generator(states::Vector{Symbol}, kept::Vector{Vector{T}}, idx::Int,
                                  rational::Bool, optimizer, rounding_tol) where {T}
     cur = CredalSet(states, kept)
-    prog = generator_redundancy_model(cur, idx)
+    tol = rational ? zero(T) : 100 * _default_atol(T)
+    prog = generator_redundancy_model(cur, idx; atol=tol)
     sol = solve_program(prog; optimizer, rounding_tol)
     sol.status === :optimal || return false
     λ = sol.values.λ
@@ -523,10 +535,9 @@ function _is_redundant_generator(states::Vector{Symbol}, kept::Vector{Vector{T}}
         end
         return true
     end
-    tol = 100 * _default_atol(T)
     for s in eachindex(states)
         recon = sum(λ[k] * others[k][s] for k in eachindex(others))
-        abs(recon - target[s]) <= tol || return false
+        abs(recon - target[s]) <= tol + 1e-12 || return false
     end
     return true
 end

@@ -1,8 +1,8 @@
 """
 The bridge to InfluenceDiagrams.jl: `normal_form` turns a single-decision influence
 diagram into a `DecisionProblem` (and the decision's information into an `Experiment`),
-so that the structural values of information of the diagram can be read, and checked,
-as `evpi` and `evsi` on a payoff table. Loaded when InfluenceDiagrams is.
+using variable elimination (`BayesianNetworkInference.VariableElimination`) rather than
+enumerating the full joint table. Loaded when InfluenceDiagrams is.
 """
 module DecisionAnalysisInfluenceDiagramsExt
 
@@ -11,6 +11,7 @@ using DecisionAnalysis: DecisionAnalysis, DecisionProblem, Experiment, FiniteBel
 using InfluenceDiagrams: InfluenceDiagrams
 
 const ID = InfluenceDiagrams
+const BNI = InfluenceDiagrams.BayesianNetworkInference
 
 function _unique_joined(tuples)
     labels = Symbol[Symbol(join(t, "_")) for t in tuples]
@@ -40,8 +41,78 @@ function _variable_names(id, ids)
     return Symbol[ID.variable_name(id, v) for v in ids]
 end
 
+function _extract_mass(fac, chosen::Vector{Symbol}, observed::Vector{Symbol})
+    pos = Dict{Symbol,Int}(x => i for (i, x) in enumerate(fac.vars))
+    s_axes = Int[pos[x] for x in chosen]
+    z_axes = Int[pos[x] for x in observed]
+    s_sizes = Int[length(fac.axes[i].labels) for i in s_axes]
+    z_sizes = Int[length(fac.axes[i].labels) for i in z_axes]
+    s_strides = _strides(s_sizes)
+    z_strides = _strides(z_sizes)
+    Z = zeros(Float64, prod(s_sizes; init=1), prod(z_sizes; init=1))
+    @inbounds for ci in CartesianIndices(fac.table)
+        p = Float64(fac.table[ci])
+        iszero(p) && continue
+        θ = _lin_idx(ci, s_axes, s_strides)
+        z = _lin_idx(ci, z_axes, z_strides)
+        Z[θ, z] += p
+    end
+    state_labels = _unique_joined(Tuple(fac.axes[i].labels[c[k]]
+                                        for (k, i) in enumerate(s_axes))
+                                  for c in vec(collect(CartesianIndices(Tuple(s_sizes)))))
+    signal_labels = _unique_joined(Tuple(fac.axes[i].labels[c[k]]
+                                         for (k, i) in enumerate(z_axes))
+                                   for c in vec(collect(CartesianIndices(Tuple(z_sizes)))))
+    return Z, state_labels, signal_labels
+end
+
+function _accumulate_utility!(N_u::Matrix{Float64}, N_total::Matrix{Float64}, fac,
+                              chosen::Vector{Symbol}, observed::Vector{Symbol},
+                              sc::Vector{Symbol}, u_tab::AbstractArray{<:Real})
+    pos = Dict{Symbol,Int}(x => i for (i, x) in enumerate(fac.vars))
+    s_axes = Int[pos[x] for x in chosen]
+    z_axes = Int[pos[x] for x in observed]
+    u_axes = Int[pos[x] for x in sc]
+    s_sizes = Int[length(fac.axes[i].labels) for i in s_axes]
+    z_sizes = Int[length(fac.axes[i].labels) for i in z_axes]
+    u_sizes = Int[size(u_tab, k) for k in eachindex(sc)]
+    s_strides = _strides(s_sizes)
+    z_strides = _strides(z_sizes)
+    u_strides = _strides(u_sizes)
+    @inbounds for ci in CartesianIndices(fac.table)
+        p = Float64(fac.table[ci])
+        iszero(p) && continue
+        θ = _lin_idx(ci, s_axes, s_strides)
+        z = _lin_idx(ci, z_axes, z_strides)
+        u_val = Float64(u_tab[_lin_idx(ci, u_axes, u_strides)])
+        contrib = p * u_val
+        N_u[θ, z] += contrib
+        N_total[θ, z] += contrib
+    end
+    return nothing
+end
+
+function _check_state_sufficiency(weighted::Vector{Matrix{Float64}}, Q::Matrix{Float64},
+                                  mass::Matrix{Float64}, prior::Vector{Float64},
+                                  chosen::Vector{Symbol}, observed::Vector{Symbol},
+                                  atol::Real)
+    scale = max(1.0, maximum(abs, Q; init=0.0))
+    for (a, N) in enumerate(weighted), θ in eachindex(prior)
+        iszero(prior[θ]) && continue
+        for z in axes(N, 2)
+            mass[θ, z] > atol || continue
+            abs(N[θ, z] / mass[θ, z] - Q[a, θ]) <= 1e-7 * scale ||
+                throw(ArgumentError("given the state $chosen, the expected utility " *
+                                    "still depends on the information $observed; add " *
+                                    "the variables the utility depends on to `states`"))
+        end
+    end
+    return nothing
+end
+
 function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothing,
-                                      baseline=nothing, atol::Real=1e-9)
+                                      baseline=nothing, multi_objective::Bool=false,
+                                      atol::Real=1e-9)
     id = ID.syntax(m)
     decisions = ID.decision_names(id)
     length(decisions) == 1 ||
@@ -73,78 +144,67 @@ function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothin
     end
     # Signals: the information variables that are not themselves part of the state.
     observed = [x for x in information if !(x in chosen)]
+    base_vars = vcat(chosen, observed)
+    u_names = Symbol[ID.utility_names(id)...]
+    nu = length(u_names)
 
     mass = nothing      # mass[θ, z] = P(state = θ, signal = z), the same for every action
-    weighted = Matrix{Float64}[]          # per action: Σ P(x) U(x) over the cells
+    weighted = Matrix{Float64}[]
+    weighted_per_u = [Matrix{Float64}[] for _ in 1:nu]
     state_labels = Symbol[]
     signal_labels = Symbol[]
+    backend = BNI.VariableElimination()
     for a in actions
-        J = ID.joint_table(ID.instantiate(ID.fix_decision(m, decision => a)))
-        position = Dict(x => i for (i, x) in enumerate(J.variables))
-        s_axes = Int[position[x] for x in chosen]
-        z_axes = Int[position[x] for x in observed]
-        s_sizes = Int[length(J.states[i]) for i in s_axes]
-        z_sizes = Int[length(J.states[i]) for i in z_axes]
-        s_strides = _strides(s_sizes)
-        z_strides = _strides(z_sizes)
-        Z = zeros(prod(s_sizes), prod(z_sizes))
-        N = zeros(size(Z))
-        assignment = Dict{Symbol,Symbol}()
-        sizehint!(assignment, length(J.variables))
-        for ci in CartesianIndices(J.table)
-            p = J.table[ci]
-            iszero(p) && continue
-            @inbounds for i in eachindex(J.variables)
-                assignment[J.variables[i]] = J.states[i][ci[i]]
-            end
-            θ = _lin_idx(ci, s_axes, s_strides)
-            z = _lin_idx(ci, z_axes, z_strides)
-            Z[θ, z] += p
-            N[θ, z] += p * ID.total_utility(m, assignment)
-        end
+        bm = ID.instantiate(ID.fix_decision(m, decision => a); atol)
+        fg = BNI.compile(bm; atol)
+        base_fac, _ = BNI.infer(fg, base_vars; backend)
+        Z, sl, zl = _extract_mass(base_fac, chosen, observed)
         if mass === nothing
             mass = Z
-            state_labels = _unique_joined(Tuple(J.states[i][c[k]]
-                                                for (k, i) in enumerate(s_axes))
-                                          for c in
-                                              vec(collect(CartesianIndices(Tuple(s_sizes)))))
-            signal_labels = _unique_joined(Tuple(J.states[i][c[k]]
-                                                 for (k, i) in enumerate(z_axes))
-                                           for c in
-                                               vec(collect(CartesianIndices(Tuple(z_sizes)))))
+            state_labels = sl
+            signal_labels = zl
         else
             maximum(abs, Z .- mass) <= atol ||
                 throw(ArgumentError("the distribution of the state and the " *
                                     "information changes with the action, so they are " *
                                     "not upstream of the decision"))
         end
-        push!(weighted, N)
+        N_total = zeros(Float64, size(Z))
+        for (ui, uname) in enumerate(u_names)
+            u = ID.utility(m, uname)
+            sc = ID.scope(u)
+            u_axes = ID.FiniteAxis[only(ID.factors(ID.space(bm, x))) for x in sc]
+            u_tab = ID.utility_table(u, u_axes)
+            all(isfinite, u_tab) ||
+                throw(ArgumentError("utility $uname has non-finite entries"))
+            N_u = zeros(Float64, size(Z))
+            if isempty(sc)
+                val = Float64(u_tab[])
+                N_u .= val .* Z
+                N_total .+= N_u
+            else
+                qvars = unique(vcat(base_vars, sc))
+                fac = length(qvars) == length(base_vars) ? base_fac :
+                      first(BNI.infer(fg, qvars; backend))
+                _accumulate_utility!(N_u, N_total, fac, chosen, observed, sc, u_tab)
+            end
+            push!(weighted_per_u[ui], N_u)
+        end
+        push!(weighted, N_total)
     end
     prior = vec(sum(mass; dims=2))
-    Q = zeros(length(actions), length(prior))
+    Q = zeros(Float64, length(actions), length(prior))
     for (a, N) in enumerate(weighted), θ in eachindex(prior)
         iszero(prior[θ]) && continue
         Q[a, θ] = sum(view(N, θ, :)) / prior[θ]
     end
-    # The state must carry everything the information says about the utility:
-    # E[U | action, state, signal] = E[U | action, state] wherever it is defined.
-    scale = max(1.0, maximum(abs, Q))
-    for (a, N) in enumerate(weighted), θ in eachindex(prior)
-        iszero(prior[θ]) && continue
-        for z in axes(N, 2)
-            mass[θ, z] > atol || continue
-            abs(N[θ, z] / mass[θ, z] - Q[a, θ]) <= 1e-7 * scale ||
-                throw(ArgumentError("given the state $chosen, the expected utility " *
-                                    "still depends on the information $observed; add " *
-                                    "the variables the utility depends on to `states`"))
-        end
-    end
+    _check_state_sufficiency(weighted, Q, mass, prior, chosen, observed, atol)
     payoff = PayoffTable(actions, state_labels, Q)
     problem = DecisionProblem(payoff, FiniteBelief(state_labels, prior ./ sum(prior));
                               baseline)
     experiment = nothing
     if !isempty(observed)
-        L = zeros(size(mass, 2), size(mass, 1))
+        L = zeros(Float64, size(mass, 2), size(mass, 1))
         for θ in eachindex(prior)
             if iszero(prior[θ])
                 L[1, θ] = 1.0             # a state of probability zero: any column will do
@@ -153,6 +213,21 @@ function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothin
             end
         end
         experiment = Experiment(L; signals=signal_labels, states=state_labels)
+    end
+    if multi_objective
+        obj_tables = map(1:nu) do ui
+            Qu = zeros(Float64, length(actions), length(prior))
+            for (a, Nu) in enumerate(weighted_per_u[ui]), θ in eachindex(prior)
+                iszero(prior[θ]) && continue
+                Qu[a, θ] = sum(view(Nu, θ, :)) / prior[θ]
+            end
+            _check_state_sufficiency(weighted_per_u[ui], Qu, mass, prior, chosen, observed,
+                                     atol)
+            return PayoffTable(actions, state_labels, Qu)
+        end
+        objectives = NamedTuple{Tuple(u_names)}(Tuple(obj_tables))
+        return (; problem, objectives, experiment, decision, action, states=chosen,
+                information, observed)
     end
     return (; problem, experiment, decision, action, states=chosen, information,
             observed)

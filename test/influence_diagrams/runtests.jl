@@ -336,4 +336,181 @@ end
                                                       states=:Climate, outcome=count,
                                                       baseline=:none)
     end
+
+    @testset "Track 4a: VE scaling, multi-objective IDs, hypothesis observed & DBN" begin
+        @test Base.get_extension(DecisionAnalysis,
+                                 :DecisionAnalysisBayesianNetworkInferenceExt) !== nothing
+
+        # 1. Multi-objective influence diagram (`reference_grazing_model`).
+        grazing = ID.reference_grazing_model()
+        nf_mo = normal_form(grazing; states=[:Climate, :CurrentVegetation],
+                            multi_objective=true, baseline=:maintain)
+        @test haskey(nf_mo, :objectives)
+        @test keys(nf_mo.objectives) == (:ConservationBenefit, :ManagementCost)
+        @test (nf_mo.objectives.ConservationBenefit + nf_mo.objectives.ManagementCost).Q ≈
+              nf_mo.problem.payoff.Q atol = 1e-10
+        pf = decide(nf_mo.objectives, nf_mo.problem.belief, ParetoFront())
+        @test !isempty(pf.chosen)
+        @test :maintain in pf.chosen
+
+        # 2. Variable-elimination scaling on a 23-node chain influence diagram
+        # (2^23 = 8,388,608 joint states: brute-force joint_table exceeds max_states=1_000_000).
+        # Obs <- X1 -> X2 -> ... -> X20 -> X21 (so X1 d-separates Obs from X21).
+        chain_vars = [:X1 => [:lo, :hi], :Obs => [:neg, :pos]]
+        for k in 2:21
+            push!(chain_vars, Symbol(:X, k) => [:lo, :hi])
+        end
+        push!(chain_vars, :Act => [:wait, :intervene])
+        chain_mechs = Pair[:Obs => :X1]
+        for k in 2:20
+            push!(chain_mechs, Symbol(:X, k) => Symbol(:X, k - 1))
+        end
+        push!(chain_mechs, :X21 => (:X20, :Act))
+        big_id = ID.influence_diagram(chain_vars...; mechanisms=chain_mechs,
+                                      decisions=[:Act => :Obs],
+                                      utilities=[:Outcome => (:X21, :Act)])
+        big_m = ID.InfluenceDiagramModel(big_id)
+        big_m = ID.bind_cpt(big_m, [:X1 => [0.6, 0.4], :Obs => [0.85 0.15; 0.15 0.85]])
+        for k in 2:20
+            big_m = ID.bind_cpt(big_m, Symbol(:X, k) => [0.85 0.15; 0.15 0.85])
+        end
+        eff = zeros(2, 2, 2) # (X20, Act, X21)
+        eff[1, 1, :] = [0.9, 0.1]
+        eff[1, 2, :] = [0.6, 0.4]
+        eff[2, 1, :] = [0.2, 0.8]
+        eff[2, 2, :] = [0.05, 0.95]
+        big_m = ID.bind_cpt(big_m, :X21 => eff)
+        big_m = ID.bind_utility(big_m, :Outcome => [0.0 -10.0; 100.0 90.0])
+        nf_big = normal_form(big_m; states=:X1, baseline=:wait)
+        @test nf_big.observed == [:Obs]
+        @test probabilities(nf_big.problem.belief) ≈ [0.6, 0.4]
+        @test nf_big.experiment.likelihood ≈ [0.85 0.15; 0.15 0.85]
+        @test evsi(nf_big.problem, nf_big.experiment) <= evpi(nf_big.problem) + 1e-10
+        @test evsi(nf_big.problem, nf_big.experiment) >= -1e-10
+
+        # 3. VE-backed Bayesian network scaling on a 23-node chain BN.
+        bn_big = BN.bayesnet(chain_vars...; mechanisms=chain_mechs)
+        bm_big = BN.BayesModel(bn_big)
+        bm_big = BN.bind_cpt(bm_big,
+                             [:X1 => [0.6, 0.4], :Obs => [0.85 0.15; 0.15 0.85],
+                              :Act => [0.5, 0.5]])
+        for k in 2:20
+            bm_big = BN.bind_cpt(bm_big, Symbol(:X, k) => [0.85 0.15; 0.15 0.85])
+        end
+        bm_big = BN.bind_cpt(bm_big, :X21 => eff)
+        nf_bn_big = normal_form(bm_big; decision=:Act, states=:X1, observed=:Obs,
+                                outcome=(:X21, :Act) => [0.0 -10.0; 100.0 90.0],
+                                baseline=:wait)
+        @test nf_bn_big.problem.payoff.Q ≈ nf_big.problem.payoff.Q atol = 1e-10
+        @test nf_bn_big.experiment.likelihood ≈ nf_big.experiment.likelihood atol = 1e-10
+
+        # 4. Hypothesis-BN `observed`: model-discrimination EVSI across rival BNs.
+        # Two hypotheses differ in Climate prior (which is upstream of Irrigation) AND
+        # in Occupancy response; observing Climate discriminates between hypotheses.
+        h1 = BN.reference_habitat_model()
+        h2 = BN.bind_cpt(h1,
+                         [:Climate => [0.7, 0.2, 0.1],
+                          :Occupancy => [0.6 0.4; 0.5 0.5]])
+        net_pair(model) = (; low=BN.do_intervention(model, :Irrigation => :low),
+                           high=BN.do_intervention(model, :Irrigation => :high))
+        nf_hyp = normal_form((; h1=net_pair(h1), h2=net_pair(h2));
+                             outcome=[:Occupancy => [0, 100],
+                                      :Irrigation => (low=0, high=-15)],
+                             observed=(:Climate, :GrazingPressure),
+                             prior=[0.5, 0.5], baseline=:low)
+        @test nf_hyp.observed == [:Climate, :GrazingPressure]
+        @test nf_hyp.experiment isa Experiment
+        @test keys(nf_hyp.experiments) == (:Climate, :GrazingPressure)
+        @test nf_hyp.experiments.Climate.likelihood ≈ [0.3 0.7; 0.5 0.2; 0.2 0.1]
+        @test nf_hyp.experiments.GrazingPressure.likelihood ≈ [0.5 0.5; 0.5 0.5]
+        # GrazingPressure has identical distribution under both hypotheses -> EVSI = 0.
+        @test evsi(nf_hyp.problem, nf_hyp.experiments.GrazingPressure) ≈ 0.0 atol = 1e-12
+        # Joint experiment equals Climate alone since GrazingPressure is uninformative.
+        @test evsi(nf_hyp.problem, nf_hyp.experiment) ≈
+              evsi(nf_hyp.problem, nf_hyp.experiments.Climate) atol = 1e-10
+        @test evsi(nf_hyp.problem, nf_hyp.experiments.Climate) <=
+              evpi(nf_hyp.problem) + 1e-10
+        # Downstream variable (Occupancy) depends on Irrigation -> refused as `observed`.
+        @test_throws ArgumentError normal_form((; h1=net_pair(h1), h2=net_pair(h2));
+                                               outcome=:Occupancy => [0, 100],
+                                               observed=:Occupancy, prior=[0.5, 0.5])
+
+        # 5. DynamicBayesModel -> adaptive_management.
+        dm = BN.vegetation_herbivore_model(; management=true)
+        nf_dbn = normal_form(dm; decision=:Management, states=:Vegetation,
+                             outcome=[:Vegetation => [0, 100],
+                                      :Management => (none=0, cull=-15)],
+                             baseline=:none)
+        @test nf_dbn.decision === :Management
+        @test nf_dbn.actions == [:none, :cull]
+        @test nf_dbn.experiments === nothing
+        @test probabilities(nf_dbn.problem.belief) ≈ [0.4, 0.6]
+        @test nf_dbn.problem.payoff.Q ≈ [0.0 100.0; -15.0 85.0]
+        # Analytical transition P(Veg_1 = dense | Veg_0, do(Management_0)):
+        # Under none: sparse -> 0.7*0.5 + 0.3*0.2 = 0.41; dense -> 0.3*0.9 + 0.7*0.6 = 0.69.
+        # Under cull: sparse -> 0.9*0.5 + 0.1*0.2 = 0.47; dense -> 0.6*0.9 + 0.4*0.6 = 0.78.
+        @test nf_dbn.transitions.none ≈ [0.59 0.31; 0.41 0.69] atol = 1e-10
+        @test nf_dbn.transitions.cull ≈ [0.53 0.22; 0.47 0.78] atol = 1e-10
+        am = adaptive_management(nf_dbn.problem, nf_dbn.experiments;
+                                 transitions=nf_dbn.transitions,
+                                 signal_of=nf_dbn.signal_of, horizon=5, discount=0.95)
+        @test am.no_learning <= am.passive + 1e-10
+        @test am.passive <= am.active + 1e-10
+        @test am.active <= am.perfect + 1e-10
+        # Herbivores drives Vegetation_1, so observing Herbivores with states=:Vegetation
+        # violates Markov sufficiency and must be rejected.
+        @test_throws ArgumentError normal_form(dm; decision=:Management, states=:Vegetation,
+                                               observed=:Herbivores,
+                                               outcome=:Vegetation => [0, 100])
+
+        # Lag-1 DBN with an action-dependent noisy Survey node (both :current and :next).
+        init_bn = BN.bayesnet(:State => [:bad, :good], :Act => [:wait, :treat],
+                              :Survey => [:neg, :pos];
+                              mechanisms=[:Survey => (:State, :Act)])
+        trans_bn = BN.bayesnet(:State => [:bad, :good], :Act => [:wait, :treat],
+                               :Survey => [:neg, :pos],
+                               BN.lagged(:State, 1) => [:bad, :good],
+                               BN.lagged(:Act, 1) => [:wait, :treat];
+                               mechanisms=[:State => (BN.lagged(:State, 1),
+                                                      BN.lagged(:Act, 1)),
+                                           :Survey => (:State, :Act)],
+                               closed=false)
+        BN.add_mechanism!(trans_bn, :Act)
+        dbn_s = BN.DynamicBayesModel(BN.DynamicBayesNet(init_bn, trans_bn; lags=1))
+        surv_cpt = zeros(2, 2, 2) # (State, Act, Survey)
+        surv_cpt[1, 1, :] = [0.6, 0.4]
+        surv_cpt[1, 2, :] = [0.9, 0.1]
+        surv_cpt[2, 1, :] = [0.4, 0.6]
+        surv_cpt[2, 2, :] = [0.1, 0.9]
+        tr_cpt = zeros(2, 2, 2) # (State[t-1], Act[t-1], State)
+        tr_cpt[1, 1, :] = [0.9, 0.1]
+        tr_cpt[1, 2, :] = [0.3, 0.7]
+        tr_cpt[2, 1, :] = [0.2, 0.8]
+        tr_cpt[2, 2, :] = [0.1, 0.9]
+        dbn_s = BN.bind_cpt(dbn_s,
+                            [:State => [0.5, 0.5], :Act => [0.5, 0.5],
+                             :Survey => surv_cpt]; slice=:initial)
+        dbn_s = BN.bind_cpt(dbn_s,
+                            [:State => tr_cpt, :Act => [0.5, 0.5], :Survey => surv_cpt];
+                            slice=:transition)
+        nf_cur = normal_form(dbn_s; decision=:Act, states=:State, observed=:Survey,
+                             outcome=[:State => [0, 100], :Act => (wait=0, treat=-25)],
+                             signal_of=:current, baseline=:wait)
+        @test nf_cur.experiments.wait.likelihood ≈ [0.6 0.4; 0.4 0.6]
+        @test nf_cur.experiments.treat.likelihood ≈ [0.9 0.1; 0.1 0.9]
+        @test nf_cur.transitions.wait ≈ [0.9 0.2; 0.1 0.8]
+        @test nf_cur.transitions.treat ≈ [0.3 0.1; 0.7 0.9]
+        am_cur = adaptive_management(nf_cur.problem, nf_cur.experiments;
+                                     transitions=nf_cur.transitions,
+                                     signal_of=nf_cur.signal_of, horizon=4,
+                                     method=:vectors)
+        @test am_cur.no_learning <= am_cur.passive + 1e-10
+        @test am_cur.passive <= am_cur.active + 1e-10
+        @test am_cur.active <= am_cur.perfect + 1e-10
+        # Because Survey_1 depends on Act_1, signal_of=:next is refused cleanly.
+        @test_throws ArgumentError normal_form(dbn_s; decision=:Act, states=:State,
+                                               observed=:Survey,
+                                               outcome=:State => [0, 100],
+                                               signal_of=:next)
+    end
 end

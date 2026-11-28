@@ -192,11 +192,11 @@ information_can_change_decision(problem, gauge)                       # true: EV
 
 ## Vignettes
 
-Thirty-five vignettes in [`vignettes/`](vignettes/). Twenty-one are tutorials (1 to 21): the
+Thirty-eight vignettes in [`vignettes/`](vignettes/). Twenty-one are tutorials (1 to 21): the
 first fifteen go from a first decision table to
 Lean-checked certificates, sample-based analysis and an application to chytridiomycosis,
 on ecological examples whose outcomes are counted in individuals and always compared with no intervention
-(all numbers illustrative). The other fourteen are case studies (22 to 29 in ecology, 30 to 35 in human epidemiology), grouped by field after the
+(all numbers illustrative). The other seventeen are case studies (22 to 29 and 36 to 38 in ecology, 30 to 35 in human epidemiology), grouped by field after the
 table. Each is rendered to Markdown, HTML and PDF beside its `.qmd`, with the code run
 once: `julia scripts/render_vignettes.jl` (see [`vignettes/README.md`](vignettes/README.md)). The Markdown
 is also published in the documentation (Tutorials, and Case studies by field), copied by `julia scripts/sync_vignettes.jl`.
@@ -247,6 +247,9 @@ with the provenance of every number, are `test/fixtures/replications/*.json` and
 | 27 | [Which species to monitor, and how](vignettes/27_ecology_bal_monitoring/27_ecology_bal_monitoring.md) | Bal et al. 2018, *Methods in Ecology and Evolution* | The model rebuilt from the paper: every cell of Table S2 (EVPI, and the EVSI of surveillance and of targeted monitoring with detection errors) and the headline numbers of both case studies; the figures of the simulated systems are not. |
 | 28 | [When to stop managing or surveying a cryptic species](vignettes/28_ecology_chades_tiger/28_ecology_chades_tiger.md) | Chadès et al. 2008, *PNAS* | The published schedule for the Sumatran tiger (manage 12 years, survey 3, stop), exactly, as the long-run solution with `adaptive_management`, `transitions` and `method=:vectors`; a strict 30-year horizon gives 11 and 2, and the vignette shows why. The analytic approximations are not reproduced. |
 | 29 | [When to stop looking for an invasive plant](vignettes/29_ecology_regan_eradication/29_ecology_regan_eradication.md) | Regan et al. 2006, *Ecology Letters*; Rout et al. 2009, *Journal of Applied Ecology* | The rule of thumb (2 to 22 and 3 to 44 empty surveys; 3 for *Helenium amarum*) and every number of the robustness analysis (3.29 surveys at a cost of 2.79), exactly. **Not** reproduced: the results with discounting (the printed equations lengthen the search, the paper reports that they shorten it), the upper end of the case-study range (7, not 5), and the size of one difference between the rule and the dynamic programme. The dynamic programme is solved with `adaptive_management`. |
+| 36 | [Mitigating Bsal invasion in fire salamanders under expert uncertainty and imperfect detection](vignettes/36_ecology_canessa_bsal/36_ecology_canessa_bsal.md) | Canessa et al. 2018, *Journal of Applied Ecology* (via `Chytridiomycosis.jl`) | Live 8-action × 1,000-draw Dryad expert ensemble: stochastic dominance, `ce_evpi` under risk aversion, `GAMRegression` (`edf`/`k_check`, `bam`), `prim_boxes` scenario discovery for $R_0 < 1$, credal `SmoothAmbiguity`/`prune_generators`, and `OccupancyStudy` EVSI with PSIS $\hat{k}$. |
+| 37 | [Dynamic Bayesian networks, multi-objective grazing, and model discrimination](vignettes/37_ecology_dynamic_bn_grazing/37_ecology_dynamic_bn_grazing.md) | Reference ecological networks of `InfluenceDiagrams.jl` and `BayesianNetworks.jl` | Multi-objective `normal_form` + `ParetoFront` + `two_way_policy_regions`, `BayesianNetworkInference.mutual_information` vs. `evsi`, model-discrimination `evsi` over rival BNs, and lag-1 `DynamicBayesModel` → `adaptive_management` cross-checked with `FiniteKernel` and `ResilienceCore.MarkovKernel`. |
+| 38 | [Coral reef restoration under warming bleaching schedules and deep uncertainty](vignettes/38_ecology_coral_reef_restoration/38_ecology_coral_reef_restoration.md) | Illustrative Mo'orea-inspired reef model (Kayal et al. 2018) | Non-stationary warming `adaptive_management`, sample-based `value_of_waiting` with `CountStudy`, `ce_evpi`/`ce_evsi`, `info_gap_robustness`/`info_gap_opportuneness`, `decision_curve`, `evim`, and `evmi`. |
 
 #### Human epidemiology
 
@@ -282,8 +285,7 @@ table such a model produces. It exports no `regret` or `regrets` (the latter is 
 
 ## Not in this version
 
-Multilevel Monte Carlo, influence diagrams with more than one decision, and
-continuous-state POMDPs. See the roadmap in the lab wiki.
+Influence diagrams with more than one decision, and continuous-state POMDPs. See the roadmap in the lab wiki.
 
 ## Licence
 

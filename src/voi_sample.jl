@@ -269,7 +269,8 @@ end
 const _AUTO_KNOTS = 4
 
 """
-    GAMRegression(; k=10, tensor=false, smoothing=:GCV)
+    GAMRegression(; k=10, tensor=false, smoothing=nothing, backend=:gam,
+                    interaction=:te, discrete=false, shape=nothing)
 
 Regression by a generalised additive model with penalised smooths, fitted by GAM.jl
 (`github.com/ecorecipes/GAM.jl`): one smooth `s(x, k = k)` per numeric column, or a
@@ -283,13 +284,30 @@ The fit follows `voi` and SAVI, so that the same draws give the same estimate as
 is, and every other action through its **difference** from the first (the estimate
 depends only on the differences, and a difference is smoother than either payoff);
 and the smoothing parameters are chosen by generalised cross-validation
-(`smoothing = :GCV`, the default of `mgcv::gam`). `smoothing = :REML` chooses them by
-restricted maximum likelihood, which smooths a little more. The REML score is nearly
-flat in the smoothing parameters where the estimate is not, so the search is run to a
-tight tolerance; `mgcv` at its default tolerance stops earlier and can differ by a
-few tenths of a percent. For a tensor product either score can have two local minima,
-and GAM.jl and `mgcv` do not always end in the same one (differences of under 1% were
-seen).
+(`smoothing = :GCV`, the default of `mgcv::gam` for `backend = :gam` and `:scam`).
+`smoothing = :REML` (the default for `backend = :bam`) chooses them by restricted
+maximum likelihood, which smooths a little more (`:ML` is also supported for `:bam`).
+The REML score is nearly flat in the smoothing parameters where the estimate is not,
+so the search is run to a tight tolerance; `mgcv` at its default tolerance stops earlier
+and can differ by a few tenths of a percent. For a tensor product either score can have
+two local minima, and GAM.jl and `mgcv` do not always end in the same one (differences
+of under 1% were seen).
+
+Optional keywords expose additional GAM.jl capabilities:
+
+- `backend`: `:gam` (default), `:bam` (chunked big-additive-model fitter `GAM.bam` for
+  large draw tables; accepts `discrete = true` for covariate binning), or `:scam`
+  (shape-constrained additive model `GAM.scam`, with basis `shape`, defaulting to
+  `:mpi`).
+- `interaction`: when `tensor = true` and at least two numeric focal parameters are
+  present, `:te` (default) fits a single full tensor product `te(...)`, whereas `:ti`
+  separates univariate main effects `s(...)` from the pure tensor interaction `ti(...)`.
+- `shape`: optional shape-constrained spline basis (`:mpi`, `:mpd`, `:cv`, `:cx`,
+  `:micv`, `:micx`, `:mdcv`, `:mdcx`) for monotone or convex/concave conditional means;
+  setting `shape` automatically uses `GAM.scam`.
+
+When run through [`evpi`](@ref), [`evppi`](@ref), or [`evsi`](@ref), `VOIEstimate.details`
+additionally records per-action `edf` and `k_check` diagnostics from GAM.jl.
 
 The method lives in a weak-dependency extension: load GAM.jl (`using GAM`) before
 using it, otherwise [`MissingExtensionError`](@ref) is thrown. GAM.jl is not a
@@ -299,11 +317,40 @@ struct GAMRegression <: AbstractRegression
     k::Int
     tensor::Bool
     smoothing::Symbol
-    function GAMRegression(; k::Integer=10, tensor::Bool=false, smoothing::Symbol=:GCV)
+    backend::Symbol
+    interaction::Symbol
+    discrete::Bool
+    shape::Union{Nothing,Symbol}
+    function GAMRegression(; k::Integer=10, tensor::Bool=false,
+                           smoothing::Union{Nothing,Symbol}=nothing,
+                           backend::Symbol=:gam, interaction::Symbol=:te,
+                           discrete::Bool=false,
+                           shape::Union{Nothing,Symbol}=nothing)
         k >= 3 || throw(ArgumentError("k must be at least 3, got $k"))
-        smoothing in (:GCV, :REML) ||
-            throw(ArgumentError("smoothing must be :GCV or :REML, got :$smoothing"))
-        return new(k, tensor, smoothing)
+        backend in (:gam, :bam, :scam) ||
+            throw(ArgumentError("backend must be :gam, :bam, or :scam, got :$backend"))
+        interaction in (:te, :ti) ||
+            throw(ArgumentError("interaction must be :te or :ti, got :$interaction"))
+        allowed_shapes = (:mpi, :mpd, :cv, :cx, :micv, :micx, :mdcv, :mdcx)
+        shape === nothing || shape in allowed_shapes ||
+            throw(ArgumentError("shape must be nothing or one of $allowed_shapes, got :$shape"))
+        eff_backend = (shape !== nothing && backend === :gam) ? :scam : backend
+        eff_backend === :bam && shape !== nothing &&
+            throw(ArgumentError("shape constraints are not supported with backend = :bam; " *
+                                "use backend = :scam"))
+        eff_smoothing = smoothing === nothing ?
+                        (eff_backend === :bam ? :REML : :GCV) : smoothing
+        if eff_backend === :bam
+            eff_smoothing in (:REML, :ML) ||
+                throw(ArgumentError("backend = :bam requires smoothing = :REML or :ML, " *
+                                    "got :$eff_smoothing"))
+        else
+            eff_smoothing in (:GCV, :REML) ||
+                throw(ArgumentError("smoothing must be :GCV or :REML, got :$eff_smoothing"))
+        end
+        eff_shape = eff_backend === :scam && shape === nothing ? :mpi : shape
+        return new(Int(k), tensor, eff_smoothing, eff_backend, interaction, discrete,
+                   eff_shape)
     end
 end
 

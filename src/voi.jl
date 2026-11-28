@@ -661,7 +661,7 @@ end
 # --------------------------------
 
 """
-    normal_form(model; states=nothing, baseline=nothing, atol=1e-9) -> NamedTuple
+    normal_form(model; states=nothing, baseline=nothing, multi_objective=false, atol=1e-9) -> NamedTuple
 
 The **normal form** of a single-decision influence diagram: the payoff table and
 belief that the diagram defines, as a [`DecisionProblem`](@ref), and the decision's
@@ -682,8 +682,10 @@ of this package.
   `nothing` when there are none.
 
 The result is `(; problem, experiment, decision, action, states, information,
-observed)`. With it, the structural quantities of the diagram are values of
-information on a payoff table:
+observed)`. When `multi_objective = true`, it also includes `objectives`, a `NamedTuple`
+mapping each utility node name to its own [`PayoffTable`](@ref) for use with
+[`ParetoFront`](@ref) or [`combine_payoffs`](@ref). With it, the structural quantities
+of the diagram are values of information on a payoff table:
 
 - `decide(problem, MaxExpectedUtility())` is the best action with no information;
 - `evsi(problem, experiment)` is the value of what the decision observes (the
@@ -694,20 +696,23 @@ information on a payoff table:
 
 `states` must carry everything the information tells about the utility
 (`E[U | a, θ, z] = E[U | a, θ]`), otherwise `ArgumentError` is thrown: add the
-variables the utility depends on. The diagram is evaluated by enumerating its joint
-distribution once per action, so this is for small diagrams, and the numbers are
-floating point, as in InfluenceDiagrams.jl. Utilities are whatever the diagram's
-utility nodes hold; this package takes the payoff's unit as given.
+variables the utility depends on. Marginals are computed by variable elimination
+(`BayesianNetworkInference.VariableElimination`), so diagrams with many chance nodes
+and bounded treewidth scale without enumerating the full joint distribution. Utilities
+are whatever the diagram's utility nodes hold; this package takes the payoff's unit as
+given.
 
     normal_form(network; decision, states, outcome, observed=(), baseline=nothing) -> NamedTuple
     normal_form((; action = network, ...); states, outcome, observed=(), baseline=nothing)
-    normal_form((; hypothesis = (; action = network, ...), ...); outcome, prior=nothing, baseline=nothing)
+    normal_form((; hypothesis = (; action = network, ...), ...); outcome, observed=(), prior=nothing, baseline=nothing)
+    normal_form(dynamic_model; decision, states, outcome, observed=(), signal_of=:current, baseline=nothing)
 
 **From Bayesian networks.** An influence diagram becomes a Bayesian network once its
 decision is made, so a decision problem is also a set of networks, one for each action.
-The networks are `BayesModel`s of BayesianNetworks.jl
+The networks are `BayesModel`s (or a lag-1 `DynamicBayesModel`) of BayesianNetworks.jl
 (`github.com/ecorecipes/BayesianNetworks.jl`), which is not a dependency of this package:
-load it first.
+load it first. When `BayesianNetworkInference` is also loaded, marginals automatically
+use variable elimination instead of brute-force joint enumeration.
 
 - **One network with a management node**: `decision` names the node, its states are the
   actions, and each action's network is the intervention `do(decision = action)`.
@@ -717,28 +722,38 @@ load it first.
   hypotheses (rival networks, or several experts' networks), the payoff is each action's
   expected outcome under each, and the belief is `prior` over them, or a
   [`ScenarioSet`](@ref) when there is none, so that only the rules that need no
-  probabilities apply.
+  probabilities apply. When `observed` is given (upstream of the decision, with the same
+  distribution across actions within each hypothesis), `experiment` and per-variable
+  `experiments` carry the model-discrimination likelihoods `P(z | hypothesis)` for
+  [`evsi`](@ref).
+- **Dynamic Bayesian network (`DynamicBayesModel`, lag 1)**: extracts a sequential
+  decision problem for [`adaptive_management`](@ref). Returns `(; problem, experiments,
+  transitions, signal_of, decision, actions, states, observed)`, where `transitions` maps
+  each action to its column-stochastic state transition matrix
+  `T[θ′, θ] = P(states_1 = θ′ | states_0 = θ, do(decision_0 = a))` and `experiments`
+  maps each action to its observation [`Experiment`](@ref) (or `nothing` when `observed`
+  is empty).
 
 `states` names the variables that form the state, and `observed` those that could be
-seen before deciding. Neither may depend on the action: their joint distribution must be
-the same in every network, which is checked (`ArgumentError` otherwise; a variable
-downstream of the decision fails it). `outcome` gives the payoff, a network having no
-utility of its own: `variable => values`, one number for each state (a vector, or a named
-tuple by state), or `(variables...) => array` with one axis per variable, or a list of
-such terms, which are added. A term may include the decision node, for what an action
-uses up. The payoff is `Q[a, θ] = E[outcome | action a, state θ]`.
+seen before deciding. For static networks neither may depend on the action: their joint
+distribution must be the same in every network, which is checked (`ArgumentError`
+otherwise; a variable downstream of the decision fails it). `outcome` gives the payoff,
+a network having no utility of its own: `variable => values`, one number for each state
+(a vector, or a named tuple by state), or `(variables...) => array` with one axis per
+variable, or a list of such terms, which are added. A term may include the decision
+node, for what an action uses up. The payoff is `Q[a, θ] = E[outcome | action a, state θ]`.
 
-The result is `(; problem, experiment, experiments, actions, states, observed)`
-(and `decision` for the first form): `experiments` holds one [`Experiment`](@ref) for each
-observed variable alone, so that `evsi(problem, experiments.X)` for every `X` says which
-variable is worth monitoring, and `experiment` is all of them together (`nothing` with
-none). As for a diagram, the state must carry everything an observation says about the
-outcome. The networks are evaluated by enumeration (`max_states`), in floating point.
+For static networks the result is `(; problem, experiment, experiments, actions, states,
+observed)` (and `decision` for the first form): `experiments` holds one
+[`Experiment`](@ref) for each observed variable alone, so that
+`evsi(problem, experiments.X)` for every `X` says which variable is worth monitoring,
+and `experiment` is all of them together (`nothing` with none). As for a diagram, the
+state must carry everything an observation says about the outcome.
 """
 function normal_form(model; kw...)
     # A collection of networks, or one: the other bridge.
     networks = model isa Union{NamedTuple,AbstractDict,AbstractVector{<:Pair}} ||
-               nameof(typeof(model)) === :BayesModel
+               nameof(typeof(model)) in (:BayesModel, :DynamicBayesModel)
     return throw(MissingExtensionError(:normal_form,
                                        networks ? :BayesianNetworks : :InfluenceDiagrams))
 end

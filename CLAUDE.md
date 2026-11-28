@@ -288,10 +288,11 @@ have the same distribution in every network; the bridge checks it and never assu
   `scenario_forecast` and `decision_robustness`.
 - `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `two_way_policy_regions`,
   `decision_curve`, `weight_sweep`, `rank_reversals`.
-- `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
-- `ext/DecisionAnalysisFiniteKernelsExt.jl`: `FiniteBelief` and `Experiment` from FiniteKernels objects.
-- `ext/DecisionAnalysisInfluenceDiagramsExt.jl`: `normal_form` from a single-decision `InfluenceDiagramModel`.
-- `ext/DecisionAnalysisBayesianNetworksExt.jl`: `normal_form` from a `BayesModel`, a named collection of them, or hypotheses × actions.
+- `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` and `_fit` (with `edf`/`k_check`, `:bam`, `:scam`, `:ti`) for `GAMRegression`, plus `parameter_draws` and `SampleBelief` for `GAM.GamModel`.
+- `ext/DecisionAnalysisFiniteKernelsExt.jl`: bidirectional `FiniteBelief`/`Experiment` ↔ `FiniteKernel` conversions and `FiniteKernel`/`ResilienceCore.MarkovKernel` transition support in `adaptive_management`.
+- `ext/DecisionAnalysisInfluenceDiagramsExt.jl`: VE-backed `normal_form` from a single-decision `InfluenceDiagramModel` (with optional `multi_objective=true`).
+- `ext/DecisionAnalysisBayesianNetworksExt.jl`: `normal_form` from a `BayesModel`, a named collection of them, hypotheses × actions (with optional `observed`), or a lag-1 `DynamicBayesModel` for `adaptive_management`.
+- `ext/DecisionAnalysisBayesianNetworkInferenceExt.jl`: variable-elimination marginalisation backend for `DecisionAnalysisBayesianNetworksExt` when `BayesianNetworkInference` is loaded.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
   `largest_action_range`, `largest_regret` with `deficiency_value_bound`.
 - `src/report.jl`, `src/tables.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives),
