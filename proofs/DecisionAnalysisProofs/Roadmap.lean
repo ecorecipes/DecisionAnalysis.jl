@@ -29,7 +29,8 @@ part of the default target.
   probability; the case in which Julia drops priors is not modelled, and neither are
   `AlphaMaxmin` or `UpperExpectation`.
 * `decide(...; atol, rtol)` with nonzero tolerances, `Satisfice`, `ParetoFront`, `Hurwicz`,
-  `CVaR`, `enbs` and the robustness metrics have no Lean counterpart.
+  `CVaR` (beyond its Rockafellar–Uryasev SSD monotonicity in `Finite/StochasticDominance.lean`),
+  `enbs`, `prim_boxes`, and CRRA (`PowerUtility`) bisection tolerances have no Lean counterpart.
 
 ## Where the Julia text and the theorems differ
 

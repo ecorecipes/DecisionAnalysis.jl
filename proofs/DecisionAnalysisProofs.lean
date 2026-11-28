@@ -21,7 +21,12 @@ import DecisionAnalysisProofs.Finite.SurveyOrAct
 import DecisionAnalysisProofs.Finite.Waiting
 import DecisionAnalysisProofs.Finite.Adaptive
 import DecisionAnalysisProofs.Finite.AdaptiveDynamic
+import DecisionAnalysisProofs.Finite.AdaptiveTimeVarying
 import DecisionAnalysisProofs.Finite.ValueVectors
+import DecisionAnalysisProofs.Finite.StochasticDominance
+import DecisionAnalysisProofs.Finite.InfoGap
+import DecisionAnalysisProofs.Finite.CertaintyEquivalentVOI
+import DecisionAnalysisProofs.Finite.ImplementationAndModel
 import DecisionAnalysisProofs.Theory.FiniteKernels
 import DecisionAnalysisProofs.Certificate.Check
 import DecisionAnalysisProofs.Certificate.Witness

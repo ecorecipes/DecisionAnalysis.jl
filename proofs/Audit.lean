@@ -224,3 +224,101 @@ import DecisionAnalysisProofs
 #print axioms DecisionAnalysisProofs.Certificate.MixedDominanceWitnessOk.not_isEAdmissible
 #print axioms DecisionAnalysisProofs.Certificate.RawNotEAdmissible.accepts_sound
 #print axioms DecisionAnalysisProofs.Certificate.RawNotGarbling.accepts_sound
+
+-- Stochastic dominance (`fsd_dominates`, `ssd_dominates`, `StochasticDominance`).
+#print axioms DecisionAnalysisProofs.fsd_refl
+#print axioms DecisionAnalysisProofs.fsd_trans
+#print axioms DecisionAnalysisProofs.strictFSD_irrefl
+#print axioms DecisionAnalysisProofs.strictFSD_trans
+#print axioms DecisionAnalysisProofs.ssd_refl
+#print axioms DecisionAnalysisProofs.ssd_trans
+#print axioms DecisionAnalysisProofs.strictSSD_irrefl
+#print axioms DecisionAnalysisProofs.strictSSD_trans
+#print axioms DecisionAnalysisProofs.fsd_of_pointwise_le
+#print axioms DecisionAnalysisProofs.expected_le_of_fsd
+#print axioms DecisionAnalysisProofs.mean_le_of_fsd
+#print axioms DecisionAnalysisProofs.ssd_of_fsd
+#print axioms DecisionAnalysisProofs.strictSSD_of_strictFSD
+#print axioms DecisionAnalysisProofs.mean_le_of_ssd
+#print axioms DecisionAnalysisProofs.cvarObj_le_of_ssd
+#print axioms DecisionAnalysisProofs.expected_le_of_ssd
+#print axioms DecisionAnalysisProofs.IsSSDUndominated.isFSDUndominated
+#print axioms DecisionAnalysisProofs.exists_isFSDUndominated
+#print axioms DecisionAnalysisProofs.exists_isSSDUndominated
+#print axioms DecisionAnalysisProofs.isSSDUndominated_of_unique_bayes
+
+-- Total-variation info-gap robustness and opportuneness (`info_gap_robustness`, `info_gap_opportuneness`).
+#print axioms DecisionAnalysisProofs.inTVBall_mono
+#print axioms DecisionAnalysisProofs.guaranteedAt_antitone
+#print axioms DecisionAnalysisProofs.achievableAt_monotone
+#print axioms DecisionAnalysisProofs.guaranteedAt_zero_iff
+#print axioms DecisionAnalysisProofs.guaranteedAt_one_iff
+#print axioms DecisionAnalysisProofs.achievableAt_zero_iff
+#print axioms DecisionAnalysisProofs.achievableAt_one_iff
+#print axioms DecisionAnalysisProofs.tvBall_drop_le
+#print axioms DecisionAnalysisProofs.exists_tvBall_attaining_shift
+#print axioms DecisionAnalysisProofs.tvBall_gain_le
+#print axioms DecisionAnalysisProofs.exists_tvBall_attaining_gain_shift
+#print axioms DecisionAnalysisProofs.greedy_drop_shift_optimal
+#print axioms DecisionAnalysisProofs.greedy_gain_shift_optimal
+#print axioms DecisionAnalysisProofs.guaranteedAt_of_greedy_drop
+#print axioms DecisionAnalysisProofs.not_achievableAt_of_greedy_gain
+
+-- Certainty-equivalent VOI (`ce_evpi`, `ce_evppi`, `ce_evsi`) and KMM smooth ambiguity (`SmoothAmbiguity`).
+#print axioms DecisionAnalysisProofs.ce_linear_eq_mean
+#print axioms DecisionAnalysisProofs.ceEvsi_linear_eq_evsi
+#print axioms DecisionAnalysisProofs.ceEvpi_linear_eq_evpi
+#print axioms DecisionAnalysisProofs.ceEvppi_linear_eq_evppi
+#print axioms DecisionAnalysisProofs.caraCE_logSumExp_eq
+#print axioms DecisionAnalysisProofs.caraCE_add_const
+#print axioms DecisionAnalysisProofs.caraCE_const
+#print axioms DecisionAnalysisProofs.caraCE_mono
+#print axioms DecisionAnalysisProofs.minOver_le_caraCE
+#print axioms DecisionAnalysisProofs.caraCE_le_maxOver
+#print axioms DecisionAnalysisProofs.caraCE_le_mean
+#print axioms DecisionAnalysisProofs.caraCE_concave
+#print axioms DecisionAnalysisProofs.caraInformedVal_eq_exp_mul
+#print axioms DecisionAnalysisProofs.caraActNowCE_eq_maxOver_caraCE
+#print axioms DecisionAnalysisProofs.cara_buying_price_eq_ce_gain
+#print axioms DecisionAnalysisProofs.cara_buying_price_nonneg
+#print axioms DecisionAnalysisProofs.expSmoothAmbiguity_logSumExp_eq
+#print axioms DecisionAnalysisProofs.lowerExpectedUtility_le_expSmoothAmbiguity
+#print axioms DecisionAnalysisProofs.expSmoothAmbiguity_le_mixture
+#print axioms DecisionAnalysisProofs.expSmoothAmbiguity_le_upperExpectedUtility
+#print axioms DecisionAnalysisProofs.expSmoothAmbiguity_mono
+#print axioms DecisionAnalysisProofs.expSmoothAmbiguity_add_const
+#print axioms DecisionAnalysisProofs.expSmoothAmbiguity_const
+#print axioms DecisionAnalysisProofs.expSmoothAmbiguity_concave
+#print axioms DecisionAnalysisProofs.smoothAmbiguity_le_mixture_of_concave
+
+-- Implementation VOI (`evpim`, `evsim`), model VOI (`evmi`), generator pruning, constrained policy weak duality.
+#print axioms DecisionAnalysisProofs.evpim_nonneg
+#print axioms DecisionAnalysisProofs.evpim_eq_zero_of_bayes_support
+#print axioms DecisionAnalysisProofs.evsim_le_evpim
+#print axioms DecisionAnalysisProofs.evim_with_experiment_eq_add
+#print axioms DecisionAnalysisProofs.evmiEnsemble_nonneg
+#print axioms DecisionAnalysisProofs.evmiEnsemble_eq_zero_iff
+#print axioms DecisionAnalysisProofs.evmiPair_nonneg
+#print axioms DecisionAnalysisProofs.evmiPair_eq_zero_iff
+#print axioms DecisionAnalysisProofs.prune_redundant_preserves_hull
+#print axioms DecisionAnalysisProofs.prune_redundant_lowerExpectedUtility
+#print axioms DecisionAnalysisProofs.prune_redundant_upperExpectedUtility
+#print axioms DecisionAnalysisProofs.prune_redundant_isEAdmissible
+#print axioms DecisionAnalysisProofs.prune_redundant_isMaximal
+#print axioms DecisionAnalysisProofs.constrained_policy_le_dual
+
+-- Time-varying adaptive management and positive homogeneity of belief normalisation.
+#print axioms DecisionAnalysisProofs.tvDynamicPolicyValue_le_tvDynamicValue
+#print axioms DecisionAnalysisProofs.exists_tvDynamicPolicyValue_eq_tvDynamicValue
+#print axioms DecisionAnalysisProofs.tvOpenLoopValue_sum_le
+#print axioms DecisionAnalysisProofs.tvOpenLoopValue_le_tvDynamicPolicyValue
+#print axioms DecisionAnalysisProofs.tvOpenLoopValue_le_tvDynamicValue
+#print axioms DecisionAnalysisProofs.tvDynamicValue_le_sum_tvObservedValue
+#print axioms DecisionAnalysisProofs.tvDynamicValue_const_eq_dynamicValue
+#print axioms DecisionAnalysisProofs.tvOpenLoopValue_const_eq_openLoopValue
+#print axioms DecisionAnalysisProofs.tvObservedValue_const_eq_observedValue
+#print axioms DecisionAnalysisProofs.tvDynamicValue_smul
+#print axioms DecisionAnalysisProofs.tvDynamicValue_eq_total_mul_normalised
+#print axioms DecisionAnalysisProofs.tvDynamicValue_zero
+#print axioms DecisionAnalysisProofs.dynamicValue_smul
+#print axioms DecisionAnalysisProofs.tvOpenLoopValue_smul
