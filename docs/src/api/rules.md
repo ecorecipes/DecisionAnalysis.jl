@@ -12,6 +12,7 @@ Laplace
 LowerExpectation
 UpperExpectation
 AlphaMaxmin
+SmoothAmbiguity
 CVaR
 Quantile
 aggregate
@@ -45,6 +46,17 @@ EAdmissible
 Maximal
 IntervalDominance
 ParetoFront
+StochasticDominance
+```
+
+## Stochastic dominance, info-gap and scenario discovery
+
+```@docs
+fsd_dominates
+ssd_dominates
+info_gap_robustness
+info_gap_opportuneness
+prim_boxes
 ```
 
 ## Rule combinators and robustness metrics

@@ -161,8 +161,9 @@ function DecisionReport(problem::DecisionProblem;
                         assumptions::AbstractVector{<:AbstractString}=String[],
                         optimizer=nothing, parameters=nothing,
                         regression::Union{Nothing,AbstractRegression}=SplineRegression(),
-                        seed::Integer=1, noise_correlation::Real=0, profile::Bool=false,
-                        quantities=nothing)
+                        seed::Integer=1,
+                        noise_correlation::Union{Nothing,Real}=nothing,
+                        profile::Bool=false, quantities=nothing)
     belief = problem.belief
     sampled = belief isa SampleBelief
     parameters === nothing || sampled ||
@@ -352,7 +353,7 @@ end
 
 # The Monte Carlo section of a sample-based report; appends its assumptions to `notes`.
 function _monte_carlo(problem::DecisionProblem, parameters, regression, seed::Integer,
-                      notes::Vector{String}, noise_correlation::Real)
+                      notes::Vector{String}, noise_correlation::Union{Nothing,Real})
     belief = problem.belief
     noisy = problem.payoff.standard_errors !== nothing
     flagged = single_replicate(problem.payoff)

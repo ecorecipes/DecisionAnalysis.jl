@@ -299,9 +299,52 @@ function payoff_table(t::OutcomeTable, u::AbstractUtility; baseline=nothing)
             end
         end
     end
-    return PayoffTable(t.actions, t.draws, Q; standard_errors=se, replicates=counts)
+    nc = nothing
+    if se !== nothing && na >= 2
+        ρ = _crn_correlation(U, ok)
+        isfinite(ρ) && (nc = clamp(ρ, -1.0, 1.0))
+    end
+    return PayoffTable(t.actions, t.draws, Q; standard_errors=se, replicates=counts,
+                       noise_correlation=nc)
 end
 payoff_table(t::OutcomeTable, f; kw...) = payoff_table(t, FunctionUtility(f); kw...)
+
+function _crn_correlation(U::AbstractArray{<:Real,3}, ok::AbstractArray{Bool,3})
+    na, nd, nr = size(ok)
+    covariance = 0.0
+    scale = 0.0
+    x = Float64[]
+    y = Float64[]
+    sizehint!(x, nr)
+    sizehint!(y, nr)
+    @inbounds for d in 1:nd, a in 1:na, b in (a + 1):na
+        empty!(x)
+        empty!(y)
+        for r in 1:nr
+            if ok[a, d, r] && ok[b, d, r]
+                push!(x, Float64(U[a, d, r]))
+                push!(y, Float64(U[b, d, r]))
+            end
+        end
+        m = length(x)
+        m >= 2 || continue
+        mx = sum(x) / m
+        my = sum(y) / m
+        sxy = 0.0
+        sxx = 0.0
+        syy = 0.0
+        for i in 1:m
+            dx = x[i] - mx
+            dy = y[i] - my
+            sxy += dx * dy
+            sxx += dx * dx
+            syy += dy * dy
+        end
+        covariance += sxy
+        scale += sqrt(sxx * syy)
+    end
+    return iszero(scale) ? NaN : covariance / scale
+end
 
 function _standard_error(x::AbstractVector)
     n = length(x)
@@ -343,19 +386,7 @@ there is no noise to correlate.
 function crn_correlation(t::OutcomeTable, utility)
     u = utility isa AbstractUtility ? utility : FunctionUtility(utility)
     U, ok = _run_utilities(t, u)
-    covariance = 0.0
-    scale = 0.0
-    for d in eachindex(t.draws), a in eachindex(t.actions), b in (a + 1):length(t.actions)
-        both = findall(view(ok, a, d, :) .& view(ok, b, d, :))
-        length(both) >= 2 || continue
-        x = Float64.(U[a, d, both])
-        y = Float64.(U[b, d, both])
-        x .-= sum(x) / length(x)
-        y .-= sum(y) / length(y)
-        covariance += dot(x, y)
-        scale += sqrt(sum(abs2, x) * sum(abs2, y))
-    end
-    return iszero(scale) ? NaN : covariance / scale
+    return _crn_correlation(U, ok)
 end
 
 # Risk attitude: utilities of one named outcome

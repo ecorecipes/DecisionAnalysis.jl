@@ -108,6 +108,289 @@ function evppi_nested(payoffs, sample_focal, sample_rest; outer::Integer, inner:
 end
 
 """
+    MultilevelMC(; tol, base_inner=2, pilot=200, min_level=2, max_level=10,
+                 max_outer=200_000)
+
+Antithetic coupled **multilevel Monte Carlo** configuration (Giles and Goda 2019,
+*Operations Research* 67:1759) for nested [`evppi_nested`](@ref) and [`evsi`](@ref).
+
+At level `ℓ = 0`, each outer sample averages `M₀ = base_inner` inner draws; at level
+`ℓ ≥ 1`, each outer sample splits `M_ℓ = M₀ · 2^ℓ` inner draws into two independent
+halves `A` and `B` of size `M_{ℓ-1}` and accumulates the antithetic difference
+
+    Δ_ℓ = max_a Ȳ^{(ℓ)}_a − ½ (max_a Ȳ^{(A)}_a + max_a Ȳ^{(B)}_a) ≤ 0,
+
+which cancels to zero whenever the same action wins in both halves. This gives variance
+decay `O(2^{-3ℓ/2})` against cost `O(2^ℓ)`, reducing the complexity of reaching RMS error
+`tol` from `O(tol⁻³)` for standard two-level Monte Carlo to `O(tol⁻²)`.
+
+Levels are added adaptively from `min_level` up to `max_level` until both the Monte Carlo
+standard error and the level-`L` bias indicator are below `tol / √2`.
+"""
+struct MultilevelMC
+    tol::Float64
+    base_inner::Int
+    pilot::Int
+    min_level::Int
+    max_level::Int
+    max_outer::Int
+    function MultilevelMC(; tol::Real, base_inner::Integer=2, pilot::Integer=200,
+                          min_level::Integer=2, max_level::Integer=10,
+                          max_outer::Integer=200_000)
+        (isfinite(tol) && tol > 0) ||
+            throw(ArgumentError("tol must be positive and finite, got $tol"))
+        base_inner >= 1 ||
+            throw(ArgumentError("base_inner must be at least 1, got $base_inner"))
+        pilot >= 20 || throw(ArgumentError("pilot must be at least 20, got $pilot"))
+        min_level >= 1 ||
+            throw(ArgumentError("min_level must be at least 1, got $min_level"))
+        max_level >= min_level ||
+            throw(ArgumentError("max_level must be at least min_level ($min_level), got " *
+                                "$max_level"))
+        max_outer >= pilot ||
+            throw(ArgumentError("max_outer must be at least pilot ($pilot), got $max_outer"))
+        return new(Float64(tol), Int(base_inner), Int(pilot), Int(min_level),
+                   Int(max_level), Int(max_outer))
+    end
+end
+
+# Accumulate `n_add` outer samples for MLMC level `lvl` (lvl = 0 uses M0 inner draws and
+# stores mean payoff vectors for act-now determination; lvl >= 1 uses antithetic splitting
+# of M = M0 * 2^lvl inner draws into two halves of M0 * 2^(lvl - 1)).
+function _mlmc_add_level0!(rng::AbstractRNG, payoffs, sample_outer, sample_inner,
+                           M0::Int, n_add::Int, means_acc::Vector{Vector{Float64}},
+                           n_actions::Ref{Int})
+    evals = 0
+    for _ in 1:n_add
+        φ = sample_outer(rng)
+        m = nothing
+        for k in 1:M0
+            rest = sample_inner(rng, φ)
+            y = _payoff_vector(payoffs(rest, φ))
+            evals += 1
+            if n_actions[] == 0
+                n_actions[] = length(y)
+            elseif length(y) != n_actions[]
+                throw(ArgumentError("`payoffs` returned $(length(y)) payoffs in one " *
+                                    "call and $(n_actions[]) in another"))
+            end
+            if m === nothing
+                m = copy(y)
+            else
+                m .+= y
+            end
+        end
+        m ./= M0
+        push!(means_acc, m)
+    end
+    return evals
+end
+
+function _mlmc_add_coupled!(rng::AbstractRNG, payoffs, sample_outer, sample_inner,
+                            half_m::Int, n_add::Int, count_ref::Ref{Int},
+                            mean_ref::Ref{Float64}, m2_ref::Ref{Float64},
+                            n_actions::Int)
+    evals = 0
+    sumA = Vector{Float64}(undef, n_actions)
+    sumB = Vector{Float64}(undef, n_actions)
+    inv_half = 1.0 / half_m
+    inv_full = 0.5 * inv_half
+    for _ in 1:n_add
+        φ = sample_outer(rng)
+        fill!(sumA, 0.0)
+        fill!(sumB, 0.0)
+        for _ in 1:half_m
+            y = _payoff_vector(payoffs(sample_inner(rng, φ), φ))
+            evals += 1
+            @inbounds for a in 1:n_actions
+                sumA[a] += y[a]
+            end
+        end
+        for _ in 1:half_m
+            y = _payoff_vector(payoffs(sample_inner(rng, φ), φ))
+            evals += 1
+            @inbounds for a in 1:n_actions
+                sumB[a] += y[a]
+            end
+        end
+        maxA = -Inf
+        maxB = -Inf
+        maxF = -Inf
+        @inbounds for a in 1:n_actions
+            va = sumA[a] * inv_half
+            vb = sumB[a] * inv_half
+            vf = (sumA[a] + sumB[a]) * inv_full
+            va > maxA && (maxA = va)
+            vb > maxB && (maxB = vb)
+            vf > maxF && (maxF = vf)
+        end
+        Δ = maxF - 0.5 * (maxA + maxB)
+        k = count_ref[] + 1
+        count_ref[] = k
+        d1 = Δ - mean_ref[]
+        mean_ref[] += d1 / k
+        m2_ref[] += d1 * (Δ - mean_ref[])
+    end
+    return evals
+end
+
+function _mlmc_level0_stats(means_acc::Vector{Vector{Float64}})
+    N = length(means_acc)
+    na = length(first(means_acc))
+    grand = zeros(na)
+    for m in means_acc
+        grand .+= m
+    end
+    grand ./= N
+    a0 = argmax(grand)
+    v0 = grand[a0]
+    mu = 0.0
+    m2 = 0.0
+    for (k, m) in enumerate(means_acc)
+        g = maximum(m) - m[a0]
+        d1 = g - mu
+        mu += d1 / k
+        m2 += d1 * (g - mu)
+    end
+    return mu, m2 / (N - 1), v0, a0
+end
+
+function _mlmc_nested(quantity::Symbol, payoffs_pair, sample_outer, sample_inner,
+                      method::MultilevelMC; seed::Union{Nothing,Integer}=nothing)
+    seed === nothing && throw(ArgumentError("give `seed`"))
+    rng = Xoshiro(seed)
+    M0 = method.base_inner
+    L = method.min_level
+    n_actions = Ref(0)
+    means0 = Vector{Float64}[]
+    counts_c = [Ref(0) for _ in 1:(method.max_level)]
+    means_c = [Ref(0.0) for _ in 1:(method.max_level)]
+    m2_c = [Ref(0.0) for _ in 1:(method.max_level)]
+    total_evals = 0
+    total_evals += _mlmc_add_level0!(rng, payoffs_pair, sample_outer, sample_inner, M0,
+                                     method.pilot, means0, n_actions)
+    for l in 1:L
+        total_evals += _mlmc_add_coupled!(rng, payoffs_pair, sample_outer, sample_inner,
+                                          M0 * (1 << (l - 1)), method.pilot, counts_c[l],
+                                          means_c[l], m2_c[l], n_actions[])
+    end
+    converged = false
+    ε = method.tol
+    for _ in 1:25
+        m0, v0_var, _, _ = _mlmc_level0_stats(means0)
+        # Current level counts, variances and costs (in model evaluations per outer sample).
+        n_cur = Int[length(means0); [counts_c[l][] for l in 1:L]]
+        vars = Float64[max(v0_var, 0.0);
+                       [max(m2_c[l][] / max(1, counts_c[l][] - 1), 0.0) for l in 1:L]]
+        costs = Float64[Float64(M0); [Float64(M0 * (1 << l)) for l in 1:L]]
+        sum_sqrt = sum(sqrt(vars[i] * costs[i]) for i in eachindex(vars))
+        added_any = false
+        if sum_sqrt > 0.0
+            for idx in 1:(L + 1)
+                target = ceil(Int, 2.0 / (ε * ε) * sqrt(vars[idx] / costs[idx]) * sum_sqrt)
+                target = min(target, method.max_outer)
+                need = target - n_cur[idx]
+                if need > 0
+                    added_any = true
+                    if idx == 1
+                        total_evals += _mlmc_add_level0!(rng, payoffs_pair, sample_outer,
+                                                         sample_inner, M0, need, means0,
+                                                         n_actions)
+                    else
+                        l = idx - 1
+                        total_evals += _mlmc_add_coupled!(rng, payoffs_pair, sample_outer,
+                                                          sample_inner, M0 * (1 << (l - 1)),
+                                                          need, counts_c[l], means_c[l],
+                                                          m2_c[l], n_actions[])
+                    end
+                end
+            end
+        end
+        # Weak-error bias check (Giles 2015): |E[Δ_L]| ≈ |E[Y^(L) - Y]|.
+        rem_bias = L >= 2 ? max(abs(means_c[L][]), 0.5 * abs(means_c[L - 1][])) :
+                   abs(means_c[L][])
+        if rem_bias <= ε / sqrt(2.0)
+            added_any || (converged=true; break)
+        elseif L < method.max_level
+            L += 1
+            total_evals += _mlmc_add_coupled!(rng, payoffs_pair, sample_outer, sample_inner,
+                                              M0 * (1 << (L - 1)), method.pilot,
+                                              counts_c[L], means_c[L], m2_c[L],
+                                              n_actions[])
+        else
+            added_any || break
+        end
+    end
+    m0, v0_var, act_v0, act_idx = _mlmc_level0_stats(means0)
+    lvl_means = Float64[m0; [means_c[l][] for l in 1:L]]
+    lvl_vars = Float64[max(v0_var, 0.0);
+                       [max(m2_c[l][] / max(1, counts_c[l][] - 1), 0.0) for l in 1:L]]
+    lvl_counts = Int[length(means0); [counts_c[l][] for l in 1:L]]
+    inner_sizes = Int[M0 * (1 << l) for l in 0:L]
+    value = sum(lvl_means)
+    se = sqrt(sum(lvl_vars[i] / lvl_counts[i] for i in eachindex(lvl_means)))
+    rem_bias = abs(lvl_means[end])
+    # Recompute convergence cleanly from final stats.
+    converged = converged || (se <= ε / sqrt(2.0) && rem_bias <= ε / sqrt(2.0))
+    # Act-now selection bias estimated from level-0 inner-mean matrix.
+    M0_mat = reduce(hcat, means0)
+    w0 = fill(1.0 / length(means0), length(means0))
+    bias = (; act_now=_act_now_bias(M0_mat, w0, rng), cells=rem_bias)
+    details = (; act_now_value=act_v0, act_now_index=act_idx, levels=L + 1,
+               inner_sizes, outer_counts=lvl_counts, level_means=lvl_means,
+               level_variances=lvl_vars, model_evaluations=total_evals, tol=ε, converged)
+    return VOIEstimate(quantity, :MultilevelMC, value, se, bias, details)
+end
+
+function evppi_nested(payoffs, sample_focal, sample_rest, method::MultilevelMC;
+                      seed::Union{Nothing,Integer}=nothing)
+    eval_pair(rest, φ) = payoffs(merge(rest, φ))
+    return _mlmc_nested(:evppi, eval_pair, sample_focal, sample_rest, method; seed)
+end
+
+"""
+    evsi(payoffs, sample_data, sample_posterior, method::MultilevelMC; seed) -> VOIEstimate
+    evsi(problem::DecisionProblem, design::AbstractStudyDesign, method::MultilevelMC;
+         payoffs, prior, seed) -> VOIEstimate
+
+The expected value of sample information by **antithetic multilevel Monte Carlo**
+([`MultilevelMC`](@ref), Giles and Goda 2019).
+
+- In the model form, `sample_data(rng)` simulates one data set from the prior predictive
+  distribution, `sample_posterior(rng, data)` draws one full parameter named tuple `θ`
+  from the posterior given `data`, and `payoffs(θ)` returns the action payoffs.
+- In the study-design form, `design` is a built-in [`AbstractStudyDesign`](@ref) with
+  conjugate `prior` and `problem` provides the [`SampleBelief`](@ref) for the non-focal
+  parameters (sampled independently of the focal parameters).
+"""
+function evsi(payoffs, sample_data, sample_posterior, method::MultilevelMC;
+              seed::Union{Nothing,Integer}=nothing)
+    eval_pair(θ, _) = payoffs(θ)
+    return _mlmc_nested(:evsi, eval_pair, sample_data, sample_posterior, method; seed)
+end
+function evsi(problem::DecisionProblem, design::AbstractStudyDesign, method::MultilevelMC;
+              payoffs, prior, seed::Union{Nothing,Integer}=nothing)
+    _sample_problem(problem, :evsi)
+    belief = problem.belief
+    rows = Tables.rowtable(belief.draws)
+    wf = Float64.(belief.weights)
+    cumulative = cumsum(wf)
+    n = length(rows)
+    focal = _study_parameters(design)
+    function _pick_row(rng)
+        return rows[min(searchsortedfirst(cumulative, rand(rng) * cumulative[end]), n)]
+    end
+    sample_data(rng) = simulate_study(rng, design, _pick_row(rng))
+    function sample_post(rng, data)
+        post = study_posterior(rng, design, data, prior; draws=1)
+        post_nt = NamedTuple{Tuple(focal)}(Tuple(first(post[nm]) for nm in focal))
+        return merge(_pick_row(rng), post_nt)
+    end
+    eval_pair(θ, _) = payoffs(θ)
+    return _mlmc_nested(:evsi, eval_pair, sample_data, sample_post, method; seed)
+end
+
+"""
     MomentMatching(focal; payoffs, simulate_data, posterior, nested=30, regression=nothing)
     MomentMatching(design::AbstractStudyDesign; payoffs, prior, nested=30,
                    posterior_draws=1000, regression=nothing)

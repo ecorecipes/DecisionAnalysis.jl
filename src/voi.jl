@@ -323,6 +323,138 @@ function two_stage_value(problem::DecisionProblem, first_stage::AbstractVector;
             chosen=stages[values .>= value - tol], act_now, gain=value - act_now)
 end
 
+# Helper to parse an implementation probability distribution over feasible actions.
+function _implementation_weights(problem::DecisionProblem, impl, what::AbstractString)
+    actions = feasible_actions(problem)
+    na = length(actions)
+    w = if impl isa AbstractVector{<:Real}
+        length(impl) == na ||
+            throw(ArgumentError("$what has $(length(impl)) entries for $na feasible actions"))
+        collect(impl)
+    else
+        pairs_list = _named_items(impl, Real, what)
+        lookup = Dict(pairs_list)
+        for a in keys(lookup)
+            a in actions ||
+                throw(ArgumentError("$what names $a, which is not a feasible action ($actions)"))
+        end
+        T = promote_type(Int, (typeof(v) for v in values(lookup))...)
+        [get(lookup, a, zero(T)) for a in actions]
+    end
+    all(v -> isfinite(v) && v >= 0, w) ||
+        throw(ArgumentError("$what probabilities must be finite and nonnegative"))
+    s = sum(w)
+    s > 0 || throw(ArgumentError("$what probabilities must have positive sum"))
+    return [_div(v, s) for v in w]
+end
+
+"""
+    evim(problem::DecisionProblem; implementation, target=nothing) -> NamedTuple
+    evim(problem::DecisionProblem, experiment::Experiment; implementation) -> NamedTuple
+
+The **expected value of implementation** (Fenwick, Claxton and Sculpher 2008, *Health
+Economics* 17:741): how much expected utility is gained by moving from current imperfect
+adoption `implementation` (probabilities across feasible actions, as a vector or
+`action => probability` collection) to either:
+
+- **perfect implementation** (`target = nothing`, default): always taking the optimal
+  act-now action, `EVPIM = V₀ − Σ_a π_a E[Q_a] ≥ 0`;
+- **specific implementation** (`target = π′`): moving to adoption profile `π′`,
+  `EVSIM = Σ_a (π′_a − π_a) E[Q_a]`;
+- **information plus perfect implementation** (with `experiment::Experiment`):
+  `value_with_information(problem, experiment) − Σ_a π_a E[Q_a] = EVSI + EVPIM`.
+
+Exact in, exact out on rationals. Needs a single prior.
+"""
+function evim(problem::DecisionProblem; implementation, target=nothing)
+    p = _prior(problem, :evim)
+    eu = _feasible_Q(problem) * p
+    π0 = _implementation_weights(problem, implementation, "implementation")
+    current_value = dot(π0, eu)
+    if target === nothing
+        opt_value = maximum(eu)
+        return (; value=opt_value - current_value, current_value, target_value=opt_value,
+                implementation=π0)
+    end
+    π1 = _implementation_weights(problem, target, "target")
+    target_value = dot(π1, eu)
+    return (; value=target_value - current_value, current_value, target_value,
+            implementation=π0, target=π1)
+end
+function evim(problem::DecisionProblem, experiment::Experiment; implementation)
+    base = evim(problem; implementation)
+    evsi_val = evsi(problem, experiment)
+    return (; value=base.value + evsi_val, evim=base.value, evsi=evsi_val,
+            current_value=base.current_value,
+            informed_value=base.target_value + evsi_val,
+            implementation=base.implementation)
+end
+
+"""
+    evmi(problems, weights=nothing) -> NamedTuple
+    evmi(approximate::DecisionProblem, truth::DecisionProblem) -> NamedTuple
+
+The **expected value of model improvement** (structural uncertainty):
+
+- Given a collection `problems` of rival [`DecisionProblem`](@ref)s sharing the same
+  feasible actions (each with a single prior) and model `weights` (equal when `nothing`,
+  normalised), computes the value of learning which structural model is true:
+  `EVMI = Σ_m w_m max_a E_m[Q_a] − max_a Σ_m w_m E_m[Q_a] ≥ 0`.
+  Returns `(; value, act_now_value, informed_value, model_values, chosen_without,
+  chosen_per_model, weights)`.
+- Given two problems `(approximate, truth)` over the same feasible actions, computes the
+  value of replacing the approximate model by `truth`, evaluated under `truth`:
+  `max_a E_truth[Q_a] − E_truth[Q_{a_approx}] ≥ 0` (worst-case tie over `a_approx`
+  reported alongside the first-choice evaluation).
+
+Exact in, exact out on rationals.
+"""
+function evmi(problems::AbstractVector{<:DecisionProblem},
+              weights::Union{Nothing,AbstractVector{<:Real}}=nothing)
+    isempty(problems) && throw(ArgumentError("evmi needs at least one model problem"))
+    actions = feasible_actions(first(problems))
+    for pr in problems
+        feasible_actions(pr) == actions ||
+            throw(LabelMismatchError("feasible actions of rival models", actions,
+                                     feasible_actions(pr)))
+    end
+    K = length(problems)
+    w = weights === nothing ? fill(1 // K, K) : _normalise_weights(collect(weights))
+    length(w) == K ||
+        throw(ArgumentError("$(length(w)) weights for $K model problems"))
+    E_cols = [aggregate(Expectation(), pr) for pr in problems]
+    E = reduce(hcat, E_cols)
+    avg = E * w
+    tol_avg = _tolerance(avg, 0, _default_rtol(eltype(avg)))
+    v_avg = maximum(avg)
+    chosen_without = actions[findall(>=(v_avg - tol_avg), avg)]
+    model_vals = [maximum(c) for c in E_cols]
+    chosen_per_model = [begin
+                            t = _tolerance(c, 0, _default_rtol(eltype(c)))
+                            actions[findall(>=(maximum(c) - t), c)]
+                        end
+                        for c in E_cols]
+    v_informed = dot(w, model_vals)
+    return (; value=v_informed - v_avg, act_now_value=v_avg, informed_value=v_informed,
+            model_values=model_vals, chosen_without, chosen_per_model, weights=w)
+end
+function evmi(approximate::DecisionProblem, truth::DecisionProblem)
+    actions = feasible_actions(approximate)
+    actions == feasible_actions(truth) ||
+        throw(LabelMismatchError("feasible actions of approximate and truth problems",
+                                 actions, feasible_actions(truth)))
+    eu_approx = aggregate(Expectation(), approximate)
+    eu_truth = aggregate(Expectation(), truth)
+    t_a = _tolerance(eu_approx, 0, _default_rtol(eltype(eu_approx)))
+    t_t = _tolerance(eu_truth, 0, _default_rtol(eltype(eu_truth)))
+    a_approx = findfirst(>=(maximum(eu_approx) - t_a), eu_approx)
+    best_truth = maximum(eu_truth)
+    chosen_truth = actions[findall(>=(best_truth - t_t), eu_truth)]
+    return (; value=best_truth - eu_truth[a_approx],
+            approximate_action=actions[a_approx], truth_actions=chosen_truth,
+            value_under_approximate_choice=eu_truth[a_approx], optimal_value=best_truth)
+end
+
 """
     enbs(problem::DecisionProblem, experiment::Experiment; population=1)
 

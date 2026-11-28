@@ -187,8 +187,9 @@ have the same distribution in every network; the bridge checks it and never assu
 - `src/lp.jl`: internal dense two-phase simplex in exact rational arithmetic (Bland's rule); the fallback
   solver, for small problems.
 - `src/programs.jl`: `DecisionProgram` and the builders `eadmissibility_model`, `garbling_model`,
-  `deficiency_model`, `evpi_envelope_model`, and `mixed_dominance_model` and `separating_payoff_model`
-  for certified "no" answers (JuMP models).
+  `deficiency_model`, `evpi_envelope_model`, `mixed_dominance_model`, `separating_payoff_model`,
+  `budget_selection_model`, `constrained_policy_model`, `generator_redundancy_model` (JuMP models),
+  and `prune_generators`.
 - `src/solve.jl`: `solve_program` and `ProgramSolution`: the three routes, rounding, and the exact
   primal-dual check.
 - `src/beliefs.jl`: `PointBelief`, `FiniteBelief`, `SampleBelief`, `CredalSet`, `ScenarioSet`; label and
@@ -207,17 +208,21 @@ have the same distribution in every network; the bridge checks it and never assu
   `MultiplicativeUtility`.
 - `src/problem.jl`: `DecisionProblem`, feasibility filter, baseline and gains over it,
   `restrict_scenarios`, and the internal `_View` that aggregators act on.
-- `src/aggregators.jl`: the ten aggregators and `aggregate`.
+- `src/aggregators.jl`: the eleven aggregators (including `SmoothAmbiguity`) and `aggregate`.
 - `src/regret.jl`: regret tables (`RegretTable`, a labelled matrix) and profiles.
 - `src/rules.jl`: transforms, `RobustnessMetric`, selectors, `DecisionRule`, the named rules, the
   set-valued rules, `DecisionResult`, `decide`.
+- `src/deep_uncertainty.jl`: `fsd_dominates`, `ssd_dominates`, `StochasticDominance`,
+  `info_gap_robustness`, `info_gap_opportuneness`, and weighted PRIM `prim_boxes`.
 - `src/experiments.jl`: `Experiment`, `gaussian_experiment`, `bayes_invert`, `garble`, `is_garbling_of`, `garbling_result`,
   `deficiency`.
-- `src/voi.jl`: `evpi`, `evppi`, `hypothesis_partition`, `two_stage_value`, `evsi`, `enbs`,
-  `value_with_information`,
+- `src/voi.jl`: `evpi`, `evppi`, `hypothesis_partition`, `two_stage_value`, `evsi`, `enbs`, `evim`,
+  `evmi`, `value_with_information`,
   `information_can_change_decision`, `robust_evpi`, `robust_evsi` (`RobustVOI.upper_prior`), and the
   stub of `normal_form`, whose methods live in `ext/DecisionAnalysisInfluenceDiagramsExt.jl` and
   `ext/DecisionAnalysisBayesianNetworksExt.jl`.
+- `src/ce_voi.jl`: certainty-equivalent VOI (`ce_evpi`, `ce_evppi`, `ce_evsi`) in outcome units under
+  linear, CARA (`ExponentialUtility`), and CRRA (`PowerUtility`) utilities.
 - `src/voi_sample.jl`: `VOIEstimate`, the methods (`SampleAverage`, `Grouping`, `StrongOakley`,
   `Sadatsafavi`, `SplineRegression`, `GAMRegression`), the studies (`SummaryStatistics`,
   `ImportanceSampling`, `GaussianApproximation`), the method-taking `evpi`, `evppi`, `evsi`, `enbs`,
@@ -232,12 +237,13 @@ have the same distribution in every network; the bridge checks it and never assu
 - `src/mars.jl`: `MARSRegression`, multivariate adaptive regression splines written from Friedman (1991):
   greedy pairs of hinges at a grid of weighted quantiles, pruned by generalised cross-validation, one basis
   for all actions.
-- `src/studies.jl`: the built-in study designs `BinomialStudy`, `TwoArmBinomialStudy`, `NormalStudy` with
+- `src/studies.jl`: the built-in study designs `BinomialStudy`, `TwoArmBinomialStudy`, `NormalStudy`,
+  `CountStudy`, `OccupancyStudy`, `CaptureRecaptureStudy`, `MvNormalStudy` with
   `simulate_study`, `study_loglikelihood`, `study_posterior` (conjugate), and the constructors of
   `SummaryStatistics` and `ImportanceSampling` from a design. Small internal samplers (binomial, gamma,
-  beta), so that no distributions package is needed.
-- `src/voi_model.jl`: the estimators that run the model: `evppi_nested` (two-level Monte Carlo) and
-  `MomentMatching` with its `evsi` method.
+  beta, Poisson), so that no distributions package is needed.
+- `src/voi_model.jl`: the estimators that run the model: `evppi_nested` (two-level Monte Carlo),
+  `MultilevelMC` (antithetic multilevel Monte Carlo), and `MomentMatching` with its `evsi` method.
 - `src/design.jl`: `voi_profile`, `expected_variance_reduction`, `optimal_design`, and `value_of_waiting`
   (act now against wait, learn and act late, with a second payoff table for late action on the same
   horizon; `value = evsi_delayed − delay_cost`; backed by `proofs/DecisionAnalysisProofs/Finite/Waiting.lean`).
@@ -280,15 +286,17 @@ have the same distribution in every network; the bridge checks it and never assu
   `design_actions`, `design_draws`, `design_belief` (a `ScenarioSet` unless every uncertainty axis has
   probabilities), `DecisionProblem(design, table, utility)`, `fractional_design`, `factor_effects`,
   `scenario_forecast` and `decision_robustness`.
-- `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `weight_sweep`, `rank_reversals`.
+- `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `two_way_policy_regions`,
+  `decision_curve`, `weight_sweep`, `rank_reversals`.
 - `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
 - `ext/DecisionAnalysisFiniteKernelsExt.jl`: `FiniteBelief` and `Experiment` from FiniteKernels objects.
 - `ext/DecisionAnalysisInfluenceDiagramsExt.jl`: `normal_form` from a single-decision `InfluenceDiagramModel`.
 - `ext/DecisionAnalysisBayesianNetworksExt.jl`: `normal_form` from a `BayesModel`, a named collection of them, or hypotheses × actions.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
   `largest_action_range`, `largest_regret` with `deficiency_value_bound`.
-- `src/report.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives), its
-  Tables.jl rows, and printing. A display is a list of blocks (titles, grids, paragraphs, lists) rendered as
+- `src/report.jl`, `src/tables.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives),
+  Tables.jl row interfaces for `DecisionReport`, `PayoffTable`, `RegretTable`, `OutcomeTable`, and
+  `VOIEstimate`, and printing. A display is a list of blocks (titles, grids, paragraphs, lists) rendered as
   plain text within 80 columns, Markdown or HTML, for `PayoffTable`, `RegretTable`, `DecisionResult` and
   `DecisionReport`.
 - `src/certificates.jl`: `export_decision_certificate`, `export_garbling_witness`,

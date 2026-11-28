@@ -38,6 +38,7 @@ compare_regressions
 
 ```@docs
 evppi_nested
+MultilevelMC
 MomentMatching
 ```
 
@@ -48,6 +49,10 @@ AbstractStudyDesign
 BinomialStudy
 TwoArmBinomialStudy
 NormalStudy
+CountStudy
+OccupancyStudy
+CaptureRecaptureStudy
+MvNormalStudy
 simulate_study
 study_loglikelihood
 study_posterior

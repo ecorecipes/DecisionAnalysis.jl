@@ -415,3 +415,35 @@ function value_of_waiting(problem::DecisionProblem, options)
             act_now_action=first(results).act_now_action, options=first.(named), values,
             results, best=results[k].wait ? first(named[k]) : :act_now)
 end
+
+# Sample-based value of waiting: `problem` carries a `SampleBelief` and `study` is any
+# sample-based EVSI study (`SummaryStatistics`, `ImportanceSampling`,
+# `GaussianApproximation` with scalar `n`, or `MomentMatching`).
+function value_of_waiting(problem::DecisionProblem, delayed::PayoffTable,
+                          study::Union{SummaryStatistics,ImportanceSampling,
+                                       GaussianApproximation,MomentMatching};
+                          seed::Integer=1)
+    Q, w = _sample_problem(problem, :value_of_waiting)
+    late = _check_delayed(problem, delayed)
+    actions = feasible_actions(problem)
+    late_problem = DecisionProblem(delayed, problem.belief; feasible=problem.feasible,
+                                   baseline=problem.baseline)
+    study isa GaussianApproximation && !(study.n isa Real) &&
+        throw(ArgumentError("value_of_waiting requires a scalar sample size `n` in " *
+                            "GaussianApproximation"))
+    evsi_delayed = evsi(late_problem, study; seed)
+    evsi_now = evsi(problem, study; seed)
+    now_scores = Float64.(Q) * Float64.(w)
+    late_scores = Float64.(late) * Float64.(w)
+    a0 = argmax(now_scores)
+    a_late = argmax(late_scores)
+    delay_diffs = [Float64(Q[a0, i] - late[a_late, i]) for i in axes(Q, 2)]
+    delay_cost = dot(Float64.(w), delay_diffs)
+    delay_cost_se = _weighted_mean_se(delay_diffs, w)
+    value = Float64(evsi_delayed.value) - delay_cost
+    se = hypot(evsi_delayed.standard_error, delay_cost_se)
+    waiting_value = now_scores[a0] + value
+    return (; value, standard_error=se, wait=value > 0, act_now_value=now_scores[a0],
+            act_now_action=actions[a0], waiting_value, delay_cost, delay_cost_se,
+            evsi_delayed, evsi_now, late_action=actions[a_late])
+end

@@ -79,6 +79,8 @@ GaussianApproximation
 ```@docs
 policy_regions
 one_way_thresholds
+two_way_policy_regions
+decision_curve
 weight_sweep
 rank_reversals
 ```

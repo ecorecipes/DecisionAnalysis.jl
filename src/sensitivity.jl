@@ -185,3 +185,117 @@ function rank_reversals(a::DecisionProblem, b::DecisionProblem;
             if (sa[i] - sa[j] > ta && sb[j] - sb[i] > tb) ||
         (sa[j] - sa[i] > ta && sb[i] - sb[j] > tb)]
 end
+
+"""
+    two_way_policy_regions(base::DecisionProblem, dir1::PayoffTable, dir2::PayoffTable;
+                           range1=(0, 1), range2=(0, 1), grid=(25, 25)) -> NamedTuple
+
+Two-way sensitivity map of the optimal action under [`MaxExpectedUtility`](@ref) for the
+two-parameter family
+
+    Q(t₁, t₂) = Q_base + t₁ · Q_dir1 + t₂ · Q_dir2,
+
+evaluated over `range1 × range2` (each a `(from, to)` tuple or explicit grid vector;
+`grid = (n1, n2)` sets the resolution when ranges are tuples).
+
+Returns `(; t1, t2, action_grid, score_grid, actions, shares, rows)`: `action_grid[i, j]`
+is the first optimal action at `(t1[i], t2[j])`, `shares` gives the fraction of grid
+points won by each action, and `rows` is a Tables.jl-compatible vector of
+`(; t1, t2, action, tied, score)` records.
+"""
+function two_way_policy_regions(base::DecisionProblem, dir1::PayoffTable,
+                                dir2::PayoffTable; range1=(0, 1), range2=(0, 1),
+                                grid::Tuple{Integer,Integer}=(25, 25))
+    _check_same_labels(base.payoff, dir1)
+    _check_same_labels(base.payoff, dir2)
+    p = _prior(base, :two_way_policy_regions)
+    α = _feasible_Q(base) * p
+    β1 = _feasible_rows(base, dir1.Q) * p
+    β2 = _feasible_rows(base, dir2.Q) * p
+    actions = feasible_actions(base)
+    function _make_axis(r, n::Integer, label::AbstractString)
+        if r isa Tuple && length(r) == 2
+            n >= 2 || throw(ArgumentError("grid size for $label must be at least 2"))
+            r[1] < r[2] || throw(ArgumentError("$label needs from < to, got $r"))
+            return collect(range(Float64(r[1]), Float64(r[2]); length=Int(n)))
+        end
+        v = collect(r)
+        isempty(v) && throw(ArgumentError("$label cannot be empty"))
+        return v
+    end
+    t1 = _make_axis(range1, grid[1], "range1")
+    t2 = _make_axis(range2, grid[2], "range2")
+    n1, n2 = length(t1), length(t2)
+    action_grid = Matrix{Symbol}(undef, n1, n2)
+    score_grid = Matrix{Float64}(undef, n1, n2)
+    counts = Dict{Symbol,Int}(a => 0 for a in actions)
+    rows = NamedTuple[]
+    sizehint!(rows, n1 * n2)
+    for j in 1:n2, i in 1:n1
+        v = Float64.(α .+ t1[i] .* β1 .+ t2[j] .* β2)
+        tol = _tolerance(v, 0, _default_rtol(Float64))
+        top = maximum(v)
+        best = actions[findall(>=(top - tol), v)]
+        winner = first(best)
+        action_grid[i, j] = winner
+        score_grid[i, j] = top
+        counts[winner] += 1
+        push!(rows, (; t1=t1[i], t2=t2[j], action=winner, tied=best, score=top))
+    end
+    total_pts = n1 * n2
+    shares = NamedTuple{Tuple(actions)}(Tuple(counts[a] / total_pts for a in actions))
+    return (; t1, t2, action_grid, score_grid, actions, shares, rows)
+end
+
+"""
+    decision_curve(outcomes::AbstractVector{<:Real}, predictions::AbstractVector{<:Real};
+                   thresholds=0.05:0.05:0.95, weights=nothing) -> Vector{NamedTuple}
+
+**Decision curve analysis** (Vickers and Elkin 2006, *Medical Decision Making* 26:565):
+evaluates the net benefit of acting whenever predicted event risk `predictions[i] ≥ p_t`
+across risk thresholds `p_t ∈ (0, 1)`, against the two reference strategies **treat all**
+and **treat none**:
+
+    NB(p_t) = TP(p_t) / N − (FP(p_t) / N) · p_t / (1 − p_t).
+
+`outcomes` must be binary (`0` or `1`, or `Bool`) and `predictions` must lie in `[0, 1]`.
+Returns a Tables.jl-compatible vector of named tuples `(; threshold, net_benefit,
+treat_all, treat_none, net_benefit_over_all, interventions_avoided)` — exact when
+`outcomes`, `predictions`, `thresholds` and `weights` are exact rationals/integers.
+"""
+function decision_curve(outcomes::AbstractVector{<:Real},
+                        predictions::AbstractVector{<:Real};
+                        thresholds=0.05:0.05:0.95,
+                        weights::Union{Nothing,AbstractVector{<:Real}}=nothing)
+    n = length(outcomes)
+    n >= 1 || throw(ArgumentError("outcomes cannot be empty"))
+    length(predictions) == n ||
+        throw(ArgumentError("outcomes ($n) and predictions ($(length(predictions))) must " *
+                            "have the same length"))
+    all(y -> y == 0 || y == 1, outcomes) ||
+        throw(ArgumentError("outcomes must be binary (0 or 1)"))
+    all(p -> isfinite(p) && 0 <= p <= 1, predictions) ||
+        throw(ArgumentError("predictions must lie in [0, 1]"))
+    ts = collect(thresholds)
+    isempty(ts) && throw(ArgumentError("thresholds cannot be empty"))
+    all(t -> isfinite(t) && 0 < t < 1, ts) ||
+        throw(ArgumentError("thresholds must lie strictly in (0, 1)"))
+    w = weights === nothing ? fill(1 // n, n) : _normalise_weights(collect(weights))
+    length(w) == n || throw(ArgumentError("$(length(w)) weights for $n observations"))
+    y_int = [y == 1 ? 1 : 0 for y in outcomes]
+    prevalence = sum(w[i] for i in 1:n if y_int[i] == 1; init=zero(eltype(w)))
+    return map(ts) do pt
+        odds = _div(pt, one(pt) - pt)
+        tp = sum(w[i] for i in 1:n if predictions[i] >= pt && y_int[i] == 1;
+                 init=zero(eltype(w)))
+        fp = sum(w[i] for i in 1:n if predictions[i] >= pt && y_int[i] == 0;
+                 init=zero(eltype(w)))
+        nb = tp - fp * odds
+        nb_all = prevalence - (one(prevalence) - prevalence) * odds
+        nb_none = zero(nb)
+        over_all = nb - nb_all
+        avoided = _div(over_all, odds)
+        return (; threshold=pt, net_benefit=nb, treat_all=nb_all, treat_none=nb_none,
+                net_benefit_over_all=over_all, interventions_avoided=avoided)
+    end
+end

@@ -319,3 +319,247 @@ function separating_payoff_model(e′::Experiment, e::Experiment)
                     sum(Lt[zt, θ] * V[zt, θ] for zt in 1:nt, θ in 1:S) - sum(u))
     return DecisionProgram(:separating_payoff, model, (; V, u), (; best))
 end
+
+# Exact budgeted unit selection, constrained policies and credal-set pruning
+# --------------------------------------------------------------------------
+
+"""
+    budget_selection_model(units, budget; option=:chosen, integer=false,
+                           worst_case=false) -> DecisionProgram
+
+The linear (or 0–1 integer) programme for selecting management units from [`survey_or_act`](@ref)
+under a `budget` (the exact optimisation counterpart to the heuristic in
+[`select_under_budget`](@ref)). With `N` units of value `v_i` and cost `c_i` (using
+`largest_cost` when `worst_case = true`):
+
+    maximise    Σ_i v_i x_i
+    subject to  Σ_i c_i x_i ≤ budget,       (budget)
+                0 ≤ x_i ≤ 1                 (binary when `integer = true`).
+
+When `integer = false` (default), returns the exact LP relaxation solvable by
+[`solve_program`](@ref) with the built-in exact rational simplex or any LP optimiser.
+When `integer = true`, marks `x` binary for a MILP solver such as `HiGHS.Optimizer`.
+
+Shape: `N` variables (`variables.x`) and `1` constraint (`constraints.budget`), plus bounds.
+"""
+function budget_selection_model(units::AbstractVector, budget::Real;
+                                option::Symbol=:chosen, integer::Bool=false,
+                                worst_case::Bool=false)
+    option in (:chosen, :act_now, :survey) ||
+        throw(ArgumentError("option is :chosen, :act_now or :survey, not :$option"))
+    (isfinite(budget) && budget >= 0) ||
+        throw(ArgumentError("the budget must be nonnegative and finite, got $budget"))
+    isempty(units) && throw(ArgumentError("units cannot be empty"))
+    picks = [_unit_option(u, option) for u in units]
+    vs = [p.value for p in picks]
+    cs = [worst_case ? p.largest_cost : p.cost for p in picks]
+    S = promote_type(typeof(budget), eltype(vs), eltype(cs))
+    T = integer ? Float64 : _program_type(S)
+    N = length(picks)
+    model = JuMP.GenericModel{T}()
+    x = JuMP.@variable(model, [1:N], lower_bound=zero(T), upper_bound=one(T), base_name="x")
+    if integer
+        for i in 1:N
+            JuMP.set_binary(x[i])
+        end
+    end
+    bud = JuMP.@constraint(model, sum(T(cs[i]) * x[i] for i in 1:N) <= T(budget))
+    JuMP.@objective(model, Max, sum(T(vs[i]) * x[i] for i in 1:N))
+    return DecisionProgram(:budget_selection, model, (; x), (; budget=bud))
+end
+
+"""
+    constrained_policy_model(problem::DecisionProblem; constraints=(), chance=())
+        -> DecisionProgram
+
+The linear programme for an optimal **randomised (mixed) policy** `μ ∈ Δ(A)` over the
+`n` feasible actions of `problem` (which needs a single prior `p`), maximising expected
+utility subject to linear expectation constraints and chance constraints:
+
+    maximise    Σ_a μ_a E_p[Q_a]
+    subject to  Σ_a μ_a = 1,                                          (simplex)
+                Σ_a μ_a E_p[C_k,a] ⋚ rhs_k          for k in constraints, (expectation[k])
+                Σ_a μ_a P_p(H_r,a ≥ τ_r) ≥ α_r      for r in chance,      (chance[r])
+                μ_a ≥ 0.
+
+- `constraints`: collection of `(table::PayoffTable, sense::Symbol, rhs::Real)` tuples
+  with `sense ∈ (:<=, :>=, :(==))` and `table` sharing the action and state labels of
+  `problem`.
+- `chance`: collection of `(table::PayoffTable, threshold::Real, min_prob::Real)` or
+  `(threshold::Real, min_prob::Real)` tuples (the two-argument form applies to
+  `problem.payoff`), requiring probability at least `min_prob ∈ [0, 1]` of attaining
+  payoff `≥ threshold`.
+
+Shape: `n` variables (`variables.μ`) and `1 + length(constraints) + length(chance)`
+constraints (`constraints.simplex`, `constraints.expectation`, `constraints.chance`),
+plus lower bounds.
+"""
+function constrained_policy_model(problem::DecisionProblem; constraints=(), chance=())
+    p = _prior(problem, :constrained_policy_model)
+    Q = _feasible_Q(problem)
+    na = size(Q, 1)
+    eu = Q * p
+    c_list = collect(constraints)
+    ch_list = collect(chance)
+    S = promote_type(eltype(eu), eltype(p))
+    exp_coeffs = Vector{Vector{Any}}()
+    exp_senses = Symbol[]
+    exp_rhs = Any[]
+    for item in c_list
+        length(item) == 3 ||
+            throw(ArgumentError("each expectation constraint must be (table, sense, rhs)"))
+        tbl, sense, rhs = item
+        tbl isa PayoffTable ||
+            throw(ArgumentError("expected a PayoffTable in constraint, got $(typeof(tbl))"))
+        _check_same_labels(problem.payoff, tbl)
+        sense in (:<=, :>=, :(==)) ||
+            throw(ArgumentError("constraint sense must be :<=, :>= or :(==), got :$sense"))
+        (rhs isa Real && isfinite(rhs)) ||
+            throw(ArgumentError("constraint rhs must be finite, got $rhs"))
+        ce = _feasible_rows(problem, tbl.Q) * p
+        S = promote_type(S, eltype(ce), typeof(rhs))
+        push!(exp_coeffs, collect(ce))
+        push!(exp_senses, sense)
+        push!(exp_rhs, rhs)
+    end
+    ch_coeffs = Vector{Vector{Any}}()
+    ch_rhs = Any[]
+    for item in ch_list
+        tbl, thresh, min_prob = if length(item) == 2
+            (problem.payoff, item[1], item[2])
+        elseif length(item) == 3
+            (item[1], item[2], item[3])
+        else
+            throw(ArgumentError("each chance constraint must be (threshold, min_prob) or " *
+                                "(table, threshold, min_prob)"))
+        end
+        tbl isa PayoffTable ||
+            throw(ArgumentError("expected a PayoffTable in chance constraint, got " *
+                                "$(typeof(tbl))"))
+        _check_same_labels(problem.payoff, tbl)
+        (thresh isa Real && isfinite(thresh)) ||
+            throw(ArgumentError("chance threshold must be finite, got $thresh"))
+        (min_prob isa Real && isfinite(min_prob) && 0 <= min_prob <= 1) ||
+            throw(ArgumentError("chance min_prob must lie in [0, 1], got $min_prob"))
+        M = _feasible_rows(problem, tbl.Q)
+        probs = [sum(p[j] for j in axes(M, 2) if M[a, j] >= thresh; init=zero(eltype(p)))
+                 for a in 1:na]
+        S = promote_type(S, eltype(probs), typeof(min_prob))
+        push!(ch_coeffs, collect(probs))
+        push!(ch_rhs, min_prob)
+    end
+    T = _program_type(S)
+    model = JuMP.GenericModel{T}()
+    μ = JuMP.@variable(model, [1:na], lower_bound=zero(T), base_name="μ")
+    simplex = JuMP.@constraint(model, sum(μ) == one(T))
+    expectation_c = Any[]
+    for k in eachindex(exp_coeffs)
+        lhs = sum(T(exp_coeffs[k][a]) * μ[a] for a in 1:na)
+        rhs = T(exp_rhs[k])
+        if exp_senses[k] === :<=
+            push!(expectation_c, JuMP.@constraint(model, lhs <= rhs))
+        elseif exp_senses[k] === :>=
+            push!(expectation_c, JuMP.@constraint(model, lhs >= rhs))
+        else
+            push!(expectation_c, JuMP.@constraint(model, lhs == rhs))
+        end
+    end
+    chance_c = [JuMP.@constraint(model,
+                                 sum(T(ch_coeffs[r][a]) * μ[a] for a in 1:na) >=
+                                 T(ch_rhs[r])) for r in eachindex(ch_coeffs)]
+    JuMP.@objective(model, Max, sum(T(eu[a]) * μ[a] for a in 1:na))
+    return DecisionProgram(:constrained_policy, model, (; μ),
+                           (; simplex, expectation=expectation_c, chance=chance_c))
+end
+
+"""
+    generator_redundancy_model(credal::CredalSet, index::Integer) -> DecisionProgram
+
+The feasibility linear programme deciding whether generating point `index` of `credal`
+lies in the convex hull of the other generating points `{p_k : k ≠ index}`:
+
+    find        λ_k ≥ 0   (k ≠ index)
+    subject to  Σ_{k ≠ index} λ_k = 1,             (simplex)
+                Σ_{k ≠ index} λ_k p_k = p_index.   (match[θ])
+
+Feasible if and only if point `index` is redundant (not a strict vertex of the credal set).
+
+Shape: `K - 1` variables (`variables.λ`) and `1 + S` equality constraints
+(`constraints.simplex`, `constraints.match`), plus lower bounds.
+"""
+function generator_redundancy_model(credal::CredalSet, index::Integer)
+    K = length(credal.points)
+    1 <= index <= K ||
+        throw(ArgumentError("index $index out of range 1:$K"))
+    K >= 2 ||
+        throw(ArgumentError("generator_redundancy_model needs at least 2 generating points"))
+    S = length(credal.states)
+    T = _program_type(eltype(first(credal.points)))
+    others = [credal.points[k] for k in 1:K if k != index]
+    target = credal.points[index]
+    m = length(others)
+    model = JuMP.GenericModel{T}()
+    λ = JuMP.@variable(model, [1:m], lower_bound=zero(T), base_name="λ")
+    simplex = JuMP.@constraint(model, sum(λ) == one(T))
+    match = JuMP.@constraint(model, [s = 1:S],
+                             sum(T(others[k][s]) * λ[k] for k in 1:m) == T(target[s]))
+    return DecisionProgram(:generator_redundancy, model, (; λ), (; simplex, match))
+end
+
+function _is_redundant_generator(states::Vector{Symbol}, kept::Vector{Vector{T}}, idx::Int,
+                                 rational::Bool, optimizer, rounding_tol) where {T}
+    cur = CredalSet(states, kept)
+    prog = generator_redundancy_model(cur, idx)
+    sol = solve_program(prog; optimizer, rounding_tol)
+    sol.status === :optimal || return false
+    λ = sol.values.λ
+    others = [kept[k] for k in eachindex(kept) if k != idx]
+    target = kept[idx]
+    if rational
+        sol.exact || return false
+        for s in eachindex(states)
+            recon = sum(λ[k] * _BigRat(others[k][s]) for k in eachindex(others))
+            recon == _BigRat(target[s]) || return false
+        end
+        return true
+    end
+    tol = 100 * _default_atol(T)
+    for s in eachindex(states)
+        recon = sum(λ[k] * others[k][s] for k in eachindex(others))
+        abs(recon - target[s]) <= tol || return false
+    end
+    return true
+end
+
+"""
+    prune_generators(credal::CredalSet; optimizer=nothing,
+                     rounding_tol=(1e-8, 1e-10, 1e-12)) -> CredalSet
+
+Remove duplicate and redundant (non-extreme) generating points from `credal`, returning
+a minimal [`CredalSet`](@ref) with the exact same convex hull. Each candidate point is
+tested against the remaining points via [`generator_redundancy_model`](@ref) and
+[`solve_program`](@ref); a point is dropped only when a convex-combination witness is
+verified (`exact` for rational credal sets).
+"""
+function prune_generators(credal::CredalSet; optimizer=nothing,
+                          rounding_tol=_ROUNDING_TOLS)
+    pts = copy(credal.points)
+    T = eltype(first(pts))
+    rational = _is_exact(T)
+    # First deduplicate identical points in order.
+    kept = Vector{T}[]
+    for p in pts
+        any(q -> q == p, kept) || push!(kept, p)
+    end
+    length(kept) <= 2 && return CredalSet(credal.states, kept)
+    i = 1
+    while i <= length(kept) && length(kept) > 1
+        if _is_redundant_generator(credal.states, kept, i, rational, optimizer,
+                                   rounding_tol)
+            deleteat!(kept, i)
+        else
+            i += 1
+        end
+    end
+    return CredalSet(credal.states, kept)
+end

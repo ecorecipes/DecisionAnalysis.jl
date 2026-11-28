@@ -167,6 +167,44 @@ struct Quantile{T<:Real} <: AbstractAggregator
 end
 Quantile(α::T) where {T<:Real} = Quantile{T}(α)
 
+"""
+    SmoothAmbiguity(ambiguity_aversion::Real; weights=nothing)
+    SmoothAmbiguity(phi::Function; inverse=identity, weights=nothing)
+
+The **smooth ambiguity** aggregator of Klibanoff, Marinacci and Mukerji (2005,
+*Econometrica* 73:1849) over a [`CredalSet`](@ref) (or a single prior, where it reduces
+to [`Expectation`](@ref)):
+
+    S(a) = φ⁻¹(Σ_k μ_k φ(E_{p_k}[Q_a])),
+
+where `p₁, …, p_K` are the generating priors of the credal set and `μ` are second-order
+weights (uniform `1 / K` when `weights = nothing`).
+
+- With a real parameter `η = ambiguity_aversion`, uses the constant absolute ambiguity
+  aversion (exponential) form `φ(v) = −exp(−η v) / η`, returning the certainty-equivalent
+  score `−(1 / η) log Σ_k μ_k exp(−η E_{p_k}[Q_a])` via shift-invariant log-sum-exp (`η > 0`
+  is ambiguity-averse, `η = 0` is ambiguity-neutral, `η < 0` is ambiguity-seeking). As
+  `η → +∞` it approaches [`LowerExpectation`](@ref).
+- With a custom strictly increasing function `phi` and optional `inverse`, evaluates
+  `inverse(Σ_k μ_k phi(E_{p_k}[Q_a]))`.
+"""
+struct SmoothAmbiguity{F,I,W} <: AbstractAggregator
+    phi::F
+    inverse::I
+    weights::W
+end
+function SmoothAmbiguity(η::Real; weights::Union{Nothing,AbstractVector{<:Real}}=nothing)
+    isfinite(η) ||
+        throw(ArgumentError("ambiguity_aversion must be finite, got $η"))
+    w = weights === nothing ? nothing : _normalise_weights(collect(weights))
+    return SmoothAmbiguity(Float64(η), nothing, w)
+end
+function SmoothAmbiguity(phi::Function; inverse::Function=identity,
+                         weights::Union{Nothing,AbstractVector{<:Real}}=nothing)
+    w = weights === nothing ? nothing : _normalise_weights(collect(weights))
+    return SmoothAmbiguity(phi, inverse, w)
+end
+
 # Internals
 # ---------
 
@@ -256,6 +294,35 @@ end
 function _aggregate(agg::Quantile, M, v::_View)
     q = _single_prior(agg, v)
     return [_quantile(r, q, agg.α) for r in _rows(M)]
+end
+
+function _aggregate(agg::SmoothAmbiguity, M, v::_View)
+    priors = _prior_set(agg, v)
+    E = _expectations(M, priors)
+    na, K = size(E)
+    μ = if agg.weights === nothing
+        fill(1.0 / K, K)
+    else
+        length(agg.weights) == K ||
+            throw(ArgumentError("SmoothAmbiguity received $(length(agg.weights)) " *
+                                "second-order weights for $K generating priors"))
+        Float64.(agg.weights)
+    end
+    if agg.phi isa Float64
+        η = agg.phi
+        if iszero(η)
+            return [sum(μ[k] * Float64(E[a, k]) for k in 1:K) for a in 1:na]
+        end
+        return map(1:na) do a
+            row = Float64[Float64(E[a, k]) for k in 1:K]
+            α = -η
+            xstar = α < 0 ? minimum(row[k] for k in 1:K if μ[k] > 0) :
+                    maximum(row[k] for k in 1:K if μ[k] > 0)
+            total = sum(μ[k] * exp(α * (row[k] - xstar)) for k in 1:K if μ[k] > 0)
+            return xstar + log(total) / α
+        end
+    end
+    return [agg.inverse(sum(μ[k] * agg.phi(E[a, k]) for k in 1:K)) for a in 1:na]
 end
 
 # `sense` is :max for a utility table and :min for a loss table.

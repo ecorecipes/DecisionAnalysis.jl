@@ -21,3 +21,11 @@ risk_premium
 AdditiveUtility
 MultiplicativeUtility
 ```
+
+## Certainty-equivalent value of information
+
+```@docs
+ce_evpi
+ce_evppi
+ce_evsi
+```

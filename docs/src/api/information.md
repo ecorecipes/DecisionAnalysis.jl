@@ -29,6 +29,8 @@ hypothesis_partition
 two_stage_value
 evsi
 enbs
+evim
+evmi
 information_can_change_decision
 robust_evpi
 robust_evsi

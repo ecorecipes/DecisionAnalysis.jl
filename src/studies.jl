@@ -76,8 +76,200 @@ struct NormalStudy <: AbstractStudyDesign
     end
 end
 
-_study_parameters(s::Union{BinomialStudy,NormalStudy}) = [s.parameter]
+"""
+    CountStudy(parameter; n, dispersion=nothing)
+
+A study of `n` independent count observations (transects, quadrats, traps, host
+examinations) with mean count given by `parameter` (a nonnegative column of the draws).
+
+- `dispersion = nothing` (default): `n` i.i.d. `Poisson(λ)` counts. The total count
+  `total ~ Poisson(n λ)` is a sufficient statistic and has a conjugate `Gamma(shape, rate)`
+  analysis (`prior = (; shape, rate)`).
+- `dispersion = k` (`k > 0`): `n` i.i.d. overdispersed Negative Binomial counts with
+  mean `λ` and variance `λ + λ² / k` (size parameter `k`). The total count
+  `total ~ NegativeBinomial(mean = n λ, size = n k)` is a sufficient statistic for
+  [`SummaryStatistics`](@ref) and [`ImportanceSampling`](@ref).
+"""
+struct CountStudy <: AbstractStudyDesign
+    parameter::Symbol
+    n::Int
+    dispersion::Union{Nothing,Float64}
+    function CountStudy(parameter; n::Integer, dispersion::Union{Nothing,Real}=nothing)
+        n >= 1 || throw(ArgumentError("the sample size n must be at least 1, got $n"))
+        if dispersion !== nothing
+            (isfinite(dispersion) && dispersion > 0) ||
+                throw(ArgumentError("dispersion must be positive and finite, got $dispersion"))
+        end
+        return new(Symbol(parameter), Int(n),
+                   dispersion === nothing ? nothing : Float64(dispersion))
+    end
+end
+
+"""
+    OccupancyStudy(occupancy, detection; sites, visits)
+
+An imperfect-detection occupancy survey (MacKenzie et al. 2002, *Ecology* 83:2248):
+`sites` independent sites, each visited `visits` times. A site is occupied with
+probability `ψ = θ[occupancy]` and, when occupied, the species or pathogen is detected on
+each visit independently with probability `p = θ[detection]`.
+
+The pair `(; sites_detected, total_detections)` is a two-dimensional exact sufficient
+statistic for any `sites` and `visits`, so the design works directly with both
+[`SummaryStatistics`](@ref) and [`ImportanceSampling`](@ref) to trade off surveying more
+sites against more repeat visits per site.
+"""
+struct OccupancyStudy <: AbstractStudyDesign
+    occupancy::Symbol
+    detection::Symbol
+    sites::Int
+    visits::Int
+    function OccupancyStudy(occupancy, detection; sites::Integer, visits::Integer)
+        sites >= 1 || throw(ArgumentError("sites must be at least 1, got $sites"))
+        visits >= 1 || throw(ArgumentError("visits must be at least 1, got $visits"))
+        Symbol(occupancy) == Symbol(detection) &&
+            throw(ArgumentError("occupancy and detection must name different parameters"))
+        return new(Symbol(occupancy), Symbol(detection), Int(sites), Int(visits))
+    end
+end
+
+"""
+    CaptureRecaptureStudy(abundance, detection; occasions=2)
+
+A closed-population capture-recapture survey (Otis et al. 1978 model `M₀`; Lincoln-Petersen
+when `occasions = 2`) over `occasions ≥ 2` sampling occasions. `abundance` names the
+nonnegative population size `N` in the draws; `detection` either names the per-occasion
+capture probability `p` in the draws or fixes a known probability `0 ≤ p ≤ 1`.
+
+Returns the exact sufficient statistics `(; unique_captured, total_captures)` (with
+recaptures equal to `total_captures - unique_captured` for `occasions = 2`), supporting
+[`SummaryStatistics`](@ref) and [`ImportanceSampling`](@ref).
+"""
+struct CaptureRecaptureStudy{D<:Union{Symbol,Float64}} <: AbstractStudyDesign
+    abundance::Symbol
+    detection::D
+    occasions::Int
+    function CaptureRecaptureStudy(abundance, detection; occasions::Integer=2)
+        occasions >= 2 ||
+            throw(ArgumentError("occasions must be at least 2, got $occasions"))
+        if detection isa Real
+            (isfinite(detection) && 0 <= detection <= 1) ||
+                throw(ArgumentError("fixed detection probability must lie in [0, 1], got " *
+                                    "$detection"))
+            return new{Float64}(Symbol(abundance), Float64(detection), Int(occasions))
+        end
+        det = Symbol(detection)
+        det == Symbol(abundance) &&
+            throw(ArgumentError("abundance and detection must name different parameters"))
+        return new{Symbol}(Symbol(abundance), det, Int(occasions))
+    end
+end
+
+"""
+    MvNormalStudy(parameters; n, covariance)
+
+A study of `n` independent multivariate normal measurements about the vector of focal
+`parameters`, with known positive-definite observation `covariance` matrix `Σ`. The
+sufficient statistic is the sample mean vector `(; xbar_<p1>, xbar_<p2>, ...)`, normal
+with covariance `Σ / n`. Its conjugate analysis takes `prior = (; mean, covariance)`.
+"""
+struct MvNormalStudy <: AbstractStudyDesign
+    parameters::Vector{Symbol}
+    n::Int
+    covariance::Matrix{Float64}
+    chol_L::Matrix{Float64}
+    precision::Matrix{Float64}
+    function MvNormalStudy(parameters; n::Integer, covariance::AbstractMatrix{<:Real})
+        n >= 1 || throw(ArgumentError("the sample size n must be at least 1, got $n"))
+        pars = _labels(parameters)
+        d = length(pars)
+        d >= 1 || throw(ArgumentError("name at least one parameter"))
+        allunique(pars) || throw(ArgumentError("parameters must be distinct, got $pars"))
+        size(covariance) == (d, d) ||
+            throw(ArgumentError("covariance must be $(d)×$(d), got $(size(covariance))"))
+        all(isfinite, covariance) ||
+            throw(ArgumentError("covariance entries must be finite"))
+        Σ = Matrix{Float64}(covariance)
+        Σ = (Σ .+ Σ') ./ 2
+        F = cholesky(Symmetric(Σ); check=false)
+        issuccess(F) ||
+            throw(ArgumentError("covariance matrix must be symmetric positive definite"))
+        return new(pars, Int(n), Σ, Matrix(F.L), inv(F))
+    end
+end
+
+_study_parameters(s::Union{BinomialStudy,NormalStudy,CountStudy}) = [s.parameter]
 _study_parameters(s::TwoArmBinomialStudy) = collect(s.parameters)
+_study_parameters(s::OccupancyStudy) = [s.occupancy, s.detection]
+function _study_parameters(s::CaptureRecaptureStudy)
+    return s.detection isa Symbol ? [s.abundance, s.detection] : [s.abundance]
+end
+_study_parameters(s::MvNormalStudy) = copy(s.parameters)
+
+function _nonnegative_rate(θ, name::Symbol)
+    haskey(θ, name) || throw(ArgumentError("the draw has no parameter $name"))
+    v = getproperty(θ, name)
+    (v isa Real && isfinite(v) && v >= 0) ||
+        throw(ArgumentError("the parameter $name must be finite and nonnegative, got " *
+                            "$(repr(v))"))
+    return Float64(v)
+end
+
+# Exact O(1)-expected-time Poisson sampler: Knuth for μ < 30 and Hörmann (1993) PTRS
+# transformed rejection with squeeze for μ >= 30.
+function _poisson(rng::AbstractRNG, μ::Float64)
+    μ <= 0.0 && return 0
+    if μ < 30.0
+        L = exp(-μ)
+        k = 0
+        p = 1.0
+        while p > L
+            k += 1
+            p *= rand(rng)
+        end
+        return k - 1
+    end
+    s = sqrt(μ)
+    b = 0.931 + 2.53 * s
+    a = -0.059 + 0.02483 * b
+    inv_alpha = 1.1239 + 1.1328 / (b - 3.4)
+    v_r = 0.9277 - 3.6224 / (b - 2.0)
+    log_mu = log(μ)
+    while true
+        u = rand(rng) - 0.5
+        v = rand(rng)
+        us = 0.5 - abs(u)
+        k = floor(Int, (2.0 * a / us + b) * u + μ + 0.43)
+        k < 0 && continue
+        (us >= 0.07 && v <= v_r) && return k
+        (us < 0.013 && v > us) && continue
+        v <= 0.0 && return k
+        log(v * inv_alpha / (a / (us * us) + b)) <= -μ + k * log_mu - loggamma(k + 1.0) &&
+            return k
+    end
+end
+
+# Exact zero-truncated Binomial(K, p) sampler given K >= 1, 0 < p <= 1.
+function _zt_binomial(rng::AbstractRNG, K::Int, p::Float64)
+    K == 1 && return 1
+    p >= 1.0 && return K
+    if K > 50 && K * p >= 1.0
+        while true
+            y = _binomial(rng, K, p)
+            y > 0 && return y
+        end
+    end
+    p_any = -expm1(K * log1p(-p))
+    u = rand(rng) * p_any
+    y = 1
+    py = exp(log(K) + log(p) + (K - 1) * log1p(-p))
+    s = p / (1.0 - p)
+    while u > py && y < K && py > 0.0
+        u -= py
+        y += 1
+        py *= ((K - y + 1) / y) * s
+    end
+    return y
+end
 
 function _probability(θ, name::Symbol)
     haskey(θ, name) || throw(ArgumentError("the draw has no parameter $name"))
@@ -233,6 +425,54 @@ function simulate_study(rng::AbstractRNG, s::NormalStudy, θ)
         throw(ArgumentError("the draw has no parameter $(s.parameter)"))
     return (; xbar=Float64(getproperty(θ, s.parameter)) + s.sd / sqrt(s.n) * randn(rng))
 end
+function simulate_study(rng::AbstractRNG, s::CountStudy, θ)
+    λ = _nonnegative_rate(θ, s.parameter)
+    if s.dispersion === nothing
+        return (; total=_poisson(rng, s.n * λ))
+    end
+    k = s.dispersion
+    rate_mix = iszero(λ) ? 0.0 : _gamma(rng, s.n * k) * (λ / k)
+    return (; total=_poisson(rng, rate_mix))
+end
+function simulate_study(rng::AbstractRNG, s::OccupancyStudy, θ)
+    ψ = _probability(θ, s.occupancy)
+    p = _probability(θ, s.detection)
+    s_occ = _binomial(rng, s.sites, ψ)
+    (s_occ == 0 || p == 0.0) && return (; sites_detected=0, total_detections=0)
+    p >= 1.0 && return (; sites_detected=s_occ, total_detections=s.visits * s_occ)
+    p_any = -expm1(s.visits * log1p(-p))
+    s_det = _binomial(rng, s_occ, p_any)
+    d_tot = 0
+    for _ in 1:s_det
+        d_tot += _zt_binomial(rng, s.visits, p)
+    end
+    return (; sites_detected=s_det, total_detections=d_tot)
+end
+function simulate_study(rng::AbstractRNG, s::CaptureRecaptureStudy, θ)
+    N = round(Int, _nonnegative_rate(θ, s.abundance))
+    p = s.detection isa Symbol ? _probability(θ, s.detection) : s.detection
+    (N == 0 || p == 0.0) && return (; unique_captured=0, total_captures=0)
+    p >= 1.0 && return (; unique_captured=N, total_captures=s.occasions * N)
+    p_any = -expm1(s.occasions * log1p(-p))
+    u = _binomial(rng, N, p_any)
+    c = 0
+    for _ in 1:u
+        c += _zt_binomial(rng, s.occasions, p)
+    end
+    return (; unique_captured=u, total_captures=c)
+end
+function simulate_study(rng::AbstractRNG, s::MvNormalStudy, θ)
+    d = length(s.parameters)
+    μ = Vector{Float64}(undef, d)
+    for (i, name) in enumerate(s.parameters)
+        haskey(θ, name) || throw(ArgumentError("the draw has no parameter $name"))
+        μ[i] = Float64(getproperty(θ, name))
+    end
+    z = randn(rng, d)
+    xbar = μ .+ (s.chol_L * z) ./ sqrt(s.n)
+    names = Tuple(Symbol(:xbar_, name) for name in s.parameters)
+    return NamedTuple{names}(Tuple(xbar))
+end
 
 _xlogy(x::Real, y::Real) = iszero(x) ? 0.0 : x * log(y)
 _binomial_loglikelihood(x::Real, n::Int, p::Float64) = _xlogy(x, p) + _xlogy(n - x, 1 - p)
@@ -241,7 +481,8 @@ _binomial_loglikelihood(x::Real, n::Int, p::Float64) = _xlogy(x, p) + _xlogy(n -
     study_loglikelihood(design::AbstractStudyDesign, data, θ) -> Float64
 
 The log-likelihood of a data set of [`simulate_study`](@ref) under the parameters `θ`,
-up to a constant that does not depend on `θ` (the binomial coefficient is left out).
+up to a constant that does not depend on `θ` (combinatorial constants independent of `θ`
+are left out).
 """
 function study_loglikelihood(s::BinomialStudy, data, θ)
     return _binomial_loglikelihood(data.x1, s.n,
@@ -254,6 +495,47 @@ function study_loglikelihood(s::TwoArmBinomialStudy, data, θ)
 end
 function study_loglikelihood(s::NormalStudy, data, θ)
     return -s.n * (data.xbar - Float64(getproperty(θ, s.parameter)))^2 / (2 * s.sd^2)
+end
+function study_loglikelihood(s::CountStudy, data, θ)
+    λ = _nonnegative_rate(θ, s.parameter)
+    tot = Float64(data.total)
+    if s.dispersion === nothing
+        return _xlogy(tot, λ) - s.n * λ
+    end
+    k = s.dispersion
+    r = s.n * k
+    return _xlogy(tot, λ) - (tot + r) * log(k + λ)
+end
+function study_loglikelihood(s::OccupancyStudy, data, θ)
+    ψ = _probability(θ, s.occupancy)
+    p = _probability(θ, s.detection)
+    s_det = Int(data.sites_detected)
+    d_tot = Int(data.total_detections)
+    s_zero = s.sites - s_det
+    p_zero = (1.0 - ψ) + ψ * (1.0 - p)^s.visits
+    return _xlogy(s_zero, p_zero) + _xlogy(s_det, ψ) + _xlogy(d_tot, p) +
+           _xlogy(s.visits * s_det - d_tot, 1.0 - p)
+end
+function study_loglikelihood(s::CaptureRecaptureStudy, data, θ)
+    N = _nonnegative_rate(θ, s.abundance)
+    p = s.detection isa Symbol ? _probability(θ, s.detection) : s.detection
+    u = Int(data.unique_captured)
+    c = Int(data.total_captures)
+    N < u && return -Inf
+    misses = s.occasions * N - c
+    misses < 0 && return -Inf
+    return loggamma(N + 1.0) - loggamma(N - u + 1.0) + _xlogy(c, p) +
+           _xlogy(misses, 1.0 - p)
+end
+function study_loglikelihood(s::MvNormalStudy, data, θ)
+    d = length(s.parameters)
+    diff = Vector{Float64}(undef, d)
+    for (i, name) in enumerate(s.parameters)
+        haskey(θ, name) || throw(ArgumentError("the draw has no parameter $name"))
+        xbi = Float64(getproperty(data, Symbol(:xbar_, name)))
+        diff[i] = xbi - Float64(getproperty(θ, name))
+    end
+    return -0.5 * s.n * dot(diff, s.precision * diff)
 end
 
 function _prior_fields(prior, names, design)
@@ -294,6 +576,48 @@ function study_posterior(rng::AbstractRNG, s::NormalStudy, data, prior; draws::I
     precision = 1 / p.sd^2 + s.n / s.sd^2
     centre = (p.mean / p.sd^2 + s.n * data.xbar / s.sd^2) / precision
     return NamedTuple{(s.parameter,)}((centre .+ randn(rng, draws) ./ sqrt(precision),))
+end
+function study_posterior(rng::AbstractRNG, s::CountStudy, data, prior; draws::Integer=1000)
+    s.dispersion === nothing ||
+        throw(ArgumentError("CountStudy with Negative Binomial overdispersion has no " *
+                            "closed-form conjugate posterior; use SummaryStatistics, " *
+                            "ImportanceSampling, or a custom posterior in MomentMatching"))
+    p = _prior_fields(prior, (:shape, :rate), s)
+    (isfinite(p.shape) && p.shape > 0 && isfinite(p.rate) && p.rate > 0) ||
+        throw(ArgumentError("Gamma prior shape and rate must be positive and finite"))
+    a_post = Float64(p.shape) + Float64(data.total)
+    b_post = Float64(p.rate) + s.n
+    return NamedTuple{(s.parameter,)}(([_gamma(rng, a_post) / b_post for _ in 1:draws],))
+end
+function study_posterior(rng::AbstractRNG, s::MvNormalStudy, data, prior;
+                         draws::Integer=1000)
+    p = _prior_fields(prior, (:mean, :covariance), s)
+    d = length(s.parameters)
+    μ0 = Float64.(collect(p.mean))
+    length(μ0) == d ||
+        throw(ArgumentError("prior mean must have length $d, got $(length(μ0))"))
+    Σ0 = Matrix{Float64}(p.covariance)
+    size(Σ0) == (d, d) ||
+        throw(ArgumentError("prior covariance must be $(d)×$(d), got $(size(Σ0))"))
+    F0 = cholesky(Symmetric((Σ0 .+ Σ0') ./ 2); check=false)
+    issuccess(F0) || throw(ArgumentError("prior covariance must be positive definite"))
+    Λ0 = inv(F0)
+    xbar = Float64[Float64(getproperty(data, Symbol(:xbar_, name)))
+                   for name in s.parameters]
+    Λ_post = Λ0 .+ s.n .* s.precision
+    Fp = cholesky(Symmetric((Λ_post .+ Λ_post') ./ 2))
+    Σ_post = inv(Fp)
+    μ_post = Σ_post * (Λ0 * μ0 .+ s.n .* (s.precision * xbar))
+    Lp = Matrix(cholesky(Symmetric((Σ_post .+ Σ_post') ./ 2)).L)
+    Z = randn(rng, d, draws)
+    samples = μ_post .+ Lp * Z
+    return NamedTuple{Tuple(s.parameters)}(Tuple(vec(samples[i, :]) for i in 1:d))
+end
+function study_posterior(::AbstractRNG, s::Union{OccupancyStudy,CaptureRecaptureStudy},
+                         data, prior; draws::Integer=1000)
+    return throw(ArgumentError("$(nameof(typeof(s))) has no closed-form conjugate " *
+                               "posterior; use SummaryStatistics, ImportanceSampling, or " *
+                               "a custom posterior in MomentMatching"))
 end
 
 _design_belief(b::SampleBelief) = b

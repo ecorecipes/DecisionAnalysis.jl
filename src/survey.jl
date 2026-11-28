@@ -202,32 +202,101 @@ function _unit_option(unit, option::Symbol)
             unit.survey.largest_cost)
 end
 
+# Exact 0-1 knapsack branch-and-bound in exact arithmetic using the Dantzig fractional
+# upper bound (sorted by decreasing value/cost ratio). Works with no external solver.
+function _knapsack_upper_bound(idx::Int, cur_val, rem_budget, vals, costs)
+    ub = float(cur_val)
+    rem = float(rem_budget)
+    n = length(vals)
+    @inbounds for j in idx:n
+        cj = float(costs[j])
+        if cj <= rem
+            rem -= cj
+            ub += float(vals[j])
+        else
+            rem > 0.0 && (ub += float(vals[j]) * (rem / cj))
+            break
+        end
+    end
+    return ub
+end
+
+function _exact_knapsack(picks, budget)
+    cand = [i for i in eachindex(picks) if picks[i].value > 0 && picks[i].cost <= budget]
+    isempty(cand) && return Int[]
+    ratio(i) = _div(picks[i].value, picks[i].cost)
+    sort!(cand; by=ratio, rev=true, alg=MergeSort)
+    n = length(cand)
+    vals = [picks[i].value for i in cand]
+    costs = [picks[i].cost for i in cand]
+    # Initial incumbent from greedy pass.
+    best_val = zero(promote_type(typeof(budget), eltype(vals)))
+    best_mask = falses(n)
+    rem0 = budget
+    for j in 1:n
+        if costs[j] <= rem0
+            rem0 -= costs[j]
+            best_val += vals[j]
+            best_mask[j] = true
+        end
+    end
+    tol = _is_exact(typeof(best_val)) ? 0.0 : 1e-12 * max(1.0, abs(float(best_val)))
+    cur_mask = falses(n)
+    # Iterative DFS stack: (idx, phase, cur_val, rem_budget)
+    stack = Tuple{Int,Int,typeof(best_val),typeof(budget)}[(1, 0, zero(best_val), budget)]
+    while !isempty(stack)
+        idx, phase, cval, rem = pop!(stack)
+        if phase == 2
+            cur_mask[idx] = false
+            continue
+        end
+        if idx > n
+            if cval > best_val
+                best_val = cval
+                copyto!(best_mask, cur_mask)
+            end
+            continue
+        end
+        if _knapsack_upper_bound(idx, cval, rem, vals, costs) <= float(best_val) + tol
+            continue
+        end
+        if phase == 0
+            # Explore skipping `idx` after exploring taking `idx`.
+            push!(stack, (idx, 1, cval, rem))
+            if costs[idx] <= rem
+                cur_mask[idx] = true
+                push!(stack, (idx, 2, cval, rem))
+                push!(stack, (idx + 1, 0, cval + vals[idx], rem - costs[idx]))
+            end
+        else
+            cur_mask[idx] = false
+            push!(stack, (idx + 1, 0, cval, rem))
+        end
+    end
+    return sort!([cand[j] for j in 1:n if best_mask[j]])
+end
+
 """
-    select_under_budget(units, budget; option=:chosen, passes=nothing) -> NamedTuple
+    select_under_budget(units, budget; option=:chosen, passes=nothing,
+                        method=:greedy) -> NamedTuple
 
 Choose which management units to work on with a fixed budget, from the results of
 [`survey_or_act`](@ref) (Raymond et al. 2020). Each unit enters with one option: the
 one it chose (`option=:chosen`), acting now (`:act_now`) or surveying first
 (`:survey`); the last two give the "never survey" and "always survey" comparisons.
 
-Units are ranked by value per unit of cost, the most cost-effective first, and ties
-keep the order in which the units were given. The first pass takes units from the top
-of the ranking until the next one would take the total over the budget. Each later
-pass looks only at the units that still fit in what is left, ranks them again (ties
-now go to the cheaper unit) and takes from the top in the same way. With
-`passes=nothing` this goes on until no unit fits, which is how the paper describes
-the method; `passes=2` stops after the second pass, as the listing printed in its
-supplement does. A unit whose option gains nothing over the baseline is never taken.
+- `method = :greedy` (default): Raymond et al. (2020)'s ranking heuristic by value per
+  unit of cost, with optional `passes` cap (`passes = nothing` runs until no unit fits;
+  `passes = 2` matches the printed supplement listing).
+- `method = :exact`: exact 0–1 knapsack optimisation via branch-and-bound in exact
+  arithmetic (no external solver required), returning the provably value-maximising subset
+  within `budget` (in index order; `passes = 1`). For a JuMP formulation or LP
+  relaxation, see [`budget_selection_model`](@ref).
 
 The result is `(; selected, choices, value, cost, largest_cost, remaining, passes)`:
-the indices of the units taken, in the order taken; the option of each; the total
-value; the total cost; the total if every survey returned its most expensive outcome;
-the budget left; and the number of passes made.
-
-Two cautions. The cost of a surveyed unit is its *expected* cost, so the budget holds
-on average and not for certain: `largest_cost` can exceed it. And ranking by value per
-cost is a heuristic for a knapsack problem, not its solution: another set of units
-can have more value within the same budget.
+the indices of the units taken; the option of each; the total value; the total cost;
+the total if every survey returned its most expensive outcome; the budget left; and the
+number of passes made.
 
 ```jldoctest
 julia> units = [(; choice=:act_now, value=v, cost=c, largest_cost=c)
@@ -240,14 +309,26 @@ julia> s.selected, s.value, s.cost, s.remaining
 ```
 """
 function select_under_budget(units::AbstractVector, budget::Real; option::Symbol=:chosen,
-                             passes::Union{Nothing,Integer}=nothing)
+                             passes::Union{Nothing,Integer}=nothing,
+                             method::Symbol=:greedy)
     option in (:chosen, :act_now, :survey) ||
         throw(ArgumentError("option is :chosen, :act_now or :survey, not :$option"))
+    method in (:greedy, :exact) ||
+        throw(ArgumentError("method must be :greedy or :exact, not :$method"))
     passes === nothing || passes >= 1 ||
         throw(ArgumentError("passes must be at least 1"))
     (isfinite(budget) && budget >= 0) ||
         throw(ArgumentError("the budget must be nonnegative and finite, got $budget"))
     picks = [_unit_option(u, option) for u in units]
+    if method === :exact
+        selected = _exact_knapsack(picks, budget)
+        cost = sum(picks[i].cost for i in selected; init=zero(budget))
+        return (; selected, choices=[picks[i].choice for i in selected],
+                value=sum(picks[i].value for i in selected; init=zero(budget)),
+                cost,
+                largest_cost=sum(picks[i].largest_cost for i in selected;
+                                 init=zero(budget)), remaining=budget - cost, passes=1)
+    end
     ratio(i) = _div(picks[i].value, picks[i].cost)
     left = [i for i in eachindex(picks) if picks[i].value > 0]
     sort!(left; by=ratio, rev=true, alg=MergeSort)

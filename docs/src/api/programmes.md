@@ -15,6 +15,10 @@ deficiency_model
 evpi_envelope_model
 mixed_dominance_model
 separating_payoff_model
+budget_selection_model
+constrained_policy_model
+generator_redundancy_model
+prune_generators
 DecisionProgram
 solve_program
 ProgramSolution

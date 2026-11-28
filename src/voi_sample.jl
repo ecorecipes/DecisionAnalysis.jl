@@ -867,19 +867,24 @@ and the bias simulations. See [`variance_components`](@ref) for the split betwee
 parameter and simulation variance.
 """
 function evpi(problem::DecisionProblem, method::SampleAverage; bootstrap::Integer=0,
-              seed::Integer=1, noise_correlation::Real=0)
+              seed::Integer=1, noise_correlation::Union{Nothing,Real}=nothing)
     Q, w = _sample_problem(problem, :evpi)
     m = size(Q, 1)
     min_ρ = m <= 1 ? -1.0 : -1.0 / (m - 1)
-    (isfinite(noise_correlation) && min_ρ <= noise_correlation <= 1) ||
-        throw(ArgumentError("noise_correlation must lie in [$min_ρ, 1] for $m actions, " *
-                            "got $noise_correlation"))
+    if noise_correlation === nothing
+        nc_stored = problem.payoff.noise_correlation
+        ρ = nc_stored === nothing ? 0.0 : clamp(nc_stored, min_ρ, 1.0)
+    else
+        (isfinite(noise_correlation) && min_ρ <= noise_correlation <= 1) ||
+            throw(ArgumentError("noise_correlation must lie in [$min_ρ, 1] for $m actions, " *
+                                "got $noise_correlation"))
+        ρ = Float64(noise_correlation)
+    end
     se = _feasible_se(problem)
-    cells = se === nothing ? 0.0 :
-            _cell_noise_bias(Q, se, w, Xoshiro(seed + 1), noise_correlation)
+    cells = se === nothing ? 0.0 : _cell_noise_bias(Q, se, w, Xoshiro(seed + 1), ρ)
     return _estimate(:evpi, method, (;), Q, w; bootstrap, seed, cells,
                      extra=(; single_replicate=single_replicate(problem.payoff),
-                            noise_correlation=Float64(noise_correlation)))
+                            noise_correlation=ρ))
 end
 _fit(::SampleAverage, ::NamedTuple, Q, w) = (Q, (;))
 
@@ -1061,6 +1066,36 @@ function evppi(problem::DecisionProblem, focal::Union{Symbol,Tuple{Vararg{Symbol
     _sample_problem(problem, :evppi)
     return evppi(problem, focal, _default_method(_focal_columns(problem.belief, focal));
                  kw...)
+end
+
+# Sample-based two-stage value: estimates the informed second-stage value given `focal`
+# parameters (via `evppi`) for each distinct first-stage commitment.
+function two_stage_value(problem::DecisionProblem, first_stage::AbstractVector, focal,
+                         method::Union{Nothing,AbstractVOIMethod}=nothing;
+                         bootstrap::Integer=0, seed::Integer=1)
+    m = size(problem.payoff, 1)
+    length(first_stage) == m ||
+        throw(ArgumentError("first_stage has $(length(first_stage)) entries for the " *
+                            "$m actions of the payoff table"))
+    _sample_problem(problem, :two_stage_value)
+    stages = unique(first_stage[problem.feasible])
+    act_now = Float64(act_now_value(problem))
+    ests = map(stages) do g
+        mask = [problem.feasible[i] && isequal(first_stage[i], g) for i in 1:m]
+        sub = DecisionProblem(problem.payoff, problem.belief, mask, problem.baseline)
+        e = method === nothing ? evppi(sub, focal; bootstrap, seed) :
+            evppi(sub, focal, method; bootstrap, seed)
+        return (; stage=g, value=Float64(e.details.act_now_value) + Float64(e.value),
+                standard_error=e.standard_error, estimate=e)
+    end
+    vals = [r.value for r in ests]
+    ses = [r.standard_error for r in ests]
+    best_i = argmax(vals)
+    val = vals[best_i]
+    tol = _tolerance(vals, 0, _default_rtol(Float64))
+    return (; value=val, standard_error=ses[best_i], first_stages=stages, values=vals,
+            standard_errors=ses, chosen=stages[vals .>= val - tol], act_now,
+            gain=val - act_now, method=first(ests).estimate.method)
 end
 
 # EVSI
@@ -1287,6 +1322,86 @@ function evsi(problem::DecisionProblem, study::SummaryStatistics; bootstrap::Int
                      extra=(; summaries=collect(keys(study.summaries))))
 end
 
+# Pareto-smoothed importance sampling tail shape diagnostic k̂ (Zhang & Stephens 2009;
+# Vehtari et al. 2024, JMLR 25:72) on the log importance weights of row `k`. Values
+# k̂ ≤ 0.5 indicate finite variance; 0.5 < k̂ ≤ 0.7 indicate slow convergence; k̂ > 0.7
+# warn that self-normalised importance sampling is unreliable for that data set.
+function _psis_khat_row(L::AbstractMatrix, k::Int, wf::Vector{Float64})
+    n = length(wf)
+    lw = Float64[]
+    sizehint!(lw, n)
+    @inbounds for j in 1:n
+        wj = wf[j]
+        wj > 0.0 || continue
+        lj = Float64(L[k, j])
+        isfinite(lj) && push!(lw, lj + log(wj))
+    end
+    S = length(lw)
+    M = min(S ÷ 5, floor(Int, 3 * sqrt(S)))
+    M < 5 && return NaN
+    sort!(lw)
+    cutoff = lw[S - M]
+    # Tail exceedances on original weight scale, shifted by cutoff to prevent overflow.
+    x = Vector{Float64}(undef, M)
+    @inbounds for i in 1:M
+        d = lw[S - M + i] - cutoff
+        x[i] = d > 700.0 ? Inf : expm1(d)
+    end
+    all(isfinite, x) || return Inf
+    xmax = x[M]
+    xmax <= 0.0 && return 0.0
+    xstar = x[max(1, floor(Int, M / 4 + 0.5))]
+    xstar <= 0.0 && (xstar = xmax)
+    m_grid = 20 + floor(Int, sqrt(M))
+    thetas = Vector{Float64}(undef, m_grid)
+    lps = Vector{Float64}(undef, m_grid)
+    @inbounds for j in 1:m_grid
+        θ = 1.0 / xmax + (1.0 - sqrt(m_grid / (j - 0.5))) / (3.0 * xstar)
+        thetas[j] = θ
+        if iszero(θ)
+            mbar = sum(x) / M
+            lps[j] = -M * log(mbar) - M
+        else
+            k_hat = 0.0
+            valid = true
+            for i in 1:M
+                t = 1.0 - θ * x[i]
+                if !(t > 0.0)
+                    valid = false
+                    break
+                end
+                k_hat += log(t)
+            end
+            if !valid
+                lps[j] = -Inf
+            else
+                k_hat /= M
+                sigma = -k_hat / θ
+                lps[j] = sigma > 0.0 ? (-M * log(sigma) - M * k_hat - M) : -Inf
+            end
+        end
+    end
+    lmax = maximum(lps)
+    isfinite(lmax) || return NaN
+    wsum = 0.0
+    θ_hat = 0.0
+    @inbounds for j in 1:m_grid
+        wj = exp(lps[j] - lmax)
+        wsum += wj
+        θ_hat += wj * thetas[j]
+    end
+    θ_hat /= wsum
+    k_est = 0.0
+    @inbounds for i in 1:M
+        t = 1.0 - θ_hat * x[i]
+        t > 0.0 || return Inf
+        k_est += log(t)
+    end
+    k_est /= M
+    # Weakly informative empirical-Bayes shrinkage toward 0.5 for small tails (Vehtari et al.).
+    return (M * k_est + 5.0) / (M + 10.0)
+end
+
 function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer=1)
     Q, w = _sample_problem(problem, :evsi)
     L = study.loglikelihood
@@ -1301,6 +1416,7 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
     gains = zeros(K)
     informed = zeros(K)
     ess = zeros(K)
+    khat = Vector{Float64}(undef, K)
     posterior = zeros(n)
     # influence[j]: the first-order effect of draw j on the estimate, summed over the
     # data sets, from the linearisation of each self-normalised posterior mean.
@@ -1308,6 +1424,7 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
     m = zeros(size(Qf, 1))
     for k in 1:K
         _posterior!(posterior, L, k, wf)
+        khat[k] = _psis_khat_row(L, k, wf)
         mul!(m, Qf, posterior)
         b = argmax(m)
         informed[k] = m[b]
@@ -1319,12 +1436,18 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
     end
     value = dot(v, gains)
     sorted = sort(ess)
+    finite_k = sort!(filter(!isnan, khat))
+    max_k = isempty(finite_k) ? NaN : finite_k[end]
+    med_k = isempty(finite_k) ? NaN : finite_k[(length(finite_k) + 1) ÷ 2]
+    high_k_frac = isempty(finite_k) ? 0.0 : count(>(0.7), finite_k) / length(finite_k)
     datasets_se = _weighted_mean_se(gains, v)
     draws_se = sqrt(sum(abs2, influence))
     details = (; act_now_value=v0, act_now_index=a, draws=n, datasets=K,
                direct_value=dot(v, informed) - Float64(v0), minimum_ess=sorted[1],
                median_ess=sorted[(K + 1) ÷ 2], mean_ess=dot(v, ess),
-               prior_ess=Float64(effective_sample_size(w)),
+               prior_ess=Float64(effective_sample_size(w)), pareto_k=khat,
+               max_pareto_k=max_k, median_pareto_k=med_k,
+               high_pareto_k_fraction=high_k_frac,
                datasets_standard_error=datasets_se, draws_standard_error=draws_se)
     bias = (; act_now=_act_now_bias(Q, w, Xoshiro(seed)), cells=nothing)
     return VOIEstimate(:evsi, :ImportanceSampling, value, hypot(datasets_se, draws_se),

@@ -97,7 +97,8 @@ export PayoffTable, action_labels, random_payoff_table, combine_payoffs,
        expected_gain_over_baseline
 # Aggregators
 export AbstractAggregator, Expectation, WorstCase, BestCase, Hurwicz, Laplace,
-       LowerExpectation, UpperExpectation, AlphaMaxmin, CVaR, Quantile, aggregate
+       LowerExpectation, UpperExpectation, AlphaMaxmin, SmoothAmbiguity, CVaR, Quantile,
+       aggregate
 # Regret (never a bare `regret` or `regrets`)
 export RegretTable, regret_table, relative_regret_table, expected_regret, max_regret
 # Rules
@@ -106,14 +107,15 @@ export AbstractTransform, IdentityTransform, RegretTransform, RelativeRegretTran
        laplace_metric, minimax_regret_metric, AbstractSelector, Optimize, Threshold,
        AbstractRule, DecisionRule, MaxExpectedUtility, Maximin, Maximax, MinimaxRegret,
        GammaMaximin, Satisfice, EAdmissible, Maximal, IntervalDominance, ParetoFront,
-       DecisionResult, first_choice, decide
+       StochasticDominance, fsd_dominates, ssd_dominates, info_gap_robustness,
+       info_gap_opportuneness, prim_boxes, DecisionResult, first_choice, decide
 # Experiments
 export Experiment, signal_labels, random_experiment, gaussian_experiment,
        BayesianInversion, bayes_invert, garble, is_garbling_of, garbling_result,
        GarblingResult, deficiency
 # Value of information
 export act_now_value, value_with_information, evpi, evppi, hypothesis_partition,
-       two_stage_value, evsi, enbs,
+       two_stage_value, evsi, enbs, ce_evpi, ce_evppi, ce_evsi, evim, evmi,
        information_can_change_decision, RobustVOI,
        robust_evpi, robust_evsi, voi_profile, expected_variance_reduction,
        optimal_design, normal_form, survey_or_act, select_under_budget,
@@ -124,8 +126,9 @@ export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Groupi
        GaussianProcessRegression, MARSRegression,
        fitted_conditional_means, SummaryStatistics, ImportanceSampling,
        importance_loglikelihoods, GaussianApproximation, variance_components,
-       evppi_nested, MomentMatching, AbstractStudyDesign, BinomialStudy,
-       TwoArmBinomialStudy, NormalStudy, simulate_study, study_loglikelihood,
+       evppi_nested, MultilevelMC, MomentMatching, AbstractStudyDesign, BinomialStudy,
+       TwoArmBinomialStudy, NormalStudy, CountStudy, OccupancyStudy,
+       CaptureRecaptureStudy, MvNormalStudy, simulate_study, study_loglikelihood,
        study_posterior, variance_reduction_table, equivalent_binomial_sample_size,
        population_value, enbs_curve, optimal_sample_size, regression_check,
        compare_regressions, ScenarioAxis, decision_axis, uncertainty_axis, ScenarioDesign,
@@ -134,11 +137,13 @@ export VOIEstimate, AbstractVOIMethod, AbstractRegression, SampleAverage, Groupi
        expected_utility_estimates, expected_gain_estimates, conditional_problem,
        probability_optimal
 # Sensitivity
-export policy_regions, one_way_thresholds, weight_sweep, rank_reversals
+export policy_regions, one_way_thresholds, two_way_policy_regions, decision_curve,
+       weight_sweep, rank_reversals
 # Linear programmes as JuMP models
 export DecisionProgram, ProgramSolution, solve_program, eadmissibility_model,
        garbling_model, deficiency_model, evpi_envelope_model, mixed_dominance_model,
-       separating_payoff_model
+       separating_payoff_model, budget_selection_model, constrained_policy_model,
+       generator_redundancy_model, prune_generators
 # Fidelity
 export total_variation, decision_loss_bound, payoff_range, largest_action_range,
        largest_regret, deficiency_value_bound
@@ -160,8 +165,10 @@ include("utilities.jl")
 include("aggregators.jl")
 include("regret.jl")
 include("rules.jl")
+include("deep_uncertainty.jl")
 include("experiments.jl")
 include("voi.jl")
+include("ce_voi.jl")
 include("voi_sample.jl")
 include("gaussian_process.jl")
 include("mars.jl")
@@ -177,6 +184,7 @@ include("adaptive.jl")
 include("estimation.jl")
 include("scenarios.jl")
 include("report.jl")
+include("tables.jl")
 include("certificates.jl")
 include("show.jl")
 

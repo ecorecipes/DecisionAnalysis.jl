@@ -51,11 +51,13 @@ struct PayoffTable{T<:Real,S<:Union{Nothing,Matrix{<:Real}}}
     Q::Matrix{T}
     standard_errors::S
     replicates::Union{Nothing,Matrix{Int}}
+    noise_correlation::Union{Nothing,Float64}
     function PayoffTable{T,S}(actions::Vector{Symbol}, states::Vector{Symbol},
                               Q::Matrix{T}, standard_errors::S,
-                              replicates::Union{Nothing,Matrix{Int}}=nothing) where {T<:Real,
-                                                                                     S<:Union{Nothing,
-                                                                                              Matrix{<:Real}}}
+                              replicates::Union{Nothing,Matrix{Int}}=nothing,
+                              noise_correlation::Union{Nothing,Float64}=nothing) where {T<:Real,
+                                                                                        S<:Union{Nothing,
+                                                                                                 Matrix{<:Real}}}
         (isempty(actions) || isempty(states)) &&
             throw(InvalidPayoffError("a payoff table needs at least one action and one state"))
         size(Q) == (length(actions), length(states)) ||
@@ -85,25 +87,32 @@ struct PayoffTable{T<:Real,S<:Union{Nothing,Matrix{<:Real}}}
             all(>=(1), replicates) ||
                 throw(InvalidPayoffError("every cell needs at least one replicate"))
         end
-        return new{T,S}(actions, states, Q, standard_errors, replicates)
+        if noise_correlation !== nothing
+            (isfinite(noise_correlation) && -1.0 <= noise_correlation <= 1.0) ||
+                throw(InvalidPayoffError("noise_correlation must lie in [-1, 1], got " *
+                                         "$noise_correlation"))
+        end
+        return new{T,S}(actions, states, Q, standard_errors, replicates, noise_correlation)
     end
 end
 
 function PayoffTable(actions, states, Q::AbstractMatrix{T};
                      standard_errors::Union{Nothing,AbstractMatrix{<:Real}}=nothing,
-                     replicates::Union{Nothing,AbstractMatrix{<:Integer}}=nothing) where {T<:Real}
+                     replicates::Union{Nothing,AbstractMatrix{<:Integer}}=nothing,
+                     noise_correlation::Union{Nothing,Real}=nothing) where {T<:Real}
     E = T === Bool ? Int : T
     se = standard_errors === nothing ? nothing : Matrix(standard_errors)
     reps = replicates === nothing ? nothing : Matrix{Int}(replicates)
+    nc = noise_correlation === nothing ? nothing : Float64(noise_correlation)
     return PayoffTable{E,typeof(se)}(_labels(actions), _labels(states), Matrix{E}(Q), se,
-                                     reps)
+                                     reps, nc)
 end
 
 function PayoffTable(Q::AbstractMatrix{<:Real};
                      actions=_default_labels("a", size(Q, 1)),
                      states=_default_labels("s", size(Q, 2)), standard_errors=nothing,
-                     replicates=nothing)
-    return PayoffTable(actions, states, Q; standard_errors, replicates)
+                     replicates=nothing, noise_correlation=nothing)
+    return PayoffTable(actions, states, Q; standard_errors, replicates, noise_correlation)
 end
 
 Base.size(t::PayoffTable) = size(t.Q)
@@ -113,12 +122,14 @@ Base.eltype(::PayoffTable{T}) where {T} = T
 
 function Base.:(==)(a::PayoffTable, b::PayoffTable)
     return a.actions == b.actions && a.states == b.states && a.Q == b.Q &&
-           a.standard_errors == b.standard_errors && a.replicates == b.replicates
+           a.standard_errors == b.standard_errors && a.replicates == b.replicates &&
+           a.noise_correlation == b.noise_correlation
 end
 function Base.hash(t::PayoffTable, h::UInt)
-    return hash(t.replicates,
-                hash(t.standard_errors,
-                     hash(t.Q, hash(t.states, hash(t.actions, hash(:PT, h))))))
+    return hash(t.noise_correlation,
+                hash(t.replicates,
+                     hash(t.standard_errors,
+                          hash(t.Q, hash(t.states, hash(t.actions, hash(:PT, h)))))))
 end
 
 """
@@ -151,7 +162,8 @@ function _subtable(t::PayoffTable, rows, cols)
     se = t.standard_errors === nothing ? nothing : t.standard_errors[rows, cols]
     reps = t.replicates === nothing ? nothing : t.replicates[rows, cols]
     return PayoffTable(t.actions[rows], t.states[cols], t.Q[rows, cols];
-                       standard_errors=se, replicates=reps)
+                       standard_errors=se, replicates=reps,
+                       noise_correlation=t.noise_correlation)
 end
 
 # Arithmetic on tables with the same labels
@@ -175,13 +187,13 @@ function Base.:-(a::PayoffTable, b::PayoffTable)
 end
 function Base.:-(a::PayoffTable)
     return PayoffTable(a.actions, a.states, -a.Q; standard_errors=a.standard_errors,
-                       replicates=a.replicates)
+                       replicates=a.replicates, noise_correlation=a.noise_correlation)
 end
 function Base.:*(c::Real, a::PayoffTable)
     isfinite(c) || throw(ArgumentError("a payoff table cannot be multiplied by $c"))
     se = a.standard_errors === nothing ? nothing : abs(c) .* a.standard_errors
     return PayoffTable(a.actions, a.states, c .* a.Q; standard_errors=se,
-                       replicates=a.replicates)
+                       replicates=a.replicates, noise_correlation=a.noise_correlation)
 end
 Base.:*(a::PayoffTable, c::Real) = c * a
 function Base.:/(a::PayoffTable, c::Real)
@@ -189,7 +201,7 @@ function Base.:/(a::PayoffTable, c::Real)
         throw(ArgumentError("a payoff table cannot be divided by $c"))
     se = a.standard_errors === nothing ? nothing : a.standard_errors ./ abs(c)
     return PayoffTable(a.actions, a.states, a.Q ./ c; standard_errors=se,
-                       replicates=a.replicates)
+                       replicates=a.replicates, noise_correlation=a.noise_correlation)
 end
 
 """
