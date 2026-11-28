@@ -2,12 +2,13 @@
 The bridge to InfluenceDiagrams.jl: `normal_form` turns a single-decision influence
 diagram into a `DecisionProblem` (and the decision's information into an `Experiment`),
 using variable elimination (`BayesianNetworkInference.VariableElimination`) rather than
-enumerating the full joint table. Loaded when InfluenceDiagrams is.
+enumerating the full joint table. Preserves exact `Rational{BigInt}` arithmetic when all
+bound chance kernels and utilities are exact. Loaded when InfluenceDiagrams is.
 """
 module DecisionAnalysisInfluenceDiagramsExt
 
 using DecisionAnalysis: DecisionAnalysis, DecisionProblem, Experiment, FiniteBelief,
-                        PayoffTable
+                        PayoffTable, _is_exact
 using InfluenceDiagrams: InfluenceDiagrams
 
 const ID = InfluenceDiagrams
@@ -41,7 +42,8 @@ function _variable_names(id, ids)
     return Symbol[ID.variable_name(id, v) for v in ids]
 end
 
-function _extract_mass(fac, chosen::Vector{Symbol}, observed::Vector{Symbol})
+function _extract_mass(::Type{T}, fac, chosen::Vector{Symbol},
+                       observed::Vector{Symbol}) where {T<:Real}
     pos = Dict{Symbol,Int}(x => i for (i, x) in enumerate(fac.vars))
     s_axes = Int[pos[x] for x in chosen]
     z_axes = Int[pos[x] for x in observed]
@@ -49,9 +51,9 @@ function _extract_mass(fac, chosen::Vector{Symbol}, observed::Vector{Symbol})
     z_sizes = Int[length(fac.axes[i].labels) for i in z_axes]
     s_strides = _strides(s_sizes)
     z_strides = _strides(z_sizes)
-    Z = zeros(Float64, prod(s_sizes; init=1), prod(z_sizes; init=1))
+    Z = zeros(T, prod(s_sizes; init=1), prod(z_sizes; init=1))
     @inbounds for ci in CartesianIndices(fac.table)
-        p = Float64(fac.table[ci])
+        p = T(fac.table[ci])
         iszero(p) && continue
         θ = _lin_idx(ci, s_axes, s_strides)
         z = _lin_idx(ci, z_axes, z_strides)
@@ -66,9 +68,10 @@ function _extract_mass(fac, chosen::Vector{Symbol}, observed::Vector{Symbol})
     return Z, state_labels, signal_labels
 end
 
-function _accumulate_utility!(N_u::Matrix{Float64}, N_total::Matrix{Float64}, fac,
+function _accumulate_utility!(N_u::Matrix{T}, N_total::Matrix{T}, fac,
                               chosen::Vector{Symbol}, observed::Vector{Symbol},
-                              sc::Vector{Symbol}, u_tab::AbstractArray{<:Real})
+                              sc::Vector{Symbol},
+                              u_tab::AbstractArray{<:Real}) where {T<:Real}
     pos = Dict{Symbol,Int}(x => i for (i, x) in enumerate(fac.vars))
     s_axes = Int[pos[x] for x in chosen]
     z_axes = Int[pos[x] for x in observed]
@@ -80,11 +83,11 @@ function _accumulate_utility!(N_u::Matrix{Float64}, N_total::Matrix{Float64}, fa
     z_strides = _strides(z_sizes)
     u_strides = _strides(u_sizes)
     @inbounds for ci in CartesianIndices(fac.table)
-        p = Float64(fac.table[ci])
+        p = T(fac.table[ci])
         iszero(p) && continue
         θ = _lin_idx(ci, s_axes, s_strides)
         z = _lin_idx(ci, z_axes, z_strides)
-        u_val = Float64(u_tab[_lin_idx(ci, u_axes, u_strides)])
+        u_val = T(u_tab[_lin_idx(ci, u_axes, u_strides)])
         contrib = p * u_val
         N_u[θ, z] += contrib
         N_total[θ, z] += contrib
@@ -92,22 +95,35 @@ function _accumulate_utility!(N_u::Matrix{Float64}, N_total::Matrix{Float64}, fa
     return nothing
 end
 
-function _check_state_sufficiency(weighted::Vector{Matrix{Float64}}, Q::Matrix{Float64},
-                                  mass::Matrix{Float64}, prior::Vector{Float64},
+function _check_state_sufficiency(weighted::Vector{Matrix{T}}, Q::Matrix{T},
+                                  mass::Matrix{T}, prior::Vector{T},
                                   chosen::Vector{Symbol}, observed::Vector{Symbol},
-                                  atol::Real)
-    scale = max(1.0, maximum(abs, Q; init=0.0))
+                                  atol::Real) where {T<:Real}
+    exact = T <: Rational
+    tol_q = exact ? zero(T) : 1e-7 * max(1.0, maximum(abs, Q; init=0.0))
+    mass_cut = exact ? zero(T) : atol
     for (a, N) in enumerate(weighted), θ in eachindex(prior)
         iszero(prior[θ]) && continue
         for z in axes(N, 2)
-            mass[θ, z] > atol || continue
-            abs(N[θ, z] / mass[θ, z] - Q[a, θ]) <= 1e-7 * scale ||
+            mass[θ, z] > mass_cut || continue
+            abs(N[θ, z] / mass[θ, z] - Q[a, θ]) <= tol_q ||
                 throw(ArgumentError("given the state $chosen, the expected utility " *
                                     "still depends on the information $observed; add " *
                                     "the variables the utility depends on to `states`"))
         end
     end
     return nothing
+end
+
+function _all_exact_diagram(m::ID.InfluenceDiagramModel, u_names::Vector{Symbol})
+    hasmethod(BNI.compile, Tuple{ID.BayesModel}, (:atol, :exact)) || return false
+    ks = ID.kernels(m)
+    !isempty(ks) && all(k -> _is_exact(eltype(k)), values(ks)) || return false
+    for uname in u_names
+        u = ID.utility(m, uname)
+        u isa ID.TabularUtility && _is_exact(eltype(u.table)) || return false
+    end
+    return true
 end
 
 function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothing,
@@ -147,29 +163,32 @@ function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothin
     base_vars = vcat(chosen, observed)
     u_names = Symbol[ID.utility_names(id)...]
     nu = length(u_names)
+    exact = _all_exact_diagram(m, u_names)
+    T = exact ? Rational{BigInt} : Float64
 
     mass = nothing      # mass[θ, z] = P(state = θ, signal = z), the same for every action
-    weighted = Matrix{Float64}[]
-    weighted_per_u = [Matrix{Float64}[] for _ in 1:nu]
+    weighted = Matrix{T}[]
+    weighted_per_u = [Matrix{T}[] for _ in 1:nu]
     state_labels = Symbol[]
     signal_labels = Symbol[]
     backend = BNI.VariableElimination()
     for a in actions
         bm = ID.instantiate(ID.fix_decision(m, decision => a); atol)
-        fg = BNI.compile(bm; atol)
+        fg = exact ? BNI.compile(bm; atol, exact=true) : BNI.compile(bm; atol)
         base_fac, _ = BNI.infer(fg, base_vars; backend)
-        Z, sl, zl = _extract_mass(base_fac, chosen, observed)
+        Z, sl, zl = _extract_mass(T, base_fac, chosen, observed)
         if mass === nothing
             mass = Z
             state_labels = sl
             signal_labels = zl
         else
-            maximum(abs, Z .- mass) <= atol ||
+            diff_ok = exact ? (Z == mass) : (maximum(abs, Z .- mass) <= atol)
+            diff_ok ||
                 throw(ArgumentError("the distribution of the state and the " *
                                     "information changes with the action, so they are " *
                                     "not upstream of the decision"))
         end
-        N_total = zeros(Float64, size(Z))
+        N_total = zeros(T, size(Z))
         for (ui, uname) in enumerate(u_names)
             u = ID.utility(m, uname)
             sc = ID.scope(u)
@@ -177,9 +196,9 @@ function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothin
             u_tab = ID.utility_table(u, u_axes)
             all(isfinite, u_tab) ||
                 throw(ArgumentError("utility $uname has non-finite entries"))
-            N_u = zeros(Float64, size(Z))
+            N_u = zeros(T, size(Z))
             if isempty(sc)
-                val = Float64(u_tab[])
+                val = T(u_tab[])
                 N_u .= val .* Z
                 N_total .+= N_u
             else
@@ -193,30 +212,32 @@ function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothin
         push!(weighted, N_total)
     end
     prior = vec(sum(mass; dims=2))
-    Q = zeros(Float64, length(actions), length(prior))
+    Q = zeros(T, length(actions), length(prior))
     for (a, N) in enumerate(weighted), θ in eachindex(prior)
         iszero(prior[θ]) && continue
         Q[a, θ] = sum(view(N, θ, :)) / prior[θ]
     end
     _check_state_sufficiency(weighted, Q, mass, prior, chosen, observed, atol)
     payoff = PayoffTable(actions, state_labels, Q)
-    problem = DecisionProblem(payoff, FiniteBelief(state_labels, prior ./ sum(prior));
-                              baseline)
+    belief = FiniteBelief(state_labels, prior ./ sum(prior);
+                          atol=exact ? 0 : 1e-9)
+    problem = DecisionProblem(payoff, belief; baseline)
     experiment = nothing
     if !isempty(observed)
-        L = zeros(Float64, size(mass, 2), size(mass, 1))
+        L = zeros(T, size(mass, 2), size(mass, 1))
         for θ in eachindex(prior)
             if iszero(prior[θ])
-                L[1, θ] = 1.0             # a state of probability zero: any column will do
+                L[1, θ] = one(T)             # a state of probability zero: any column will do
             else
                 L[:, θ] .= view(mass, θ, :) ./ prior[θ]
             end
         end
-        experiment = Experiment(L; signals=signal_labels, states=state_labels)
+        experiment = Experiment(L; signals=signal_labels, states=state_labels,
+                                atol=exact ? 0 : 1e-9)
     end
     if multi_objective
         obj_tables = map(1:nu) do ui
-            Qu = zeros(Float64, length(actions), length(prior))
+            Qu = zeros(T, length(actions), length(prior))
             for (a, Nu) in enumerate(weighted_per_u[ui]), θ in eachindex(prior)
                 iszero(prior[θ]) && continue
                 Qu[a, θ] = sum(view(Nu, θ, :)) / prior[θ]

@@ -289,10 +289,11 @@ have the same distribution in every network; the bridge checks it and never assu
 - `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `two_way_policy_regions`,
   `decision_curve`, `weight_sweep`, `rank_reversals`.
 - `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` and `_fit` (with `edf`/`k_check`, `:bam`, `:scam`, `:ti`) for `GAMRegression`, plus `parameter_draws` and `SampleBelief` for `GAM.GamModel`.
-- `ext/DecisionAnalysisFiniteKernelsExt.jl`: bidirectional `FiniteBelief`/`Experiment` ↔ `FiniteKernel` conversions and `FiniteKernel`/`ResilienceCore.MarkovKernel` transition support in `adaptive_management`.
-- `ext/DecisionAnalysisInfluenceDiagramsExt.jl`: VE-backed `normal_form` from a single-decision `InfluenceDiagramModel` (with optional `multi_objective=true`).
+- `ext/DecisionAnalysisFiniteKernelsExt.jl`: bidirectional `FiniteBelief`/`Experiment` ↔ `FiniteKernel` conversions, direct `bayes_invert(::FiniteKernel, ::FiniteKernel)` delegating to `FiniteKernels.invert_kernel`, and `FiniteKernel`/`ResilienceCore.MarkovKernel` transition support in `adaptive_management`.
+- `ext/DecisionAnalysisInfluenceDiagramsExt.jl`: VE-backed `normal_form` from a single-decision `InfluenceDiagramModel` (with optional `multi_objective=true` and exact `Rational{BigInt}` preservation when kernels and utilities are exact).
 - `ext/DecisionAnalysisBayesianNetworksExt.jl`: `normal_form` from a `BayesModel`, a named collection of them, hypotheses × actions (with optional `observed`), or a lag-1 `DynamicBayesModel` for `adaptive_management`.
-- `ext/DecisionAnalysisBayesianNetworkInferenceExt.jl`: variable-elimination marginalisation backend for `DecisionAnalysisBayesianNetworksExt` when `BayesianNetworkInference` is loaded.
+- `ext/DecisionAnalysisBayesianNetworkInferenceExt.jl`: variable-elimination marginalisation backend (including exact `Rational{BigInt}` VE when all bound kernels are exact) for `DecisionAnalysisBayesianNetworksExt` when `BayesianNetworkInference` is loaded.
+- `ext/DecisionAnalysisSciMLBaseExt.jl`: generic `with_parameters`/`apply_action`/`simulate`/`outcome` adapter for `SciMLBase.AbstractSciMLProblem` and `AbstractSciMLSolution` (`[weakdeps]` only).
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
   `largest_action_range`, `largest_regret` with `deficiency_value_bound`.
 - `src/report.jl`, `src/tables.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives),

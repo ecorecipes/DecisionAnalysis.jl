@@ -71,6 +71,25 @@
         @test r_mk.active ≈ Float64(r_named_mat.active) atol = 1e-10
         r_mk_single = adaptive_management(prob, obs; transitions=mk_wait, horizon=3)
         @test r_mk_single.active ≈ Float64(r_mat.active) atol = 1e-10
+
+        # Direct FiniteKernel Bayesian inversion (delegates to FiniteKernels.invert_kernel when available).
+        inv_fk = bayes_invert(kb, ke)
+        inv_da = bayes_invert(b, e)
+        @test inv_fk isa BayesianInversion{Rational{Int}}
+        @test inv_fk.signals == inv_da.signals
+        @test inv_fk.states == inv_da.states
+        @test inv_fk.joint == inv_da.joint
+        @test inv_fk.marginal == inv_da.marginal
+        @test inv_fk.posteriors == inv_da.posteriors
+
+        # Zero-evidence signal yields `nothing` posterior without error.
+        e_zero = Experiment([1 // 1 1 // 1; 0 // 1 0 // 1];
+                            signals=[:always, :never], states=[:absent, :present])
+        ke_zero = FiniteKernels.FiniteKernel(e_zero; state_name=:Disease, signal_name=:Swab)
+        inv_zero = bayes_invert(kb, ke_zero)
+        @test inv_zero.marginal == [1 // 1, 0 // 1]
+        @test inv_zero.posteriors[1] == b
+        @test inv_zero.posteriors[2] === nothing
     end
 
     @testset "T4a.4 GAMRegression bam/scam/ti, diagnostics, and parameter_draws" begin

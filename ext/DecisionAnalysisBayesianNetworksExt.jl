@@ -10,7 +10,7 @@ is; automatically uses variable elimination when BayesianNetworkInference is als
 module DecisionAnalysisBayesianNetworksExt
 
 using DecisionAnalysis: DecisionAnalysis, DecisionProblem, Experiment, FiniteBelief,
-                        PayoffTable, ScenarioSet
+                        PayoffTable, ScenarioSet, _is_exact
 using BayesianNetworks: BayesianNetworks
 
 const BN = BayesianNetworks
@@ -73,7 +73,9 @@ function _outcome_term(model::BN.BayesModel, term::Pair)
         Set(keys(given)) == Set(labels) ||
             throw(ArgumentError("the outcome of $(only(variables)) needs one value for " *
                                 "each of its states $labels, got $(collect(keys(given)))"))
-        return variables, Float64[given[s] for s in labels]
+        raw = [given[s] for s in labels]
+        T = all(v -> _is_exact(typeof(v)), raw) ? Rational{BigInt} : Float64
+        return variables, T[T(v) for v in raw]
     end
     values isa AbstractArray{<:Real} ||
         throw(ArgumentError("the values of an outcome term are an array of numbers, or a " *
@@ -82,7 +84,8 @@ function _outcome_term(model::BN.BayesModel, term::Pair)
         throw(ArgumentError("the outcome of $variables needs an array of size $sizes " *
                             "(one axis per variable, in the order of its states), got " *
                             "$(size(values))"))
-    return variables, Float64.(values)
+    T = _is_exact(eltype(values)) ? Rational{BigInt} : Float64
+    return variables, T.(values)
 end
 
 _outcome_terms(model, outcome::Pair) = [_outcome_term(model, outcome)]
@@ -143,17 +146,19 @@ function _tables(model::BN.BayesModel, states::Vector{Symbol}, observed::Vector{
                   for (vars, table) in terms]
     nθ = prod(dims[ax] for ax in s_axes; init=1)
     nz = prod(dims[ax] for ax in z_axes; init=1)
-    mass = zeros(Float64, nθ, nz)
-    value = zeros(Float64, nθ, nz)
+    exact = _is_exact(eltype(joint)) && all(t -> _is_exact(eltype(last(t))), terms)
+    T = exact ? Rational{BigInt} : Float64
+    mass = zeros(T, nθ, nz)
+    value = zeros(T, nθ, nz)
     for ci in CartesianIndices(dims)
-        p = Float64(joint[ci])
+        p = T(joint[ci])
         iszero(p) && continue
         θ = _lin_idx(ci, s_axes, s_strides)
         z = _lin_idx(ci, z_axes, z_strides)
         mass[θ, z] += p
-        acc = 0.0
+        acc = zero(T)
         for (t_axes, t_strides, table) in term_specs
-            acc += table[_lin_idx(ci, t_axes, t_strides)]
+            acc += T(table[_lin_idx(ci, t_axes, t_strides)])
         end
         value[θ, z] += p * acc
     end
@@ -168,16 +173,16 @@ function _tables(model::BN.BayesModel, states::Vector{Symbol}, observed::Vector{
 end
 
 # The experiment with likelihood P(z | θ) from mass[θ, z].
-function _experiment(mass::AbstractMatrix, prior, signals, states)
-    L = zeros(Float64, size(mass, 2), size(mass, 1))
+function _experiment(mass::AbstractMatrix{T}, prior, signals, states) where {T<:Real}
+    L = zeros(T, size(mass, 2), size(mass, 1))
     for θ in eachindex(prior)
         if iszero(prior[θ])
-            L[1, θ] = 1.0             # a state of probability zero: any column will do
+            L[1, θ] = one(T)          # a state of probability zero: any column will do
         else
             L[:, θ] .= view(mass, θ, :) ./ prior[θ]
         end
     end
-    return Experiment(L; signals, states)
+    return Experiment(L; signals, states, atol=T <: Rational ? 0 : 1e-9)
 end
 
 function DecisionAnalysis.normal_form(models::NamedTuple{<:Any,
@@ -190,46 +195,56 @@ function DecisionAnalysis.normal_form(models::NamedTuple{<:Any,
     isempty(chosen) && throw(ArgumentError("`states` names at least one variable"))
     allunique(vcat(chosen, seen)) ||
         throw(ArgumentError("a variable is named twice in `states` and `observed`"))
-    mass = nothing
-    values = Matrix{Float64}[]
+    masses = Matrix[]
+    raw_values = Matrix[]
     state_labels, signal_labels, signal_sizes = Symbol[], Symbol[], ()
     for (action, model) in pairs(models)
         m, v, sl, zl, sizes = _tables(model, chosen, seen, _outcome_terms(model, outcome);
                                       max_states, atol)
-        if mass === nothing
-            mass, state_labels, signal_labels, signal_sizes = m, sl, zl, sizes
+        if isempty(masses)
+            state_labels, signal_labels, signal_sizes = sl, zl, sizes
         else
             (sl == state_labels && zl == signal_labels) ||
                 throw(ArgumentError("the networks do not agree on the states of " *
                                     "$(vcat(chosen, seen))"))
-            maximum(abs, m .- mass) <= atol ||
+            diff_ok = (eltype(m) <: Rational && eltype(masses[1]) <: Rational) ?
+                      (m == masses[1]) : (maximum(abs, m .- masses[1]) <= atol)
+            diff_ok ||
                 throw(ArgumentError("the distribution of $(vcat(chosen, seen)) under " *
                                     "$action differs from that under $(first(actions)): " *
                                     "a state, or something observed before the decision, " *
                                     "cannot depend on the action"))
         end
-        push!(values, v)
+        push!(masses, m)
+        push!(raw_values, v)
     end
+    exact = all(x -> eltype(x) <: Rational, masses) &&
+            all(x -> eltype(x) <: Rational, raw_values)
+    T = exact ? Rational{BigInt} : Float64
+    mass = Matrix{T}(masses[1])
+    values = Matrix{T}[Matrix{T}(v) for v in raw_values]
     prior = vec(sum(mass; dims=2))
-    Q = zeros(Float64, length(actions), length(prior))
+    Q = zeros(T, length(actions), length(prior))
     for (a, v) in enumerate(values), θ in eachindex(prior)
         iszero(prior[θ]) && continue
         Q[a, θ] = sum(view(v, θ, :)) / prior[θ]
     end
     # The state must carry everything the observation says about the outcome.
-    scale = max(1.0, maximum(abs, Q; init=0.0))
+    tol_q = exact ? zero(T) : 1e-7 * max(1.0, maximum(abs, Q; init=0.0))
+    mass_cut = exact ? zero(T) : atol
     for (a, v) in enumerate(values), θ in eachindex(prior)
         iszero(prior[θ]) && continue
         for z in axes(v, 2)
-            mass[θ, z] > atol || continue
-            abs(v[θ, z] / mass[θ, z] - Q[a, θ]) <= 1e-7 * scale ||
+            mass[θ, z] > mass_cut || continue
+            abs(v[θ, z] / mass[θ, z] - Q[a, θ]) <= tol_q ||
                 throw(ArgumentError("given the state $chosen, the expected outcome still " *
                                     "depends on the observed $seen; add to `states` the " *
                                     "variables the outcome depends on"))
         end
     end
     problem = DecisionProblem(PayoffTable(actions, state_labels, Q),
-                              FiniteBelief(state_labels, prior ./ sum(prior)); baseline)
+                              FiniteBelief(state_labels, prior ./ sum(prior);
+                                           atol=exact ? 0 : 1e-9); baseline)
     experiment = isempty(seen) ? nothing :
                  _experiment(mass, prior, signal_labels, state_labels)
     # One experiment for each observed variable alone: the joint mass summed over the

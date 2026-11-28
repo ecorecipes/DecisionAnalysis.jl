@@ -12,8 +12,8 @@ Loaded when both DecisionAnalysis and FiniteKernels are.
 """
 module DecisionAnalysisFiniteKernelsExt
 
-using DecisionAnalysis: DecisionAnalysis, DecisionProblem, Experiment, FiniteBelief,
-                        LabelMismatchError, _default_atol
+using DecisionAnalysis: DecisionAnalysis, BayesianInversion, DecisionProblem, Experiment,
+                        FiniteBelief, LabelMismatchError, _default_atol
 using FiniteKernels: FiniteKernels, FiniteAxis, FiniteKernel, FiniteSpace, ResilienceCore,
                      axis_names, factors, joint_states, kernel_matrix, state
 
@@ -80,6 +80,27 @@ function DecisionAnalysis._transition_matrix(::DecisionProblem,
     # ResilienceCore.MarkovKernel stores row-stochastic P[present, next];
     # adaptive_management expects column-stochastic T[next, present].
     return permutedims(mk.P)
+end
+
+function DecisionAnalysis.bayes_invert(prior::FiniteKernel, channel::FiniteKernel; kw...)
+    if isdefined(FiniteKernels, :invert_kernel)
+        res = FiniteKernels.invert_kernel(prior, channel; kw...)
+        s_labels = _space_labels(prior.codom)
+        z_labels = _space_labels(channel.codom)
+        T = eltype(res.evidence)
+        ev = vec(kernel_matrix(res.evidence))
+        # FiniteKernels.invert_kernel stores joint over X ⊗ Y (nx × ny);
+        # DecisionAnalysis.BayesianInversion stores joint[z, θ] (ny × nx).
+        J = permutedims(reshape(vec(kernel_matrix(res.joint)), length(s_labels),
+                                length(z_labels)))
+        posts = Union{Nothing,FiniteBelief{T}}[p === nothing ? nothing :
+                                               FiniteBelief(s_labels, vec(kernel_matrix(p));
+                                                            atol=T <: Rational ? 0 :
+                                                                 _default_atol(T))
+                                               for p in res.posteriors]
+        return BayesianInversion{T}(z_labels, s_labels, Matrix{T}(J), Vector{T}(ev), posts)
+    end
+    return DecisionAnalysis.bayes_invert(FiniteBelief(prior), Experiment(channel))
 end
 
 end # module

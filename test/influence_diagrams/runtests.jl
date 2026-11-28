@@ -512,5 +512,53 @@ end
                                                observed=:Survey,
                                                outcome=:State => [0, 100],
                                                signal_of=:next)
+
+        # 6. Exact Rational{BigInt} end-to-end preservation when BNI supports `exact=true`
+        #    and InfluenceDiagrams preserves rational TabularUtility tables.
+        BNI = ID.BayesianNetworkInference
+        if hasmethod(BNI.compile, Tuple{BN.BayesModel}, (:atol, :exact))
+            # Exact BayesianNetwork normal_form
+            bn_ex = BN.bayesnet(:Bd => [:absent, :present],
+                                :Swab => [:neg, :pos],
+                                :Act => [:wait, :treat];
+                                mechanisms=[:Swab => (:Bd,)])
+            bm_ex = BN.bind_cpt(BN.BayesModel(bn_ex),
+                                [:Bd => [3 // 5, 2 // 5],
+                                 :Swab => [9 // 10 1 // 10; 1 // 5 4 // 5],
+                                 :Act => [1 // 2, 1 // 2]])
+            u_ex = [100 // 1 90 // 1; 0 // 1 60 // 1] # (Bd, Act)
+            nf_bn_ex = normal_form(bm_ex; decision=:Act, states=:Bd, observed=:Swab,
+                                   outcome=(:Bd, :Act) => u_ex, baseline=:wait)
+            @test eltype(nf_bn_ex.problem.payoff.Q) == Rational{BigInt}
+            @test eltype(probabilities(nf_bn_ex.problem.belief)) == Rational{BigInt}
+            @test eltype(nf_bn_ex.experiment.likelihood) == Rational{BigInt}
+            @test nf_bn_ex.problem.payoff.Q == permutedims(u_ex)
+            @test probabilities(nf_bn_ex.problem.belief) == [3 // 5, 2 // 5]
+            @test nf_bn_ex.experiment.likelihood == [9 // 10 1 // 5; 1 // 10 4 // 5]
+            @test evpi(nf_bn_ex.problem) == 6 // 1
+            @test evsi(nf_bn_ex.problem, nf_bn_ex.experiment) == 3 // 5
+
+            # Exact InfluenceDiagram normal_form (requires rational-preserving TabularUtility)
+            id_ex = ID.influence_diagram(:Bd => [:absent, :present],
+                                         :Swab => [:neg, :pos],
+                                         :Act => [:wait, :treat];
+                                         mechanisms=[:Swab => :Bd],
+                                         decisions=[:Act => :Swab],
+                                         utilities=[:Payoff => (:Bd, :Act)])
+            idm_ex = ID.InfluenceDiagramModel(id_ex)
+            idm_ex = ID.bind_cpt(idm_ex,
+                                 [:Bd => [3 // 5, 2 // 5],
+                                  :Swab => [9 // 10 1 // 10; 1 // 5 4 // 5]])
+            idm_ex = ID.bind_utility(idm_ex, :Payoff => u_ex)
+            if eltype(ID.utility(idm_ex, :Payoff).table) <: Rational
+                nf_id_ex = normal_form(idm_ex; states=:Bd, baseline=:wait)
+                @test eltype(nf_id_ex.problem.payoff.Q) == Rational{BigInt}
+                @test eltype(probabilities(nf_id_ex.problem.belief)) == Rational{BigInt}
+                @test eltype(nf_id_ex.experiment.likelihood) == Rational{BigInt}
+                @test nf_id_ex.problem.payoff.Q == permutedims(u_ex)
+                @test evpi(nf_id_ex.problem) == 6 // 1
+                @test evsi(nf_id_ex.problem, nf_id_ex.experiment) == 3 // 5
+            end
+        end
     end
 end
