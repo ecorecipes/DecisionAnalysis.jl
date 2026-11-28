@@ -70,7 +70,8 @@ struct NormalStudy <: AbstractStudyDesign
     sd::Float64
     function NormalStudy(parameter; n::Integer, sd::Real=1)
         n >= 1 || throw(ArgumentError("the sample size n must be at least 1, got $n"))
-        sd > 0 || throw(ArgumentError("sd must be positive, got $sd"))
+        (isfinite(sd) && sd > 0) ||
+            throw(ArgumentError("sd must be positive and finite, got $sd"))
         return new(Symbol(parameter), n, Float64(sd))
     end
 end
@@ -86,26 +87,126 @@ function _probability(θ, name::Symbol)
     return Float64(p)
 end
 
-_binomial(rng::AbstractRNG, n::Int, p::Float64) = count(_ -> rand(rng) < p, 1:n)
+# Exact Binomial(n, p) sampler in O(1) expected time: inverse-CDF (BINV) when
+# min(np, n(1-p)) < 10 and Kachitvichyanukul & Schmeiser (1988) BTPE otherwise.
+function _binomial(rng::AbstractRNG, n::Int, p::Float64)
+    (n <= 0 || p <= 0.0) && return 0
+    p >= 1.0 && return n
+    q = p <= 0.5 ? p : 1.0 - p
+    r = 1.0 - q
+    np = n * q
+    if np < 10.0
+        s = q / r
+        a = (n + 1) * s
+        pk = exp(n * log1p(-q))
+        u = rand(rng)
+        y = 0
+        while u > pk && y < n && pk > 0.0
+            u -= pk
+            y += 1
+            pk *= (a / y - s)
+        end
+        return p <= 0.5 ? y : n - y
+    end
+    # BTPE (Kachitvichyanukul & Schmeiser 1988, ACM TOMS 14:216)
+    fm = np + q
+    m = floor(Int, fm)
+    npq = np * r
+    p1 = floor(2.195 * sqrt(npq) - 4.6 * r) + 0.5
+    xm = m + 0.5
+    xl = xm - p1
+    xr = xm + p1
+    c = 0.134 + 20.5 / (15.3 + m)
+    al = (fm - xl) / (fm - xl * q)
+    laml = al * (1.0 + 0.5 * al)
+    ar = (xr - fm) / (xr * r)
+    lamr = ar * (1.0 + 0.5 * ar)
+    p2 = p1 * (1.0 + 2.0 * c)
+    p3 = p2 + c / laml
+    p4 = p3 + c / lamr
+    s = q / r
+    a_step = (n + 1) * s
+    log_s = log(s)
+    lg_mode = loggamma(m + 1.0) + loggamma(n - m + 1.0)
+    k_limit = floor(Int, npq / 2.0) - 1
+    while true
+        u = rand(rng) * p4
+        v = rand(rng)
+        if u <= p1
+            y = floor(Int, xm - p1 * v + u)
+            return p <= 0.5 ? y : n - y
+        elseif u <= p2
+            x = xl + (u - p1) / c
+            v = v * c + 1.0 - abs(m - x + 0.5) / p1
+            v > 1.0 && continue
+            y = floor(Int, x)
+        elseif u <= p3
+            y = floor(Int, xl + log(v) / laml)
+            y < 0 && continue
+            v *= (u - p2) * laml
+        else
+            y = floor(Int, xr - log(v) / lamr)
+            y > n && continue
+            v *= (u - p3) * lamr
+        end
+        k = abs(y - m)
+        if k <= 20 || k >= k_limit
+            f = 1.0
+            if m < y
+                for i in (m + 1):y
+                    f *= (a_step / i - s)
+                end
+            elseif m > y
+                for i in (y + 1):m
+                    f /= (a_step / i - s)
+                end
+            end
+            v <= f && return p <= 0.5 ? y : n - y
+        else
+            v <= 0.0 && return p <= 0.5 ? y : n - y
+            lv = log(v)
+            rho = (k / npq) * ((k * (k / 3.0 + 0.625) + 1.0 / 6.0) / npq + 0.5)
+            t = -k * k / (2.0 * npq)
+            lv < t - rho && return p <= 0.5 ? y : n - y
+            lv > t + rho && continue
+            log_ratio = lg_mode - loggamma(y + 1.0) - loggamma(n - y + 1.0) +
+                        (y - m) * log_s
+            lv <= log_ratio && return p <= 0.5 ? y : n - y
+        end
+    end
+end
 
-# Gamma(shape, 1) by Marsaglia and Tsang (2000), with the boost for shape < 1.
-function _gamma(rng::AbstractRNG, shape::Float64)
-    shape < 1 && return _gamma(rng, shape + 1) * rand(rng)^(1 / shape)
+# log(Gamma(shape, 1)) by Marsaglia and Tsang (2000), sampling in log space for shape < 1
+# so small shapes never underflow to 0 / 0 = NaN in `_beta`.
+function _log_gamma(rng::AbstractRNG, shape::Float64)
+    if shape < 1
+        u = rand(rng)
+        while iszero(u)
+            u = rand(rng)
+        end
+        return _log_gamma(rng, shape + 1.0) + log(u) / shape
+    end
     d = shape - 1 / 3
     c = 1 / sqrt(9d)
     while true
         z = randn(rng)
         v = (1 + c * z)^3
         v > 0 || continue
-        log(rand(rng)) < z^2 / 2 + d - d * v + d * log(v) && return d * v
+        u = rand(rng)
+        u > 0 || continue
+        log(u) < z^2 / 2 + d - d * v + d * log(v) && return log(d * v)
     end
 end
 
+_gamma(rng::AbstractRNG, shape::Float64) = exp(_log_gamma(rng, shape))
+
 function _beta(rng::AbstractRNG, a::Real, b::Real)
-    (a > 0 && b > 0) ||
-        throw(ArgumentError("Beta parameters must be positive, got ($a, $b)"))
-    x = _gamma(rng, Float64(a))
-    return x / (x + _gamma(rng, Float64(b)))
+    (isfinite(a) && isfinite(b) && a > 0 && b > 0) ||
+        throw(ArgumentError("Beta parameters must be positive and finite, got ($a, $b)"))
+    lx = _log_gamma(rng, Float64(a))
+    ly = _log_gamma(rng, Float64(b))
+    m = max(lx, ly)
+    return exp(lx - (m + log(exp(lx - m) + exp(ly - m))))
 end
 
 """

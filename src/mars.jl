@@ -97,18 +97,50 @@ function _mars_column(parent::AbstractVector, x::AbstractVector, t::Real, sign::
     return parent .* max.(sign .* (x .- t), 0.0)
 end
 
-# Orthogonalise `c` against the orthonormal columns of `basis`; `nothing` when what is
-# left is negligible beside the column itself.
-function _mars_orthogonal(c::Vector{Float64}, basis::Vector{Vector{Float64}})
+function _mars_weighted_column!(dst::Vector{Float64}, root::Vector{Float64},
+                                parent::Vector{Float64}, x::Vector{Float64}, t::Float64,
+                                sign::Int)
+    @inbounds for i in eachindex(dst)
+        d = sign * (x[i] - t)
+        dst[i] = d > 0.0 ? root[i] * parent[i] * d : 0.0
+    end
+    return dst
+end
+
+# Orthogonalise `c` against the orthonormal columns of `basis` (and optional `extra`)
+# in-place into `u`; returns `true` when the residual norm is non-negligible.
+function _mars_orthogonal!(u::Vector{Float64}, c::Vector{Float64},
+                           basis::Vector{Vector{Float64}},
+                           extra::Union{Nothing,Vector{Float64}}=nothing)
     size0 = dot(c, c)
-    size0 > 0 || return nothing
-    u = copy(c)
-    for _ in 1:2, q in basis
-        u .-= dot(q, u) .* q
+    size0 > 0 || return false
+    copyto!(u, c)
+    for _ in 1:2
+        for q in basis
+            d = dot(q, u)
+            @inbounds for i in eachindex(u)
+                u[i] -= d * q[i]
+            end
+        end
+        if extra !== nothing
+            d = dot(extra, u)
+            @inbounds for i in eachindex(u)
+                u[i] -= d * extra[i]
+            end
+        end
     end
     left = dot(u, u)
-    left > 1e-10 * size0 || return nothing
-    return u ./ sqrt(left)
+    left > 1e-10 * size0 || return false
+    inv_n = inv(sqrt(left))
+    @inbounds for i in eachindex(u)
+        u[i] *= inv_n
+    end
+    return true
+end
+
+function _mars_orthogonal(c::Vector{Float64}, basis::Vector{Vector{Float64}})
+    u = similar(c)
+    return _mars_orthogonal!(u, c, basis) ? u : nothing
 end
 
 function _mars(method::MARSRegression, columns::NamedTuple, Q::AbstractMatrix,
@@ -132,21 +164,31 @@ function _mars(method::MARSRegression, columns::NamedTuple, Q::AbstractMatrix,
     raw = [ones(n)]                       # the basis functions at the draws
     ortho = [root ./ sqrt(sum(abs2, root))]
     R = Z .- ortho[1] .* (permutedims(ortho[1]) * Z)
+    c_buf = Vector{Float64}(undef, n)
+    u1_buf = Vector{Float64}(undef, n)
+    u2_buf = Vector{Float64}(undef, n)
+    r_buf = Vector{Float64}(undef, size(R, 2))
     while length(terms) + 1 <= method.max_terms && sum(abs2, R) > 1e-12 * total
         best = (0.0, 0, 0, 0.0)
         for (b, term) in enumerate(terms)
             length(term.variables) < method.degree || continue
+            parent_b = raw[b]
             for v in eachindex(predictors)
                 v in term.variables && continue
+                xv = predictors[v]
                 for t in knots[v]
                     gain = 0.0
-                    added = Vector{Float64}[]
-                    for sign in (1, -1)
-                        c = root .* _mars_column(raw[b], predictors[v], t, sign)
-                        u = _mars_orthogonal(c, vcat(ortho, added))
-                        u === nothing && continue
-                        gain += sum(abs2, permutedims(u) * R)
-                        push!(added, u)
+                    _mars_weighted_column!(c_buf, root, parent_b, xv, t, 1)
+                    has_first = _mars_orthogonal!(u1_buf, c_buf, ortho)
+                    if has_first
+                        mul!(r_buf, transpose(R), u1_buf)
+                        gain += dot(r_buf, r_buf)
+                    end
+                    _mars_weighted_column!(c_buf, root, parent_b, xv, t, -1)
+                    if _mars_orthogonal!(u2_buf, c_buf, ortho,
+                                         has_first ? u1_buf : nothing)
+                        mul!(r_buf, transpose(R), u2_buf)
+                        gain += dot(r_buf, r_buf)
                     end
                     gain > best[1] && (best = (gain, b, v, t))
                 end
@@ -164,26 +206,36 @@ function _mars(method::MARSRegression, columns::NamedTuple, Q::AbstractMatrix,
                             vcat(terms[b].signs, sign)))
             push!(raw, column)
             push!(ortho, u)
-            R .-= u .* (permutedims(u) * R)
+            mul!(r_buf, transpose(R), u)
+            @inbounds for j in axes(R, 2), i in axes(R, 1)
+                R[i, j] -= u[i] * r_buf[j]
+            end
         end
     end
 
-    # Backward pass on the normal equations: drop the term whose loss is least, and
-    # keep the subset with the smallest generalised cross-validation score.
+    # Backward pass via thin QR of Bw: for any subset S, columns of Bw[:, S] lie in
+    # span(Q), so ||Z - Bw[:, S] β||² = base_rss + ||QtZ - R[:, S] β||² on an M × |S|
+    # matrix (exact QR conditioning without squaring κ(Bw) or re-factoring n rows).
     B = reduce(hcat, raw)
     Bw = root .* B
-    gram = Bw' * Bw
-    cross = Bw' * Z
+    r_bw = min(size(Bw, 1), size(Bw, 2))
+    F_bw = qr(Bw)
+    R_bw = Matrix(F_bw.R)
+    QtZ_full = F_bw.Q' * Z
+    QtZ = QtZ_full[1:r_bw, :]
+    base_rss = r_bw < n ? sum(abs2, view(QtZ_full, (r_bw + 1):n, :)) : 0.0
+    n_eff = Float64(effective_sample_size(wf))
     penalty = method.penalty === nothing ? (method.degree == 1 ? 2.0 : 3.0) :
               method.penalty
     function rss(S)
-        fit = qr(gram[S, S], ColumnNorm()) \ cross[S, :]
-        return max(total - sum(cross[S, :] .* fit), 0.0)
+        Rs = view(R_bw, :, S)
+        fit = qr(Rs, ColumnNorm()) \ QtZ
+        return base_rss + sum(abs2, QtZ .- Rs * fit)
     end
     function score(S)
         cost = length(S) + penalty * (length(S) - 1) / 2
-        cost < n || return Inf
-        return rss(S) / n / (1 - cost / n)^2
+        cost < n_eff || return Inf
+        return (rss(S) / n) / (1 - cost / n_eff)^2
     end
     kept = collect(eachindex(terms))
     chosen, lowest = copy(kept), score(kept)

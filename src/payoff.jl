@@ -92,9 +92,10 @@ end
 function PayoffTable(actions, states, Q::AbstractMatrix{T};
                      standard_errors::Union{Nothing,AbstractMatrix{<:Real}}=nothing,
                      replicates::Union{Nothing,AbstractMatrix{<:Integer}}=nothing) where {T<:Real}
+    E = T === Bool ? Int : T
     se = standard_errors === nothing ? nothing : Matrix(standard_errors)
     reps = replicates === nothing ? nothing : Matrix{Int}(replicates)
-    return PayoffTable{T,typeof(se)}(_labels(actions), _labels(states), Matrix{T}(Q), se,
+    return PayoffTable{E,typeof(se)}(_labels(actions), _labels(states), Matrix{E}(Q), se,
                                      reps)
 end
 
@@ -177,13 +178,15 @@ function Base.:-(a::PayoffTable)
                        replicates=a.replicates)
 end
 function Base.:*(c::Real, a::PayoffTable)
+    isfinite(c) || throw(ArgumentError("a payoff table cannot be multiplied by $c"))
     se = a.standard_errors === nothing ? nothing : abs(c) .* a.standard_errors
     return PayoffTable(a.actions, a.states, c .* a.Q; standard_errors=se,
                        replicates=a.replicates)
 end
 Base.:*(a::PayoffTable, c::Real) = c * a
 function Base.:/(a::PayoffTable, c::Real)
-    iszero(c) && throw(ArgumentError("a payoff table cannot be divided by zero"))
+    (isfinite(c) && !iszero(c)) ||
+        throw(ArgumentError("a payoff table cannot be divided by $c"))
     se = a.standard_errors === nothing ? nothing : a.standard_errors ./ abs(c)
     return PayoffTable(a.actions, a.states, a.Q ./ c; standard_errors=se,
                        replicates=a.replicates)

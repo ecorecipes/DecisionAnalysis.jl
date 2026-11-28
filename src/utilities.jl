@@ -152,9 +152,7 @@ end
 function _run_utilities(t::OutcomeTable, u::AbstractUtility)
     ok = t.status .== _OK
     names = Tuple(t.outcomes)
-    raw = Array{Any}(undef, size(ok))
-    fill!(raw, 0)
-    T = Union{}
+    U = nothing
     for i in CartesianIndices(ok)
         ok[i] || continue
         v = u(NamedTuple{names}(Tuple(view(t.values, i, :))))
@@ -162,13 +160,27 @@ function _run_utilities(t::OutcomeTable, u::AbstractUtility)
             throw(InvalidOutcomeError("the utility of action $(t.actions[i[1]]) at draw " *
                                       "$(t.draws[i[2]]), replicate $(t.replicates[i[3]]) " *
                                       "is $(repr(v)), not a finite number"))
-        raw[i] = v
-        T = promote_type(T, typeof(v))
+        if U === nothing
+            T = typeof(v) === Bool ? Int : typeof(v)
+            U = zeros(T, size(ok))
+            U[i] = v
+        elseif v isa eltype(U)
+            U[i] = v
+        else
+            T = promote_type(eltype(U), typeof(v))
+            T === Bool && (T = Int)
+            U = Array{T,3}(U)
+            U[i] = v
+        end
     end
-    T === Union{} && throw(InvalidOutcomeError("the table has no usable run"))
-    return Array{T,3}(raw), ok
+    U === nothing && throw(InvalidOutcomeError("the table has no usable run"))
+    return U, ok
 end
 
+_exact_mean_div(s::Union{Integer,Rational}, n::Int) = s // n
+_exact_mean_div(s::Real, n::Int) = s / n
+_exact_mean_type(::Type{T}) where {T<:Union{Integer,Rational}} = typeof(zero(T) // 1)
+_exact_mean_type(::Type{T}) where {T<:Real} = typeof(zero(T) / 1)
 _exact_mean(x::AbstractVector{<:Union{Integer,Rational}}) = sum(x) // length(x)
 _exact_mean(x::AbstractVector) = sum(x) / length(x)
 
@@ -229,21 +241,63 @@ function payoff_table(t::OutcomeTable, u::AbstractUtility; baseline=nothing)
     # Relative to the baseline: differences within a run, where both runs are usable.
     U = b === nothing ? raw : raw .- view(raw, b:b, :, :)
     ok = b === nothing ? usable : usable .& view(usable, b:b, :, :)
-    na, nd = length(t.actions), length(t.draws)
-    counts = [count(view(ok, a, d, :)) for a in 1:na, d in 1:nd]
-    i = findfirst(iszero, counts)
-    i === nothing ||
+    na, nd, nr = size(U)
+    counts = Matrix{Int}(undef, na, nd)
+    min_count = nr
+    @inbounds for d in 1:nd, a in 1:na
+        c = 0
+        for r in 1:nr
+            c += ok[a, d, r]
+        end
+        counts[a, d] = c
+        c < min_count && (min_count = c)
+    end
+    if min_count == 0
+        i = findfirst(iszero, counts)
         throw(InvalidOutcomeError("action $(t.actions[i[1]]) at draw $(t.draws[i[2]]) " *
                                   "has no usable run" *
                                   (baseline === nothing ? "" :
                                    " shared with the baseline") *
                                   ", so its conditional expected utility cannot be " *
                                   "estimated"))
-    cell(a, d) = U[a, d, findall(view(ok, a, d, :))]
-    Q = [_exact_mean(cell(a, d)) for a in 1:na, d in 1:nd]
-    se = nothing
-    if all(>=(2), counts)
-        se = [_standard_error(cell(a, d)) for a in 1:na, d in 1:nd]
+    end
+    need_se = min_count >= 2
+    TU = eltype(U) === Bool ? Int : eltype(U)
+    TQ = _exact_mean_type(TU)
+    Q = Matrix{TQ}(undef, na, nd)
+    se = need_se ? Matrix{Float64}(undef, na, nd) : nothing
+    @inbounds for d in 1:nd, a in 1:na
+        c = counts[a, d]
+        s = zero(TU)
+        first_v = zero(TU)
+        has_first = false
+        all_same = true
+        for r in 1:nr
+            ok[a, d, r] || continue
+            v = TU(U[a, d, r])
+            if !has_first
+                first_v = v
+                has_first = true
+            elseif v != first_v
+                all_same = false
+            end
+            s += v
+        end
+        Q[a, d] = _exact_mean_div(s, c)
+        if se !== nothing
+            if all_same
+                se[a, d] = 0.0
+            else
+                m = Float64(s) / c
+                ssq = 0.0
+                for r in 1:nr
+                    ok[a, d, r] || continue
+                    diff = Float64(U[a, d, r]) - m
+                    ssq += diff * diff
+                end
+                se[a, d] = sqrt(ssq / (c - 1) / c)
+            end
+        end
     end
     return PayoffTable(t.actions, t.draws, Q; standard_errors=se, replicates=counts)
 end
@@ -371,7 +425,8 @@ individuals. The attitude does not depend on the level of the outcome: adding th
 same number to every result of a lottery adds it to the certainty equivalent.
 
 With `worst` and `best` the utility is scaled to `[0, 1]` and measured along the
-improvement `d = |x − worst|` from the worst level towards the best,
+signed improvement `d = σ (x − worst)` from the worst level towards the best (with
+`σ = +1` when `best > worst` and `σ = −1` when `best < worst`),
 `u(x) = v(d) / v(|best − worst|)` with `v` the function above, so `best < worst`
 describes an outcome that counts against, and `r > 0` is then averse to risk in the
 improvement.
@@ -483,8 +538,8 @@ end
 function _natural_inverse(u::PowerUtility, y::Real)
     ρ = u.risk_aversion
     isone(ρ) && return exp(y)
-    (1 - ρ) * y >= 0 ||
-        throw(ArgumentError("no outcome has utility $y under this power utility"))
+    ok = ρ < 1 ? (1 - ρ) * y >= 0 : (1 - ρ) * y > 0
+    ok || throw(ArgumentError("no outcome has utility $y under this power utility"))
     return ((1 - ρ) * y)^(1 / (1 - ρ))
 end
 
@@ -504,6 +559,36 @@ end
 
 (u::_AttributeUtility)(x::Real) = _value(u, x)
 (u::_AttributeUtility)(o::NamedTuple) = _value(u, _outcome_value(o, u.name))
+
+# Fast path for single-attribute utilities: reads the one named column directly with no
+# per-run NamedTuple allocation.
+function _run_utilities(t::OutcomeTable, u::_AttributeUtility)
+    k = findfirst(==(u.name), t.outcomes)
+    k === nothing &&
+        throw(InvalidOutcomeError("there is no outcome named $(u.name) among $(t.outcomes)"))
+    ok = t.status .== _OK
+    slice = view(t.values, :, :, :, k)
+    first_i = findfirst(ok)
+    first_i === nothing && throw(InvalidOutcomeError("the table has no usable run"))
+    v1 = _value(u, slice[first_i])
+    (v1 isa Real && isfinite(v1)) ||
+        throw(InvalidOutcomeError("the utility of action $(t.actions[first_i[1]]) at draw " *
+                                  "$(t.draws[first_i[2]]), replicate " *
+                                  "$(t.replicates[first_i[3]]) is $(repr(v1)), not a " *
+                                  "finite number"))
+    T = typeof(v1) === Bool ? Int : typeof(v1)
+    U = zeros(T, size(ok))
+    @inbounds for i in CartesianIndices(ok)
+        ok[i] || continue
+        v = _value(u, slice[i])
+        (v isa Real && isfinite(v)) ||
+            throw(InvalidOutcomeError("the utility of action $(t.actions[i[1]]) at draw " *
+                                      "$(t.draws[i[2]]), replicate $(t.replicates[i[3]]) " *
+                                      "is $(repr(v)), not a finite number"))
+        U[i] = v
+    end
+    return U, ok
+end
 
 """
     inverse_utility(utility, value)
@@ -552,6 +637,20 @@ function _lottery_weights(lottery::AbstractVector, weights)
     return _normalise_weights(collect(weights))
 end
 
+# Shift-invariant certainty equivalent for ExponentialUtility via log-sum-exp, avoiding
+# expm1 saturation on large outcome scales.
+function _exp_certainty_equivalent(u::ExponentialUtility, xs::AbstractVector{<:Real},
+                                   ws::AbstractVector{<:Real})
+    r = u.risk_aversion
+    iszero(r) && return sum(Float64(ws[i]) * Float64(xs[i]) for i in eachindex(xs))
+    α = -r * _direction(u)
+    xstar = α < 0 ? minimum(Float64(xs[i]) for i in eachindex(xs) if ws[i] > 0) :
+            maximum(Float64(xs[i]) for i in eachindex(xs) if ws[i] > 0)
+    total = sum(Float64(ws[i]) * exp(α * (Float64(xs[i]) - xstar))
+                for i in eachindex(xs) if ws[i] > 0)
+    return xstar + log(total) / α
+end
+
 """
     certainty_equivalent(utility, lottery::AbstractVector; weights=nothing)
     certainty_equivalent(outcomes::OutcomeTable, utility) -> Vector{NamedTuple}
@@ -589,6 +688,7 @@ julia> round(certainty_equivalent(u, [0, 40]; weights=[1, 3]); digits=3)   # the
 function certainty_equivalent(u::AbstractUtility, lottery::AbstractVector{<:Real};
                               weights::Union{Nothing,AbstractVector{<:Real}}=nothing)
     w = _lottery_weights(lottery, weights)
+    u isa ExponentialUtility && return _exp_certainty_equivalent(u, lottery, w)
     return inverse_utility(u,
                            sum(w[i] * _lottery_value(u, lottery[i])
                                for i in eachindex(lottery)))
@@ -627,6 +727,8 @@ function certainty_equivalent(t::OutcomeTable, u::AbstractUtility)
     return map(enumerate(t.actions)) do (a, action)
         eu = zero(promote_type(eltype(U), eltype(w)))
         ex = zero(promote_type(eltype(t.values), eltype(w)))
+        xs = u isa ExponentialUtility ? Float64[] : nothing
+        ws = u isa ExponentialUtility ? Float64[] : nothing
         for d in eachindex(t.draws)
             runs = findall(view(ok, a, d, :))
             isempty(runs) &&
@@ -634,8 +736,15 @@ function certainty_equivalent(t::OutcomeTable, u::AbstractUtility)
                                           "usable run"))
             eu += w[d] * _exact_mean(U[a, d, runs])
             ex += w[d] * _exact_mean(t.values[a, d, runs, k])
+            if xs !== nothing
+                per = Float64(w[d]) / length(runs)
+                for r in runs
+                    push!(xs, Float64(t.values[a, d, r, k]))
+                    push!(ws, per)
+                end
+            end
         end
-        ce = inverse_utility(u, eu)
+        ce = xs !== nothing ? _exp_certainty_equivalent(u, xs, ws) : inverse_utility(u, eu)
         return (; action, expected_utility=eu, certainty_equivalent=ce,
                 expected_outcome=ex, risk_premium=_direction(u) * (ex - ce))
     end
@@ -712,36 +821,54 @@ function (u::AdditiveUtility)(o::NamedTuple)
     return sum(k * c(o) for (c, k) in zip(u.utilities, u.weights))
 end
 
+# Elementary symmetric polynomials e_0, e_1, ..., e_n of k.
+function _elementary_symmetric(k::Vector{Float64})
+    n = length(k)
+    e = zeros(n + 1)
+    e[1] = 1.0
+    for ki in k
+        for m in n:-1:1
+            e[m + 1] += ki * e[m]
+        end
+    end
+    return e
+end
+
+# Evaluate g(K) = (Π_i (1 + K k_i) - 1 - K) / K = (Σ k_i - 1) + Σ_{m=2}^n e_m K^{m-1}.
+function _eval_interaction_poly(c0::Float64, e::Vector{Float64}, K::Float64)
+    acc = e[end]
+    for m in (length(e) - 2):-1:2
+        acc = acc * K + e[m + 1]
+    end
+    return c0 + K * acc
+end
+
 # The interaction constant K of the multiplicative form: the root of
 # 1 + K = Π (1 + K k_i) other than zero, in (−1, 0) when Σ k_i > 1 and positive when
-# Σ k_i < 1, by bisection.
+# Σ k_i < 1, by dividing out the trivial root K = 0.
 function _interaction_constant(weights)
     total = sum(weights)
     isone(total) && return zero(total)
     k = Float64.(collect(weights))
-    f(K) = prod(1 .+ K .* k) - 1 - K
+    length(k) == 2 && return (1.0 - k[1] - k[2]) / (k[1] * k[2])
+    e = _elementary_symmetric(k)
+    c0 = sum(k) - 1.0
     if total > 1
-        lo, hi = -1.0, -eps()
-        while f(hi) >= 0                   # move off the root at zero
-            hi *= 2
-            hi > -1 || return -1.0
-        end
+        lo, hi = -1.0, 0.0
+        _eval_interaction_poly(c0, e, lo) >= 0 && return -1.0
     else
-        lo, hi = eps(), 1.0
-        while f(lo) >= 0
-            lo *= 2
-        end
-        while f(hi) < 0
+        lo, hi = 0.0, 1.0
+        while _eval_interaction_poly(c0, e, hi) < 0 && isfinite(hi)
             hi *= 2
         end
     end
     for _ in 1:200
         mid = (lo + hi) / 2
         (mid == lo || mid == hi) && break
-        if (f(mid) < 0) == (total > 1)
-            hi = mid
-        else
+        if _eval_interaction_poly(c0, e, mid) < 0
             lo = mid
+        else
+            hi = mid
         end
     end
     return (lo + hi) / 2

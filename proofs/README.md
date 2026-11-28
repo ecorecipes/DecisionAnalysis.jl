@@ -100,11 +100,11 @@ solver produced it, a witness is checked exactly in Julia and then by the checke
 whose soundness is what is proved. For `deficiency_model` and `evpi_envelope_model` the
 theorems are about the feasible set and objective written in their docstrings.
 
-**Where the Julia text and the theorems differ** (details in `Roadmap.lean`): the docstring
-of `evpi` says noise in the table "biases EVPI upwards", which is false in general
-(`evpi_bias_sign_indefinite`); the `B` of `decision_loss_bound` and of the deficiency bound
-can each be smaller than the table range (largest row range, and largest regret,
-respectively); the constant `B δ` for `deficiency` is correct.
+**Where the Julia text and the theorems differ** (details in `Roadmap.lean`): the `B` of
+`decision_loss_bound` and of the deficiency bound can each be smaller than the table range
+(largest row range, and largest regret, respectively); the constant `B δ` for `deficiency`
+is correct. (`evpi` docstrings already state that the sign of simulation-noise bias on EVPI
+is indefinite, matching `evpi_bias_sign_indefinite`.)
 
 ### By certificate
 
@@ -115,8 +115,8 @@ respectively); the constant `B δ` for `deficiency` is correct.
 | `decision-certificate/1` | `export_decision_certificate` | `Certificate.check` | `Certificate.certificate_spec`: every claim equals the verified definition; `bayes_actions` and `minimax_regret_actions` list exactly the optimal actions; `evpi ≥ 0` and is the minimum expected regret; `0 ≤ evsi ≤ evpi` |
 | `garbling-witness/1` | `export_garbling_witness`: the matrix returned by `is_garbling_of` (programme `garbling_model`, any `optimizer`; verified exactly before writing) | `Certificate.checkGarbling` | `Certificate.RawGarbling.accepts_sound`: `IsGarblingOf e′ e`, hence value(e′) ≤ value(e) for every problem |
 | `e-admissible-witness/1` | `export_eadmissible_witness`: weights and prior from the E-admissibility programme (`eadmissibility_model`, any `optimizer`; verified exactly before writing) | `Certificate.checkEAdmissible` | `Certificate.RawEAdmissible.accepts_sound`: `IsEAdmissible`, hence `IsMaximal` |
-| `not-e-admissible-witness/1` (proposed) | no exporter yet; the dual solution of `eadmissibility_model` | `Certificate.checkNotEAdmissible` | `Certificate.RawNotEAdmissible.accepts_sound`: `¬ IsEAdmissible`. Complete: `not_isEAdmissible_iff_isMixedDominated` |
-| `not-garbling-witness/1` (proposed) | no exporter yet; the Farkas multipliers of `garbling_model` | `Certificate.checkNotGarbling` | `Certificate.RawNotGarbling.accepts_sound`: `¬ IsGarblingOf e′ e`. Complete: `not_isGarblingOf_iff_exists_separating` |
+| `not-e-admissible-witness/1` | `export_not_eadmissible_witness`: mixed dominating action from `mixed_dominance_model` | `Certificate.checkNotEAdmissible` | `Certificate.RawNotEAdmissible.accepts_sound`: `¬ IsEAdmissible`. Complete: `not_isEAdmissible_iff_isMixedDominated` |
+| `not-garbling-witness/1` | `export_not_garbling_witness`: separating decision problem from `separating_payoff_model` | `Certificate.checkNotGarbling` | `Certificate.RawNotGarbling.accepts_sound`: `¬ IsGarblingOf e′ e`. Complete: `not_isGarblingOf_iff_exists_separating` |
 
 Numbers are JSON strings `"n/d"` or `"n"`; indices are JSON integers from zero; payoff rows are
 actions; likelihood rows are signals; `garbling[z′][z] = P(z′ | z)`. The witness schemas are

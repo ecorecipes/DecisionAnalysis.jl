@@ -41,7 +41,8 @@ function policy_regions(base::DecisionProblem, direction::PayoffTable; from::Rea
     α = _feasible_Q(base) * p
     β = _feasible_rows(base, direction.Q) * p
     actions = feasible_actions(base)
-    T = typeof((one(eltype(α)) + one(eltype(β)) * from) / one(eltype(β)))
+    T = _div_type(promote_type(eltype(α), eltype(β), typeof(from), typeof(to)),
+                  promote_type(eltype(β), Int))
     function tol(t)
         return _is_exact(T) ? zero(T) :
                sqrt(eps(float(T))) * max(one(T), maximum(abs, α .+ t .* β))
@@ -51,7 +52,7 @@ function policy_regions(base::DecisionProblem, direction::PayoffTable; from::Rea
     points = T[from, to]
     for i in eachindex(α), j in (i + 1):length(α)
         β[i] == β[j] && continue
-        t = (α[j] - α[i]) / (β[i] - β[j])
+        t = _div(α[j] - α[i], β[i] - β[j])
         from < t < to && push!(points, t)
     end
     sort!(unique!(points))
@@ -60,7 +61,7 @@ function policy_regions(base::DecisionProblem, direction::PayoffTable; from::Rea
         lo, hi = points[k], points[k + 1]
         # Lines optimal at the midpoint are optimal on the whole open interval,
         # because no two lines cross inside it.
-        best = actions[best_at((lo + hi) / 2)]
+        best = actions[best_at(_div(lo + hi, 2))]
         if !isempty(regions) && regions[end].actions == best
             regions[end] = (; from=regions[end].from, to=hi, actions=best)
         else
@@ -113,7 +114,7 @@ function weight_sweep(build, weights; rule::AbstractRule=MaxExpectedUtility())
             throw(ArgumentError("weight_sweep needs a rule that scores every action"))
         order = sortperm(result.scores; rev=result.sense === :max, alg=MergeSort)
         return (; weight=w, first_choice=first_choice(result), chosen=result.chosen,
-                scores=result.scores, ranking=result.actions[order])
+                scores=result.scores, ranking=result.actions[order], sense=result.sense)
     end
 end
 
@@ -125,8 +126,8 @@ end
 
 The first form takes the result of [`weight_sweep`](@ref) and compares each weight
 with the next: one `(; from, to, actions, top_changed)` per pair of actions that
-swap between the two weights, where `top_changed` says whether the first choice
-itself changed.
+strictly swap between the two weights (ties aside), where `top_changed` says whether
+the first choice itself changed.
 
 The second form compares two problems with the same feasible actions (two
 utilities, two beliefs, a count and a fraction): one `(; actions, top_changed)` per
@@ -143,12 +144,24 @@ function rank_reversals(sweep::AbstractVector{<:NamedTuple})
         all(a -> haskey(position, a), x.ranking) &&
         length(x.ranking) == length(y.ranking) ||
             throw(ArgumentError("the feasible actions change along the sweep"))
+        sense_x = get(x, :sense, :max)
+        sense_y = get(y, :sense, :max)
+        sx = sort(collect(x.scores); rev=sense_x === :max)
+        sy = sort(collect(y.scores); rev=sense_y === :max)
+        tol_x = _tolerance(sx, 0, _default_rtol(eltype(sx)))
+        tol_y = _tolerance(sy, 0, _default_rtol(eltype(sy)))
         for i in eachindex(x.ranking), j in (i + 1):length(x.ranking)
             a, b = x.ranking[i], x.ranking[j]
-            position[a] > position[b] &&
+            pi, pj = position[a], position[b]
+            pi > pj || continue
+            # Require a strict gap in both rows so ties do not register as reversals.
+            gap_x = sense_x === :max ? sx[i] - sx[j] : sx[j] - sx[i]
+            gap_y = sense_y === :max ? sy[pj] - sy[pi] : sy[pi] - sy[pj]
+            if gap_x > tol_x && gap_y > tol_y
                 push!(out,
                       (; from=x.weight, to=y.weight, actions=(a, b),
                        top_changed=x.first_choice != y.first_choice))
+            end
         end
     end
     return out
@@ -161,9 +174,14 @@ function rank_reversals(a::DecisionProblem, b::DecisionProblem;
         throw(LabelMismatchError("feasible actions of the two problems", actions,
                                  feasible_actions(b)))
     sa, sb = aggregate(aggregator, a), aggregate(aggregator, b)
-    top_changed = actions[argmax(sa)] != actions[argmax(sb)]
+    ta = _tolerance(sa, 0, _default_rtol(eltype(sa)))
+    tb = _tolerance(sb, 0, _default_rtol(eltype(sb)))
+    top_a = findfirst(>=(maximum(sa) - ta), sa)
+    top_b = findfirst(>=(maximum(sb) - tb), sb)
+    top_changed = actions[top_a] != actions[top_b]
     return [(; actions=(actions[i], actions[j]), top_changed)
             for i in eachindex(actions)
             for j in (i + 1):length(actions)
-            if (sa[i] > sa[j] && sb[i] < sb[j]) || (sa[i] < sa[j] && sb[i] > sb[j])]
+            if (sa[i] - sa[j] > ta && sb[j] - sb[i] > tb) ||
+        (sa[j] - sa[i] > ta && sb[i] - sb[j] > tb)]
 end

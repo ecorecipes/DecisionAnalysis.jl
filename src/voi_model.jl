@@ -67,9 +67,9 @@ function evppi_nested(payoffs, sample_focal, sample_rest; outer::Integer, inner:
         φ isa NamedTuple ||
             throw(ArgumentError("`sample_focal(rng)` must return a named tuple, got " *
                                 "$(typeof(φ))"))
-        total = nothing
-        products = nothing
-        for _ in 1:inner
+        m = nothing
+        M2 = nothing
+        for k in 1:inner
             rest = sample_rest(rng, φ)
             rest isa NamedTuple ||
                 throw(ArgumentError("`sample_rest(rng, φ)` must return a named tuple, " *
@@ -79,16 +79,19 @@ function evppi_nested(payoffs, sample_focal, sample_rest; outer::Integer, inner:
             length(y) == size(means, 1) ||
                 throw(ArgumentError("`payoffs` returned $(length(y)) payoffs in one " *
                                     "call and $(size(means, 1)) in another"))
-            total === nothing &&
-                ((total, products) = (zero(y), zeros(length(y), length(y))))
-            total .+= y
-            products .+= y .* y'
+            if m === nothing
+                m = zero(y)
+                M2 = zeros(length(y), length(y))
+            end
+            delta = y .- m
+            m .+= delta ./ k
+            delta2 = y .- m
+            M2 .+= delta .* delta2'
         end
-        m = total ./ inner
         means[:, r] .= m
         # The inner means of the actions share their inner sample, so their noise is
         # correlated: the inflation of the maximum is simulated with their covariance.
-        covariance = (products ./ inner .- m .* m') ./ (inner - 1)
+        covariance = M2 ./ (inner * (inner - 1))
         inflation += _maximum_inflation(m, covariance, rng)
     end
     w = fill(1 / outer, outer)
@@ -227,10 +230,25 @@ end
 function _matched_estimate(Gc::AbstractMatrix, w::AbstractVector, target::AbstractMatrix,
                            fitted::AbstractMatrix)
     F = eigen(Symmetric((target .+ target') ./ 2))
-    removed = F.vectors * (max.(F.values, 0.0) .* F.vectors')
-    ratio = tr(removed) / tr(fitted)
-    capped = ratio > 1
-    capped && (removed = removed ./ ratio)
+    removed_pos = F.vectors * (max.(F.values, 0.0) .* F.vectors')
+    ratio = tr(removed_pos) / tr(fitted)
+    Ff = eigen(Symmetric((fitted .+ fitted') ./ 2))
+    keep = findall(>(1e-12 * max(1.0, maximum(Ff.values))), Ff.values)
+    if isempty(keep)
+        removed = zero(removed_pos)
+        capped = tr(removed_pos) > 0
+    else
+        V = Ff.vectors[:, keep]
+        root = sqrt.(Ff.values[keep])
+        inv_root = 1.0 ./ root
+        W = (inv_root .* V') * removed_pos * (V .* inv_root')
+        Fw = eigen(Symmetric((W .+ W') ./ 2))
+        capped = any(>(1.0), Fw.values)
+        vals = clamp.(Fw.values, 0.0, 1.0)
+        W_cap = Fw.vectors * (vals .* Fw.vectors')
+        removed = (V .* root') * W_cap * (root .* V')
+        removed = (removed .+ removed') ./ 2
+    end
     value, best = _matched_value(Gc, w, removed, fitted)
     return value, best, tr(removed), capped, ratio
 end
@@ -256,7 +274,9 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
         return VOIEstimate(:evsi, :MomentMatching, 0.0, 0.0, bias,
                            merge(base,
                                  (; variance_removed=0.0, evppi_variance=0.0,
-                                  capped=false, model_evaluations=0)))
+                                  capped=false, variance_ratio=0.0, model_evaluations=0,
+                                  draws_standard_error=0.0, nested_standard_error=0.0),
+                                 info))
     end
     # Nested data sets at draws spread over the most variable fitted contrast.
     spread = [fitted[k, k] for k in axes(fitted, 1)]
@@ -305,7 +325,8 @@ function evsi(problem::DecisionProblem, study::MomentMatching; seed::Integer=1)
         names = Tuple(study.focal)
         for s in 1:S
             other = rows[pick()]
-            prior_focal = NamedTuple{names}(Tuple(getproperty(rows[pick()], name)
+            prior_row = rows[pick()]
+            prior_focal = NamedTuple{names}(Tuple(getproperty(prior_row, name)
                                                   for name in names))
             posterior_focal = NamedTuple{names}(Tuple(post[name][s] for name in names))
             before[:, s] .= contrasts(merge(other, prior_focal))

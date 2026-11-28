@@ -273,7 +273,8 @@ const _AUTO_KNOTS = 4
 
 Regression by a generalised additive model with penalised smooths, fitted by GAM.jl
 (`github.com/ecorecipes/GAM.jl`): one smooth `s(x, k = k)` per numeric column, or a
-tensor-product smooth of all of them with `tensor = true`; non-numeric columns enter
+tensor-product smooth of all of them with `tensor = true` (each marginal basis capped
+at `min(k, 5)` so the product basis stays tractable); non-numeric columns enter
 as factors. This is the regression that the R package `voi` uses by default for up to
 four parameters (Strong, Oakley and Brennan 2014).
 
@@ -400,24 +401,45 @@ function _act_now_bias(Q::AbstractMatrix, w::AbstractVector, rng::AbstractRNG)
 end
 
 # Upward bias of Σ_i w_i max_a Q̂[a, i] from normal noise in the cells, with a common
-# correlation ρ between the actions of a cell. The shared part of the noise shifts
-# every action alike and leaves the maximum's excess unchanged, so only the part
-# scaled by √(1 − ρ) is simulated.
+# correlation ρ between the actions of a cell (handling unequal standard errors across
+# actions exactly).
 function _cell_noise_bias(Q::AbstractMatrix, se::AbstractMatrix, w::AbstractVector,
                           rng::AbstractRNG, ρ::Real=0)
-    (size(Q, 1) == 1 || all(iszero, se) || ρ >= 1) && return 0.0
-    se = sqrt(1 - ρ) .* se
+    m = size(Q, 1)
+    (m == 1 || all(iszero, se)) && return 0.0
+    ρf = Float64(ρ)
     reps = clamp(200_000 ÷ size(Q, 2), 20, 400)
-    z = zeros(size(Q, 1))
+    z = zeros(m)
+    neg_root = if ρf < 0
+        C = fill(ρf, m, m)
+        for j in 1:m
+            C[j, j] = 1.0
+        end
+        F = eigen(Symmetric(C))
+        F.vectors * Diagonal(sqrt.(max.(F.values, 0.0)))
+    else
+        nothing
+    end
+    a_ρ = ρf >= 0 ? sqrt(ρf) : 0.0
+    b_ρ = ρf >= 0 ? sqrt(max(1.0 - ρf, 0.0)) : 0.0
     total = 0.0
     for i in axes(Q, 2)
         q = Float64.(view(Q, :, i))
         s = Float64.(view(se, :, i))
         all(iszero, s) && continue
+        ρf == 1.0 && allequal(s) && continue
         acc = 0.0
-        for _ in 1:reps
-            randn!(rng, z)
-            acc += maximum(q .+ s .* z)
+        if neg_root !== nothing
+            for _ in 1:reps
+                randn!(rng, z)
+                acc += maximum(q .+ s .* (neg_root * z))
+            end
+        else
+            for _ in 1:reps
+                u = randn(rng)
+                randn!(rng, z)
+                acc += maximum(q .+ s .* (a_ρ * u .+ b_ρ .* z))
+            end
         end
         total += Float64(w[i]) * (acc / reps - maximum(q))
     end
@@ -704,23 +726,35 @@ end
 # it, tells nothing more than they do, but a regression given it has more to fit and
 # overfits a little more. At least one column is always kept. (SAVI screens its
 # parameters in the same way.)
-function _screen_columns(columns::NamedTuple)
+function _screen_columns(columns::NamedTuple,
+                         w::Union{Nothing,AbstractVector}=nothing)
     kept = Symbol[]
     dropped = Symbol[]
     basis = Vector{Float64}[]
+    n = isempty(columns) ? 0 : length(first(columns))
+    wf = if w === nothing
+        fill(1.0 / max(n, 1), n)
+    else
+        tmp = Float64.(w)
+        s = sum(tmp)
+        s > 0 ? tmp ./ s : fill(1.0 / max(n, 1), n)
+    end
+    root = sqrt.(wf)
     for (name, column) in pairs(columns)
         if !_is_numeric(column)
             push!(kept, name)
             continue
         end
-        v = Float64.(column) .- mean(column)
+        x = Float64.(column)
+        centre = dot(wf, x)
+        v = root .* (x .- centre)
         scale = sqrt(dot(v, v))
         if allequal(column) || iszero(scale)
             push!(dropped, name)
             continue
         end
         v ./= scale
-        for b in basis
+        for _ in 1:2, b in basis
             v .-= dot(b, v) .* b
         end
         rest = sqrt(dot(v, v))
@@ -731,28 +765,29 @@ function _screen_columns(columns::NamedTuple)
             push!(kept, name)
         end
     end
-    isempty(kept) && push!(kept, popfirst!(dropped))
+    isempty(kept) && !isempty(dropped) && push!(kept, popfirst!(dropped))
     return NamedTuple{Tuple(kept)}(Tuple(columns[name] for name in kept)), dropped
 end
 const _REDUNDANT_TOL = 1e-8
 
 # The columns `method` is fitted on and the names left out: screened for a regression,
 # as given for a method that fits no smooth function of them.
-function _fit_columns(method, columns::NamedTuple)
-    return method isa Union{AbstractRegression,_Shrunk} ? _screen_columns(columns) :
+function _fit_columns(method, columns::NamedTuple,
+                      w::Union{Nothing,AbstractVector}=nothing)
+    return method isa Union{AbstractRegression,_Shrunk} ? _screen_columns(columns, w) :
            (columns, Symbol[])
 end
 
 # `_fit` on the screened columns: what every caller outside `_estimate` uses, so that a
 # constant or duplicated focal parameter is left out wherever a regression is fitted.
 function _fit_screened(method, columns::NamedTuple, Q, w)
-    return _fit(method, first(_fit_columns(method, columns)), Q, w)
+    return _fit(method, first(_fit_columns(method, columns, w)), Q, w)
 end
 
 function _estimate(quantity::Symbol, method::AbstractVOIMethod, columns::NamedTuple,
                    Q::AbstractMatrix, w::AbstractVector; bootstrap::Integer, seed::Integer,
                    cells=nothing, extra=(;))
-    used, redundant = _fit_columns(method, columns)
+    used, redundant = _fit_columns(method, columns, w)
     G, info = _fit(method, used, Q, w)
     value, v0, a = _voi_from_fit(G, Q, w)
     # A constant fit is worth nothing; the sum above gives zero only to rounding.
@@ -833,10 +868,12 @@ parameter and simulation variance.
 """
 function evpi(problem::DecisionProblem, method::SampleAverage; bootstrap::Integer=0,
               seed::Integer=1, noise_correlation::Real=0)
-    -1 <= noise_correlation <= 1 ||
-        throw(ArgumentError("noise_correlation must lie in [-1, 1], got " *
-                            "$noise_correlation"))
     Q, w = _sample_problem(problem, :evpi)
+    m = size(Q, 1)
+    min_ρ = m <= 1 ? -1.0 : -1.0 / (m - 1)
+    (isfinite(noise_correlation) && min_ρ <= noise_correlation <= 1) ||
+        throw(ArgumentError("noise_correlation must lie in [$min_ρ, 1] for $m actions, " *
+                            "got $noise_correlation"))
     se = _feasible_se(problem)
     cells = se === nothing ? 0.0 :
             _cell_noise_bias(Q, se, w, Xoshiro(seed + 1), noise_correlation)
@@ -1268,9 +1305,10 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
     # influence[j]: the first-order effect of draw j on the estimate, summed over the
     # data sets, from the linearisation of each self-normalised posterior mean.
     influence = zeros(n)
+    m = zeros(size(Qf, 1))
     for k in 1:K
         _posterior!(posterior, L, k, wf)
-        m = Qf * posterior
+        mul!(m, Qf, posterior)
         b = argmax(m)
         informed[k] = m[b]
         gains[k] = m[b] - m[a]
@@ -1293,17 +1331,102 @@ function evsi(problem::DecisionProblem, study::ImportanceSampling; seed::Integer
                        bias, details)
 end
 
+function _evsi_gaussian_from_fit(method::AbstractVOIMethod, G_base::AbstractMatrix,
+                                 base_info::NamedTuple, redundant::Vector{Symbol},
+                                 Q::AbstractMatrix, Qf::Matrix{Float64},
+                                 w::AbstractVector, wf::Vector{Float64},
+                                 centre::Vector{Float64}, dev::Matrix{Float64},
+                                 R::Matrix{Float64}, v0, a::Int, sample_evpi,
+                                 ess_w::Float64, act_bias::Float64, focal::Vector{Symbol},
+                                 n0::Float64, n_val::Real, bootstrap::Int,
+                                 boot_fits)
+    factor = sqrt(Float64(n_val) / (n0 + Float64(n_val)))
+    G = centre .+ factor .* dev
+    value, _, _ = _voi_from_fit(G, Q, w)
+    (get(base_info, :degree, 1) == 0 || iszero(factor)) && (value = zero(value))
+    gains = if iszero(factor)
+        zeros(size(G, 2))
+    else
+        [begin
+             b = argmax(view(G, :, i))
+             G[b, i] - G[a, i] + factor * (R[b, i] - R[a, i])
+         end
+         for i in axes(G, 2)]
+    end
+    se = if boot_fits === nothing
+        _weighted_mean_se(gains, w)
+    else
+        vals = [begin
+                    Gsb = cb .+ factor .* db
+                    first(_voi_from_fit(Gsb, Qb, wb))
+                end
+                for (cb, db, Qb, wb) in boot_fits]
+        mu = sum(vals) / length(vals)
+        sqrt(sum(v -> (v - mu)^2, vals) / (length(vals) - 1))
+    end
+    above = _above_sample_evpi(value, sample_evpi, se, v0)
+    above &&
+        @warn "The evsi estimate by GaussianApproximation, $(_cell(value)), is " *
+              "above the EVPI of the same sample, $(_cell(sample_evpi)), by more than " *
+              "twice its standard error. No information is worth more than perfect " *
+              "information, so the fitted values are not conditional means here (too " *
+              "few draws for the fit, or a misspecified regression) and the estimate " *
+              "should not be used. The standard error does not show this. Use fewer " *
+              "knots or parameters, StrongOakley() or Grouping(; bins), or more draws."
+    info = merge(base_info, (; shrinkage=factor, fit=_method_name(method)))
+    details = merge((; act_now_value=v0, act_now_index=a, draws=length(w),
+                     effective_sample_size=ess_w, bootstrap, sample_evpi,
+                     policy_gain=sum(wf[i] * gains[i] for i in eachindex(gains)),
+                     above_sample_evpi=above, redundant_parameters=redundant), info,
+                    (; focal, n0, n=n_val))
+    return VOIEstimate(:evsi, :GaussianApproximation, value, se,
+                       (; act_now=act_bias, cells=nothing), details)
+end
+
 function evsi(problem::DecisionProblem, study::GaussianApproximation; bootstrap::Integer=0,
               seed::Integer=1)
     Q, w = _sample_problem(problem, :evsi)
     columns = _focal_columns(problem.belief, study.focal)
     method = _method_for(study.regression, columns)
-    function one_size(n)
-        return _estimate(:evsi, _Shrunk(method, sqrt(n / (study.n0 + n))), columns, Q,
-                         w; bootstrap, seed,
-                         extra=(; focal=study.focal, n0=study.n0, n=n))
+    used, redundant = _fit_columns(method, columns, w)
+    # Fit the regression once, then rescale fitted deviations for every sample size in study.n.
+    G_base, base_info = _fit(method, used, Q, w)
+    wf = Float64.(w)
+    Qf = Float64.(Q)
+    v0, a = _act_now(Q, w)
+    centre = G_base * wf
+    dev = G_base .- centre
+    R = Qf .- G_base
+    sample_evpi = dot(w, [maximum(view(Q, :, i)) for i in axes(Q, 2)]) - v0
+    ess_w = Float64(effective_sample_size(w))
+    rng = Xoshiro(seed)
+    act_bias = _act_now_bias(Q, w, rng)
+    B = Int(bootstrap)
+    boot_fits = if B > 0
+        B >= 2 || throw(ArgumentError("bootstrap needs at least 2 resamples, got $B"))
+        m = length(w)
+        [begin
+             idx = rand(rng, 1:m, m)
+             wb = Float64.(w[idx])
+             wb ./= sum(wb)
+             Qb = Q[:, idx]
+             Gb, _ = _fit(method, map(c -> c[idx], used), Qb, wb)
+             cb = Gb * wb
+             (cb, Gb .- cb, Qb, wb)
+         end
+         for _ in 1:B]
+    else
+        nothing
     end
-    return study.n isa Real ? one_size(study.n) : [one_size(n) for n in study.n]
+    if study.n isa Real
+        return _evsi_gaussian_from_fit(method, G_base, base_info, redundant, Q, Qf, w, wf,
+                                       centre, dev, R, v0, a, sample_evpi, ess_w, act_bias,
+                                       study.focal, study.n0, study.n, B, boot_fits)
+    end
+    return [_evsi_gaussian_from_fit(method, G_base, base_info, redundant, Q, Qf, w, wf,
+                                    centre, dev, R, v0, a, sample_evpi, ess_w, act_bias,
+                                    study.focal, study.n0, n_val, B, boot_fits)
+            for n_val in study.n]
 end
 
 # A fit shrunk towards its weighted mean: the preposterior conditional means.
@@ -1390,15 +1513,17 @@ julia> [(r.action, r.probability) for r in probability_optimal(problem)]
 """
 function probability_optimal(problem::DecisionProblem)
     belief = problem.belief
-    belief isa Union{FiniteBelief,SampleBelief} ||
+    belief isa Union{PointBelief,FiniteBelief,SampleBelief} ||
         throw(BeliefFormError(:probability_optimal, nameof(typeof(belief)),
                               "the probability that an action is best needs a single " *
                               "prior over the states"))
     Q = _feasible_Q(problem)
-    w = belief isa SampleBelief ? belief.weights : belief.probabilities
+    w = _prior(problem, :probability_optimal)
+    rtol = _default_rtol(eltype(Q))
     best = [maximum(view(Q, :, i)) for i in axes(Q, 2)]
+    tols = [_tolerance(view(Q, :, i), 0, rtol) for i in axes(Q, 2)]
     return map(enumerate(feasible_actions(problem))) do (a, action)
-        hit = [Q[a, i] == best[i] for i in axes(Q, 2)]
+        hit = [Q[a, i] >= best[i] - tols[i] for i in axes(Q, 2)]
         return (; action, probability=sum(w[i] * hit[i] for i in eachindex(hit)),
                 standard_error=belief isa SampleBelief ? _weighted_mean_se(hit, w) :
                                nothing)
@@ -1510,6 +1635,10 @@ function conditional_problem(problem::DecisionProblem, focal)
     mass = weight[order]
     labels = [Symbol(join((string(column[i]) for column in columns), "_"))
               for i in representative]
+    if !allunique(labels)
+        labels = [Symbol(join((string(k, "=", column[i]) for (k, column) in pairs(columns)),
+                              "|")) for i in representative]
+    end
     payoff = PayoffTable(problem.payoff.actions, labels, G[:, representative])
     return DecisionProblem(payoff, FiniteBelief(labels, mass), problem.feasible,
                            problem.baseline)

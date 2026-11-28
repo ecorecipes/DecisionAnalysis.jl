@@ -369,37 +369,51 @@ function factor_effects(design::ScenarioDesign, values)
     n = length(y)
     grand = sum(y) / n
     total = sum(abs2, y .- grand)
-    function level_means(k)
-        return [(members=findall(c -> c[k] == l, design.cells);
-                 isempty(members) ? NaN : sum(y[members]) / length(members))
-                for l in eachindex(design.axes[k].levels)]
-    end
-    function explained(k)
-        return sum(count(c -> c[k] == l, design.cells) * (m - grand)^2
-                   for (l, m) in enumerate(level_means(k)) if !isnan(m))
-    end
     share(x) = iszero(total) ? 0.0 : x / total
-    main = map(enumerate(design.axes)) do (k, axis)
-        means = level_means(k)
-        effect = length(means) == 2 ? means[2] - means[1] :
+    naxes = length(design.axes)
+    exp_main = Vector{Float64}(undef, naxes)
+    main = Vector{NamedTuple}(undef, naxes)
+    for k in 1:naxes
+        axis = design.axes[k]
+        nl = length(axis.levels)
+        counts = zeros(Int, nl)
+        sums = zeros(Float64, nl)
+        @inbounds for idx in 1:n
+            l = design.cells[idx][k]
+            counts[l] += 1
+            sums[l] += y[idx]
+        end
+        means = [counts[l] == 0 ? NaN : sums[l] / counts[l] for l in 1:nl]
+        ss = 0.0
+        @inbounds for l in 1:nl
+            counts[l] > 0 && (ss += counts[l] * (means[l] - grand)^2)
+        end
+        exp_main[k] = ss
+        effect = nl == 2 ? means[2] - means[1] :
                  maximum(filter(!isnan, means)) - minimum(filter(!isnan, means))
-        return (; axis=axis.name, kind=axis.kind, levels=axis.levels, means, effect,
-                share=share(explained(k)))
+        main[k] = (; axis=axis.name, kind=axis.kind, levels=axis.levels, means, effect,
+                   share=share(ss))
     end
     full = n == prod(length(a.levels) for a in design.axes)
     interactions = NamedTuple[]
     if full
-        for i in eachindex(design.axes), j in (i + 1):length(design.axes)
+        for i in 1:naxes, j in (i + 1):naxes
+            ni, nj = length(design.axes[i].levels), length(design.axes[j].levels)
+            counts = zeros(Int, ni, nj)
+            sums = zeros(Float64, ni, nj)
+            @inbounds for idx in 1:n
+                c = design.cells[idx]
+                counts[c[i], c[j]] += 1
+                sums[c[i], c[j]] += y[idx]
+            end
             joint = 0.0
-            for a in eachindex(design.axes[i].levels), b in
-                                                       eachindex(design.axes[j].levels)
-
-                members = findall(c -> c[i] == a && c[j] == b, design.cells)
-                joint += length(members) * (sum(y[members]) / length(members) - grand)^2
+            @inbounds for b in 1:nj, a in 1:ni
+                cnt = counts[a, b]
+                cnt > 0 && (joint += cnt * (sums[a, b] / cnt - grand)^2)
             end
             push!(interactions,
                   (; axes=(design.axes[i].name, design.axes[j].name),
-                   share=share(max(joint - explained(i) - explained(j), 0.0))))
+                   share=share(max(joint - exp_main[i] - exp_main[j], 0.0))))
         end
     end
     return (; grand_mean=grand, total, main, interactions)
@@ -442,6 +456,15 @@ function scenario_forecast(design::ScenarioDesign, projections;
     replicated || all(v -> v isa Real, raw) ||
         throw(ArgumentError("give every scenario a number, or every scenario a vector " *
                             "of replicates"))
+    if replicated && any(isempty, raw)
+        throw(ArgumentError("every scenario must have at least one replicate"))
+    end
+    if replicated && any(v -> any(!isfinite, v), raw)
+        throw(ArgumentError("every replicate projection must be finite"))
+    end
+    if !replicated && any(!isfinite, raw)
+        throw(ArgumentError("every scenario projection must be finite"))
+    end
     means = replicated ? [sum(v) / length(v) for v in raw] : Float64.(raw)
     within_each = replicated ?
                   [sum(abs2, v .- m) / length(v) for (v, m) in zip(raw, means)] :
@@ -484,14 +507,17 @@ uncertainty axes. With probabilities on the states the size of what is at stake 
 [`evpi`](@ref), which is positive exactly when the reversal has positive probability.
 """
 function decision_robustness(problem::DecisionProblem)
-    Q = _feasible_Q(problem)
-    actions = feasible_actions(problem)
-    states = problem.payoff.states
+    v = _view(problem)
+    Q = v.Q
+    actions, states = _regret_labels(problem)
+    rtol = _default_rtol(eltype(Q))
     tops = [maximum(view(Q, :, j)) for j in axes(Q, 2)]
-    best = [states[j] => actions[findall(==(tops[j]), view(Q, :, j))] for j in axes(Q, 2)]
+    tols = [_tolerance(view(Q, :, j), 0, rtol) for j in axes(Q, 2)]
+    best = [states[j] => actions[findall(>=(tops[j] - tols[j]), view(Q, :, j))]
+            for j in axes(Q, 2)]
     robust = [a
               for (k, a) in enumerate(actions)
-              if all(Q[k, j] == tops[j] for j in axes(Q, 2))]
+              if all(Q[k, j] >= tops[j] - tols[j] for j in axes(Q, 2))]
     losses = [a => maximum(tops[j] - Q[k, j] for j in axes(Q, 2))
               for (k, a) in enumerate(actions)]
     return (; best, robust, reversal=isempty(robust), losses)

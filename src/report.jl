@@ -375,20 +375,31 @@ function _monte_carlo(problem::DecisionProblem, parameters, regression, seed::In
             push!(notes,
                   "The draws carry no parameters, so the all-parameter regression " *
                   "estimate of EVPI, which smooths over simulation noise, is not shown.")
-        elseif regression isa SplineRegression &&
-               10 * size(_design(regression, belief.draws, belief.weights), 2) >
-               length(belief)
-            push!(notes,
-                  "There are too few draws for the all-parameter regression estimate " *
-                  "of EVPI with the default regression (fewer than ten draws per " *
-                  "coefficient), so it is not shown; pass a smaller `regression`.")
         else
-            regressed = evpi(problem, regression; seed)
-            push!(notes,
-                  "The all-parameter regression estimate of EVPI replaces the noisy " *
-                  "cells by fitted conditional means, so simulation noise is smoothed " *
-                  "and not maximised over; it is the estimate to prefer when cells " *
-                  "are noisy.")
+            used, _ = _screen_columns(belief.draws, belief.weights)
+            chosen_reg = if regression isa SplineRegression && regression.automatic
+                _method_for(nothing, used)
+            else
+                regression
+            end
+            n_pos = count(>(0), belief.weights)
+            too_small = (chosen_reg isa GaussianProcessRegression &&
+                         n_pos <= length(used) + 3) ||
+                        (chosen_reg isa SplineRegression && !chosen_reg.automatic &&
+                         size(_design(chosen_reg, used, belief.weights), 2) >= n_pos)
+            if too_small
+                push!(notes,
+                      "There are too few draws of positive weight ($n_pos) for the " *
+                      "all-parameter regression estimate of EVPI on $(length(used)) " *
+                      "parameters, so it is not shown; pass a simpler `regression`.")
+            else
+                regressed = evpi(problem, chosen_reg; seed)
+                push!(notes,
+                      "The all-parameter regression estimate of EVPI replaces the noisy " *
+                      "cells by fitted conditional means, so simulation noise is smoothed " *
+                      "and not maximised over; it is the estimate to prefer when cells " *
+                      "are noisy.")
+            end
         end
     end
     named = parameters === nothing ? [] :

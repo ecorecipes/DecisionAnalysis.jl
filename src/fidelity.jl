@@ -19,9 +19,10 @@ julia> total_variation([1 // 2, 1 // 2], [1 // 4, 3 // 4])
 ```
 """
 function total_variation(p::AbstractVector{<:Real}, q::AbstractVector{<:Real})
+    isempty(p) && throw(ArgumentError("the vectors cannot be empty"))
     length(p) == length(q) ||
         throw(ArgumentError("the vectors have lengths $(length(p)) and $(length(q))"))
-    return sum(abs(a - b) for (a, b) in zip(p, q)) / 2
+    return _div(sum(abs(a - b) for (a, b) in zip(p, q)), 2)
 end
 
 function total_variation(p::FiniteBelief, q::FiniteBelief)

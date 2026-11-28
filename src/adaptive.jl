@@ -138,14 +138,27 @@ function _look_ahead(c, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
     return value, choice
 end
 
+function _normalise_belief(w::Vector{T}) where {T}
+    total = sum(w)
+    iszero(total) && return (zero(T), w)
+    if T <: Integer
+        return (total, w)
+    elseif T <: Rational
+        return (total, T[v // total for v in w])
+    end
+    return (total, w ./ total)
+end
+
 function _best(c::_ByBeliefs{T}, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
     n == 0 && return (zero(T), 0)
-    key = (Int(n), _weights_key(w))
+    total, b = _normalise_belief(w)
+    iszero(total) && return (zero(T), 1)
+    key = (Int(n), _weights_key(b))
     found = get(c.memo, key, nothing)
-    found === nothing || return found
-    result = _look_ahead(c, m, n, w)
+    found === nothing || return (total * found[1], found[2])
+    result = _look_ahead(c, m, n, b)
     c.memo[key] = result
-    return result
+    return (total * result[1], result[2])
 end
 function _best(c::_BySets{T}, m::_Sequential{T}, n::Integer, w::Vector{T}) where {T}
     return n == 0 ? (zero(T), 0) : _look_ahead(c, m, n, w)
@@ -273,8 +286,9 @@ function _policy_node(c, m::_Sequential{T}, signals, actions::Vector{Symbol},
                                                 next, levels - 1))
         end
     end
-    return (; period=horizon - n + 1, probability=total, belief=w ./ total,
-            action=actions[a], value=value / total, branches)
+    return (; period=horizon - n + 1, probability=total,
+            belief=[_div(v, total) for v in w],
+            action=actions[a], value=_div(value, total), branches)
 end
 
 # Value functions as sets of vectors
@@ -307,11 +321,13 @@ end
 # `G[i, 1] + (G[i, 2] − G[i, 1]) x` over `0 ≤ x ≤ 1`, found as a convex hull. A row
 # that reaches the envelope at a single point is not needed. Among equal rows the
 # first is kept.
-function _envelope(G::AbstractMatrix{T}) where {T}
+# Upper envelope indices of two-state lines `G[i, 1] + (G[i, 2] − G[i, 1]) x` over [0, 1],
+# returned in strictly increasing slope order.
+function _envelope_ordered(G::AbstractMatrix{T}) where {T}
     m = size(G, 1)
     m <= 1 && return collect(1:m)
     slope(i) = G[i, 2] - G[i, 1]
-    crossing(i, j) = (G[i, 1] - G[j, 1]) / (slope(j) - slope(i))
+    crossing(i, j) = _div(G[i, 1] - G[j, 1], slope(j) - slope(i))
     order = sort(1:m; by=i -> (slope(i), -G[i, 1], i))
     hull = Int[]
     for i in order
@@ -331,7 +347,45 @@ function _envelope(G::AbstractMatrix{T}) where {T}
         to = k == length(hull) ? one(T) : min(one(T), crossing(hull[k], hull[k + 1]))
         from < to && push!(keep, hull[k])
     end
-    return sort!(keep)
+    return keep
+end
+
+_envelope(G::AbstractMatrix) = sort!(_envelope_ordered(G))
+
+# Pointwise sum of two 2D upper envelopes A and B, each already sorted by strictly
+# increasing slope and strictly active on [0, 1]: two-pointer merge over breakpoints in
+# O(M + K) time (producing at most M + K - 1 active lines in increasing slope order).
+function _sum_envelopes(A::Matrix{T}, B::Matrix{T}) where {T}
+    m, k = size(A, 1), size(B, 1)
+    if m == 1 && k == 1
+        return A .+ B
+    end
+    xs = [_div(A[i, 1] - A[i + 1, 1],
+               (A[i + 1, 2] - A[i + 1, 1]) - (A[i, 2] - A[i, 1])) for i in 1:(m - 1)]
+    ys = [_div(B[j, 1] - B[j + 1, 1],
+               (B[j + 1, 2] - B[j + 1, 1]) - (B[j, 2] - B[j, 1])) for j in 1:(k - 1)]
+    out = Matrix{T}(undef, m + k - 1, 2)
+    idx = 0
+    i, j = 1, 1
+    while true
+        idx += 1
+        out[idx, 1] = A[i, 1] + B[j, 1]
+        out[idx, 2] = A[i, 2] + B[j, 2]
+        (i == m && j == k) && break
+        if i == m
+            j += 1
+        elseif j == k
+            i += 1
+        elseif xs[i] < ys[j]
+            i += 1
+        elseif ys[j] < xs[i]
+            j += 1
+        else
+            i += 1
+            j += 1
+        end
+    end
+    return idx == size(out, 1) ? out : out[1:idx, :]
 end
 
 # One step back, exactly: the vectors for one more period from the set `G` for the
@@ -343,13 +397,8 @@ function _backup_vectors(G::AbstractMatrix{T}, Q::AbstractMatrix{T}, kernels,
         sums = Matrix{T}(reshape(Q[a, :], 1, :))
         for K in kernels[a]
             later = discount .* (G * K)
-            later = later[_envelope(later), :]
-            crossed = Matrix{T}(undef, size(sums, 1) * size(later, 1), size(G, 2))
-            for i in axes(sums, 1), j in axes(later, 1)
-                crossed[(i - 1) * size(later, 1) + j, :] = view(sums, i, :) .+
-                                                           view(later, j, :)
-            end
-            sums = crossed[_envelope(crossed), :]
+            later_env = later[_envelope_ordered(later), :]
+            sums = _sum_envelopes(sums, later_env)
         end
         push!(blocks, sums)
         append!(tags, fill(a, size(sums, 1)))
@@ -424,18 +473,31 @@ function _upper_at(u::_UpperBound{T}, n::Integer, w::Vector{T}) where {T}
     n == 0 && return zero(T)
     total = sum(w)
     iszero(total) && return zero(T)
-    b = w ./ total
     values, gaps = u.values[n], u.gaps[n]
-    states = eachindex(b)
-    plane = sum(b[t] * values[t] for t in states)
+    ns = length(w)
+    plane = zero(T)
+    @inbounds for t in 1:ns
+        plane += w[t] * values[t]
+    end
     bound = plane
-    for i in (length(b) + 1):length(u.points)
-        q = u.points[i]
-        share = minimum(b[t] / q[t] for t in states if !iszero(q[t]))
+    pts = u.points
+    @inbounds for i in (ns + 1):length(pts)
+        q = pts[i]
+        share = zero(T)
+        first_nz = true
+        for t in 1:ns
+            qt = q[t]
+            iszero(qt) && continue
+            ratio = _div(w[t], qt)
+            if first_nz || ratio < share
+                share = ratio
+                first_nz = false
+            end
+        end
         hanging = plane + share * gaps[i]
         hanging < bound && (bound = hanging)
     end
-    return total * bound
+    return bound
 end
 
 # The upper bound on the value of `horizon` periods from `w0`. What each action leads
@@ -606,8 +668,8 @@ function adaptive_management(problem::DecisionProblem, experiments; horizon::Int
                              method::Symbol=:beliefs,
                              passive::Bool=method !== :points, grid::Integer=10)
     horizon >= 1 || throw(ArgumentError("the horizon must be at least 1, got $horizon"))
-    discount >= 0 ||
-        throw(ArgumentError("the discount cannot be negative, got $discount"))
+    (isfinite(discount) && discount >= 0) ||
+        throw(ArgumentError("the discount must be nonnegative and finite, got $discount"))
     depth >= 0 || throw(ArgumentError("the depth cannot be negative, got $depth"))
     signal_of in (:current, :next) ||
         throw(ArgumentError("signal_of must be :current or :next, got :$signal_of"))

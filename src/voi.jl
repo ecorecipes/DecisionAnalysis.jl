@@ -120,18 +120,19 @@ false
 """
 function information_can_change_decision(problem::DecisionProblem, experiment::Experiment;
                                          atol::Real=0,
-                                         rtol::Real=_default_rtol(promote_type(eltype(problem.payoff),
-                                                                               eltype(experiment))))
+                                         rtol::Union{Nothing,Real}=nothing)
     _check_states(experiment, problem.payoff.states, "payoff table")
     p = _prior(problem, :information_can_change_decision)
     Q = _feasible_Q(problem)
     L = experiment.likelihood
+    rtol_eff = rtol === nothing ?
+               _default_rtol(promote_type(eltype(Q), eltype(p), eltype(L))) : rtol
     always_best = trues(size(Q, 1))
     for z in axes(L, 1)
         joint = p .* view(L, z, :)
         iszero(sum(joint)) && continue
         scores = Q * joint
-        best = _select(Optimize(), scores, :max, _tolerance(scores, atol, rtol))
+        best = _select(Optimize(), scores, :max, _tolerance(scores, atol, rtol_eff))
         always_best .&= [a in best for a in eachindex(scores)]
     end
     return !any(always_best)
@@ -316,9 +317,10 @@ function two_stage_value(problem::DecisionProblem, first_stage::AbstractVector;
         return sum(maximum(view(Q, rows, cols) * view(p, cols)) for cols in columns)
     end
     value = maximum(values)
+    tol = _tolerance(values, 0, _default_rtol(eltype(values)))
     act_now = maximum(_feasible_Q(problem) * p)
-    return (; value, first_stages=stages, values, chosen=stages[values .== value], act_now,
-            gain=value - act_now)
+    return (; value, first_stages=stages, values,
+            chosen=stages[values .>= value - tol], act_now, gain=value - act_now)
 end
 
 """
@@ -603,7 +605,8 @@ outcome. The networks are evaluated by enumeration (`max_states`), in floating p
 """
 function normal_form(model; kw...)
     # A collection of networks, or one: the other bridge.
-    networks = model isa NamedTuple || nameof(typeof(model)) === :BayesModel
+    networks = model isa Union{NamedTuple,AbstractDict,AbstractVector{<:Pair}} ||
+               nameof(typeof(model)) === :BayesModel
     return throw(MissingExtensionError(:normal_form,
                                        networks ? :BayesianNetworks : :InfluenceDiagrams))
 end

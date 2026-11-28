@@ -10,9 +10,19 @@ _default_labels(prefix::AbstractString, n::Integer) = [Symbol(prefix, i) for i i
 # Arithmetic
 # ----------
 
+_is_exact(::Type{Bool}) = false
 _is_exact(::Type{<:Integer}) = true
 _is_exact(::Type{<:Rational}) = true
 _is_exact(::Type) = false
+
+# Exact division for integers and rationals, floating division otherwise.
+function _div(a::Real, b::Real)
+    return (_is_exact(typeof(a)) && _is_exact(typeof(b))) ? (a // b) : (a / b)
+end
+function _div_type(::Type{A}, ::Type{B}) where {A<:Real,B<:Real}
+    return (_is_exact(A) && _is_exact(B)) ? typeof(one(A) // one(B)) :
+           Base.promote_op(/, A, B)
+end
 
 # Tolerance on "sums to one" and "is nonnegative": none in exact arithmetic.
 _default_atol(::Type{T}) where {T} = _is_exact(T) ? 0 : 1e-8
@@ -105,7 +115,8 @@ struct FiniteBelief{T<:Real} <: AbstractBelief
 end
 
 function FiniteBelief(states, probabilities::AbstractVector{T}; kw...) where {T<:Real}
-    return FiniteBelief{T}(_labels(states), collect(probabilities); kw...)
+    E = T === Bool ? Int : T
+    return FiniteBelief{E}(_labels(states), collect(E, probabilities); kw...)
 end
 
 function FiniteBelief(probabilities::AbstractVector{<:Real}; kw...)
@@ -443,5 +454,29 @@ number of draws for equal weights and falls towards one as the weights concentra
 effective_sample_size(b::SampleBelief) = effective_sample_size(b.weights)
 function effective_sample_size(weights::AbstractVector{<:Real})
     isempty(weights) && throw(ArgumentError("no weights"))
-    return sum(weights)^2 / sum(abs2, weights)
+    for (i, v) in enumerate(weights)
+        isfinite(v) || throw(ArgumentError("weight $i is $v, which is not finite"))
+        v >= 0 || throw(ArgumentError("weight $i is $v, which is negative"))
+    end
+    if _is_exact(eltype(weights))
+        wb = Rational{BigInt}.(weights)
+        total = sum(wb)
+        total > 0 || throw(ArgumentError("the weights sum to zero"))
+        ess = total^2 // sum(abs2, wb)
+        return _from_big_ess(eltype(weights), ess)
+    end
+    wf = float.(weights)
+    total = sum(wf)
+    total > 0 || throw(ArgumentError("the weights sum to zero"))
+    return total^2 / sum(abs2, wf)
+end
+
+function _from_big_ess(::Type{T}, x::Rational{BigInt}) where {T}
+    R = T <: Rational ? T : Rational{Int}
+    S = typeof(numerator(zero(R)))
+    if typemin(S) <= numerator(x) <= typemax(S) &&
+       typemin(S) <= denominator(x) <= typemax(S)
+        return S(numerator(x)) // S(denominator(x))
+    end
+    return x
 end

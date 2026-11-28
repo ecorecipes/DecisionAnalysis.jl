@@ -216,7 +216,8 @@ have the same distribution in every network; the bridge checks it and never assu
 - `src/voi.jl`: `evpi`, `evppi`, `hypothesis_partition`, `two_stage_value`, `evsi`, `enbs`,
   `value_with_information`,
   `information_can_change_decision`, `robust_evpi`, `robust_evsi` (`RobustVOI.upper_prior`), and the
-  stub of `normal_form`, whose method is in `ext/DecisionAnalysisInfluenceDiagramsExt.jl`.
+  stub of `normal_form`, whose methods live in `ext/DecisionAnalysisInfluenceDiagramsExt.jl` and
+  `ext/DecisionAnalysisBayesianNetworksExt.jl`.
 - `src/voi_sample.jl`: `VOIEstimate`, the methods (`SampleAverage`, `Grouping`, `StrongOakley`,
   `Sadatsafavi`, `SplineRegression`, `GAMRegression`), the studies (`SummaryStatistics`,
   `ImportanceSampling`, `GaussianApproximation`), the method-taking `evpi`, `evppi`, `evsi`, `enbs`,
@@ -282,6 +283,8 @@ have the same distribution in every network; the bridge checks it and never assu
 - `src/sensitivity.jl`: `policy_regions`, `one_way_thresholds`, `weight_sweep`, `rank_reversals`.
 - `ext/DecisionAnalysisGAMExt.jl`: `fitted_conditional_means` for `GAMRegression`.
 - `ext/DecisionAnalysisFiniteKernelsExt.jl`: `FiniteBelief` and `Experiment` from FiniteKernels objects.
+- `ext/DecisionAnalysisInfluenceDiagramsExt.jl`: `normal_form` from a single-decision `InfluenceDiagramModel`.
+- `ext/DecisionAnalysisBayesianNetworksExt.jl`: `normal_form` from a `BayesModel`, a named collection of them, or hypotheses × actions.
 - `src/fidelity.jl`: `total_variation`, `decision_loss_bound`, and the constants `payoff_range`,
   `largest_action_range`, `largest_regret` with `deficiency_value_bound`.
 - `src/report.jl`, `src/show.jl`: `DecisionReport` (named experiments, partitions, objectives), its
@@ -317,9 +320,9 @@ have the same distribution in every network; the bridge checks it and never assu
   finite core, 11 to 13 sample-based analysis on the toy simulator `vignettes/_toy_pond.jl`, 14 the Bd
   application on the cached Drawert et al. 2017 table of `../Chytridiomycosis.jl`, 15 risk attitude and
   multi-attribute utilities on the toy simulator), 16 is the ecological example of the methods that follow `voi` and of scenario designs (a stage-structured frog population), 17 `survey_or_act` on synthetic parcels, 18 `value_of_waiting` on an invented outbreak, 19 `adaptive_management` on an invented colony, 20 the same with a state that moves (`transitions`, and the `:vectors` and `:points` methods) on an invented reserve, and fourteen case studies, each a replication of a published analysis, grouped by field in the
-  directory name (`NN_ecology_*`, which includes diseases of animals: 21 Shea et al. 2014, 22 Runge et al.
-  2011, 23 Li et al. 2021, 24 Luhede et al. 2024, 25 Christensen et al. 2026, 26 Bal et al. 2018, 27 Chadès
-  et al. 2008, 28 Regan et al. 2006 with Rout et al. 2009; `NN_epidemiology_*`, human: 29 Eze et al. 2023, 30 Kim et al. 2017, 31 Li et al. 2019, which reads its 999-state table from the test fixture by a line pattern, so keep one row per line there; 32 Atkins et al. 2020, whose epidemic model is rebuilt in the vignette and in `test/test_replications.jl`; 33 de Vries et al. 2021; 34 Shea et al. 2023, which also reads its table from the fixture line by line, and whose value-of-information part is ours, not the paper's). Their titles do not
+  directory name (`NN_ecology_*`, which includes diseases of animals: 22 Shea et al. 2014, 23 Runge et al.
+  2011, 24 Li et al. 2021, 25 Luhede et al. 2024, 26 Christensen et al. 2026, 27 Bal et al. 2018, 28 Chadès
+  et al. 2008, 29 Regan et al. 2006 with Rout et al. 2009; `NN_epidemiology_*`, human: 30 Eze et al. 2023, 31 Kim et al. 2017, 32 Li et al. 2019, which reads its 999-state table from the test fixture by a line pattern, so keep one row per line there; 33 Atkins et al. 2020, whose epidemic model is rebuilt in the vignette and in `test/test_replications.jl`; 34 de Vries et al. 2021; 35 Shea et al. 2023, which also reads its table from the fixture line by line, and whose value-of-information part is ours, not the paper's). Their titles do not
   say "replication"; the opening section "About this case study" does. `docs/make.jl` lists them under
   "Case studies", by field, from the directory name), each rendered to
   `.md`, `.html` and `.pdf` beside it; `vignettes/_common.jl` (plot helpers and a small Markdown table for

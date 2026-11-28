@@ -72,9 +72,24 @@ end
 function Experiment(likelihood::AbstractMatrix{T};
                     signals=_default_labels("z", size(likelihood, 1)), states=nothing,
                     cost::Real=0, kw...) where {T<:Real}
+    E = T === Bool ? Int : T
+    C = cost isa Bool ? Int(cost) : cost
     labels = states === nothing ? nothing : _labels(states)
-    return Experiment{T,typeof(cost)}(_labels(signals), labels, Matrix{T}(likelihood),
-                                      cost; kw...)
+    return Experiment{E,typeof(C)}(_labels(signals), labels, Matrix{E}(likelihood),
+                                   C; kw...)
+end
+
+# Exact probability mass of N(μ, sd²) over [a, b] without tail cancellation.
+function _normal_bin_mass(a::Float64, b::Float64, μ::Float64, sd::Float64)
+    inv_s = inv(sqrt(2.0) * sd)
+    ua = (a - μ) * inv_s
+    ub = (b - μ) * inv_s
+    if ua >= 0
+        return max(0.5 * (erfc(ua) - erfc(ub)), 0.0)
+    elseif ub <= 0
+        return max(0.5 * (erfc(-ub) - erfc(-ua)), 0.0)
+    end
+    return max(1.0 - 0.5 * (erfc(-ua) + erfc(ub)), 0.0)
 end
 
 """
@@ -86,14 +101,13 @@ state `θ` the observation is `Normal(means[θ], sd)`, and the signal is the bin
 regular grid that the observation falls in. The grid has `bins` bins and runs from
 `minimum(means) − width × sd` to `maximum(means) + width × sd`.
 
-`likelihood[z, θ]` is the normal density at the midpoint of bin `z`, normalised so that
-each column sums to one (midpoint rule; the mass beyond `width` standard deviations is
-below `1e-14` at the default). The experiment is therefore a discretised version of
-the continuous measurement, and its [`evsi`](@ref) approaches that of the continuous
-measurement as `bins` grows; check convergence by doubling `bins`. The entries are
-`Float64`, so the result is not exact arithmetic. `sd` must be positive (a measurement
-without error reveals the partition of the states by their means; use
-[`evppi`](@ref)).
+`likelihood[z, θ]` is the normal probability integrated over bin `z`, normalised so that
+each column sums to one (the mass beyond `width` standard deviations is below `1e-14` at
+the default). The experiment is therefore a discretised version of the continuous
+measurement, and its [`evsi`](@ref) approaches that of the continuous measurement as
+`bins` grows; check convergence by doubling `bins`. The entries are `Float64`, so the
+result is not exact arithmetic. `sd` must be positive (a measurement without error
+reveals the partition of the states by their means; use [`evppi`](@ref)).
 
 This is the experiment behind "learning by doing" with measurement error: `means` is
 the row of the payoff table of the action that is tried, and the observed outcome
@@ -121,9 +135,29 @@ function gaussian_experiment(means::AbstractVector{<:Real}, sd::Real; states=not
     lo = Float64(minimum(means)) - width * sd
     hi = Float64(maximum(means)) + width * sd
     step = (hi - lo) / bins
-    mids = [lo + (z - 0.5) * step for z in 1:bins]
-    L = [exp(-abs2((x - mu) / sd) / 2) for x in mids, mu in means]
-    L ./= sum(L; dims=1)
+    sdf = Float64(sd)
+    nbins = Int(bins)
+    L = Matrix{Float64}(undef, nbins, length(means))
+    for (j, mu) in enumerate(means)
+        μ = Float64(mu)
+        col_sum = 0.0
+        for z in 1:nbins
+            a = lo + (z - 1) * step
+            b = lo + z * step
+            v = _normal_bin_mass(a, b, μ, sdf)
+            L[z, j] = v
+            col_sum += v
+        end
+        if col_sum > 0
+            L[:, j] ./= col_sum
+        else
+            mids = [lo + (z - 0.5) * step for z in 1:nbins]
+            logw = [-abs2((x - μ) / sdf) / 2 for x in mids]
+            top = maximum(logw)
+            w = exp.(logw .- top)
+            L[:, j] .= w ./ sum(w)
+        end
+    end
     return Experiment(L; signals=_default_labels("bin", bins), states, cost)
 end
 
@@ -235,8 +269,10 @@ function bayes_invert(prior::SampleBelief, ::Experiment)
 end
 function bayes_invert(prior::FiniteBelief, experiment::Experiment)
     _check_states(experiment, prior.states, "prior")
-    joint = experiment.likelihood .* permutedims(prior.probabilities)
-    T = eltype(joint)
+    raw_joint = experiment.likelihood .* permutedims(prior.probabilities)
+    R = eltype(raw_joint)
+    T = R <: Integer ? Rational{promote_type(Int, R)} : R
+    joint = T === R ? raw_joint : T.(raw_joint)
     marginal = vec(sum(joint; dims=2))
     posteriors = Union{Nothing,FiniteBelief{T}}[]
     for z in eachindex(marginal)
@@ -244,7 +280,9 @@ function bayes_invert(prior::FiniteBelief, experiment::Experiment)
             push!(posteriors, nothing)
         else
             # Normalise by the row's own sum so that rounding cannot fail the check.
-            push!(posteriors, FiniteBelief(prior.states, joint[z, :] ./ marginal[z]))
+            probs = _is_exact(T) ? [joint[z, j] // marginal[z] for j in axes(joint, 2)] :
+                    joint[z, :] ./ marginal[z]
+            push!(posteriors, FiniteBelief(prior.states, probs))
         end
     end
     return BayesianInversion{T}(experiment.signals, prior.states, joint, marginal,
@@ -396,10 +434,11 @@ function GarblingResult(is_garbling::Bool, witness, exact::Bool, route::Symbol)
 end
 
 # The separating payoff table of `_separating_payoff` as a decision problem.
-function _separating_problem(found, e′::Experiment)
+function _separating_problem(found, e′::Experiment, e::Experiment)
     found === nothing && return nothing
     V, prior = found
-    states = e′.states === nothing ? _default_labels("s", size(V, 2)) : e′.states
+    states = e′.states !== nothing ? e′.states :
+             e.states !== nothing ? e.states : _default_labels("s", size(V, 2))
     actions = [Symbol("act_on_", z) for z in e′.signals]
     allunique(actions) || (actions = _default_labels("a", size(V, 1)))
     return DecisionProblem(PayoffTable(actions, states, V), FiniteBelief(states, prior))
@@ -453,7 +492,7 @@ function garbling_result(e′::Experiment, e::Experiment;
         # table passes the exact check.
         found = separating || !sol.exact ?
                 _separating_problem(_separating_payoff(e′, e; optimizer, rounding_tol),
-                                    e′) : nothing
+                                    e′, e) : nothing
         return GarblingResult(false, nothing, sol.exact || found !== nothing, sol.route,
                               found)
     end

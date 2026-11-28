@@ -11,7 +11,7 @@ function _relative_regret_matrix(M::AbstractMatrix)
     j === nothing ||
         throw(ArgumentError("relative regret is undefined: the best payoff in column " *
                             "$(j[2]) of the table is zero"))
-    return (best .- M) ./ abs.(best)
+    return _div.(best .- M, abs.(best))
 end
 
 """

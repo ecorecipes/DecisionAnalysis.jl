@@ -14,8 +14,10 @@ using FiniteKernels: FiniteKernel, FiniteSpace, axis_names, factors, joint_state
 # A one-axis space keeps its labels; the joint states of a several-axis space are
 # labelled by joining the axis labels with `_`, in `joint_states` order.
 function _space_labels(X::FiniteSpace)
-    return ndims(X) == 1 ? copy(only(factors(X)).labels) :
-           [Symbol(join(s, "_")) for s in joint_states(X)]
+    ndims(X) == 1 && return copy(only(factors(X)).labels)
+    labels = [Symbol(join(s, "_")) for s in joint_states(X)]
+    allunique(labels) && return labels
+    return [Symbol(join(s, "|")) for s in joint_states(X)]
 end
 
 function DecisionAnalysis.FiniteBelief(k::FiniteKernel; kw...)

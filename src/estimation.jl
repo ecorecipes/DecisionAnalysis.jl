@@ -177,21 +177,22 @@ function equivalent_binomial_sample_size(mean::Real, standard_error::Real)
     n = mean * (1 - mean) / standard_error^2 - 1
     n > 0 || throw(ArgumentError("a proportion with mean $mean cannot have a standard " *
                                  "error as large as $standard_error"))
-    return round(Float64(n); digits=10)
+    return round(Float64(n); sigdigits=12)
 end
 
 # Population value and the net benefit of sampling
 # ------------------------------------------------
 
 function _population_factor(population::Real, horizon, discount::Real)
-    population >= 0 ||
-        throw(ArgumentError("the population must be nonnegative, got $population"))
-    discount >= 0 ||
-        throw(ArgumentError("the discount rate must be nonnegative, got $discount"))
+    (isfinite(population) && population >= 0) ||
+        throw(ArgumentError("the population must be nonnegative and finite, got $population"))
+    (isfinite(discount) && discount >= 0) ||
+        throw(ArgumentError("the discount rate must be nonnegative and finite, got $discount"))
     horizon === nothing && return population
-    horizon >= 0 || throw(ArgumentError("the horizon must be nonnegative, got $horizon"))
+    (isfinite(horizon) && horizon >= 0) ||
+        throw(ArgumentError("the horizon must be nonnegative and finite, got $horizon"))
     return iszero(discount) ? population * horizon :
-           population * (1 - exp(-discount * horizon)) / discount
+           population * (-expm1(-discount * horizon)) / discount
 end
 
 """
@@ -269,6 +270,8 @@ function enbs_curve(estimates::AbstractVector; n::AbstractVector{<:Real}, setup_
     length(estimates) == length(n) ||
         throw(ArgumentError("$(length(estimates)) estimates for $(length(n)) sample sizes"))
     isempty(n) && throw(ArgumentError("no sample size was given"))
+    all(s -> isfinite(s) && s >= 0, n) ||
+        throw(ArgumentError("sample sizes must be nonnegative and finite"))
     for e in estimates
         e isa VOIEstimate && e.quantity !== :evsi &&
             throw(ArgumentError("enbs_curve needs EVSI estimates, got $(e.quantity)"))
@@ -328,6 +331,8 @@ function optimal_sample_size(curve::AbstractVector; near::Real=0.05, smooth::Boo
     isempty(curve) && throw(ArgumentError("the curve is empty"))
     0 <= near < 1 || throw(ArgumentError("near must lie in [0, 1), got $near"))
     sizes = Float64[row.n for row in curve]
+    all(s -> isfinite(s) && s >= 0, sizes) ||
+        throw(ArgumentError("sample sizes in the curve must be nonnegative and finite"))
     values = Float64[row.enbs for row in curve]
     if smooth
         distinct = length(unique(sizes))
@@ -337,7 +342,11 @@ function optimal_sample_size(curve::AbstractVector; near::Real=0.05, smooth::Boo
         4 <= k < distinct ||
             throw(ArgumentError("df must be at least 4 and below the number of sample " *
                                 "sizes ($distinct), got $k"))
-        grid = collect(Float64, ceil(Int, minimum(sizes)):floor(Int, maximum(sizes)))
+        lo_n, hi_n = ceil(Int, minimum(sizes)), floor(Int, maximum(sizes))
+        lo_n <= hi_n ||
+            throw(ArgumentError("smoothing needs at least one integer sample size " *
+                                "between $(minimum(sizes)) and $(maximum(sizes))"))
+        grid = collect(Float64, lo_n:hi_n)
         values = _smooth_curve(sqrt.(sizes), values, sqrt.(grid), k)
         sizes = grid
     end
@@ -488,7 +497,11 @@ function compare_regressions(problem::DecisionProblem, columns, methods; folds::
         for k in 1:Int(folds)
             held = fold .== k
             training = ifelse.(held, 0.0, wf)
-            training ./= sum(training)
+            mass = sum(training)
+            mass > 0 ||
+                throw(ArgumentError("fold $k contains all draws of positive weight; " *
+                                    "reduce `folds` or supply more positive-weight draws"))
+            training ./= mass
             G, _ = _fit_screened(method, cols, Q, training)
             predicted = Float64.(G) .- permutedims(Float64.(G[a, :]))
             error += sum(wf[i] * (observed[b, i] - predicted[b, i])^2

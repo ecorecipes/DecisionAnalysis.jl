@@ -19,47 +19,80 @@ struct _LPSolution
 end
 
 # One pivot on row `r`, column `s` of the tableau `T` with reduced-cost row `z`.
+# Iterates column-major and skips columns whose pivot-row entry is zero.
 function _pivot!(T::Matrix{_BigRat}, z::Vector{_BigRat}, basis::Vector{Int}, r::Int,
                  s::Int)
-    ncol = size(T, 2)
+    nrow, ncol = size(T)
     piv = T[r, s]
-    for j in 1:ncol
-        T[r, j] /= piv
+    col_s = Vector{_BigRat}(undef, nrow)
+    @inbounds for i in 1:nrow
+        col_s[i] = T[i, s]
     end
-    for i in axes(T, 1)
-        i == r && continue
-        f = T[i, s]
-        iszero(f) && continue
-        for j in 1:ncol
-            T[i, j] -= f * T[r, j]
+    fs = z[s]
+    @inbounds for j in 1:ncol
+        j == s && continue
+        trj = T[r, j]
+        iszero(trj) && continue
+        trj = trj / piv
+        T[r, j] = trj
+        for i in 1:nrow
+            i == r && continue
+            f = col_s[i]
+            iszero(f) && continue
+            T[i, j] -= f * trj
+        end
+        if !iszero(fs)
+            z[j] -= fs * trj
         end
     end
-    f = z[s]
-    if !iszero(f)
-        for j in 1:ncol
-            z[j] -= f * T[r, j]
-        end
+    @inbounds for i in 1:nrow
+        T[i, s] = i == r ? one(_BigRat) : zero(_BigRat)
     end
+    z[s] = zero(_BigRat)
     basis[r] = s
     return nothing
 end
 
-# Simplex iterations with Bland's rule; entering columns are restricted to `1:n`.
+# Simplex iterations restricted to entering columns `1:n`: Dantzig's most-negative rule
+# normally, switching to Bland's anti-cycling rule after `2 * nrow` consecutive degenerate
+# pivots until a strictly improving pivot is made.
 function _iterate!(T::Matrix{_BigRat}, z::Vector{_BigRat}, basis::Vector{Int}, n::Int)
+    nrow = size(T, 1)
+    degenerate = 0
+    bland_threshold = 2 * nrow
     while true
-        s = findfirst(j -> z[j] < 0, 1:n)
-        s === nothing && return :optimal
+        s = 0
+        if degenerate >= bland_threshold
+            for j in 1:n
+                if z[j] < 0
+                    s = j
+                    break
+                end
+            end
+        else
+            best_z = zero(_BigRat)
+            for j in 1:n
+                zj = z[j]
+                if zj < best_z
+                    best_z = zj
+                    s = j
+                end
+            end
+        end
+        s == 0 && return :optimal
         r = 0
         best = zero(_BigRat)
-        for i in axes(T, 1)
-            T[i, s] > 0 || continue
-            ratio = T[i, end] / T[i, s]
+        for i in 1:nrow
+            tis = T[i, s]
+            tis > 0 || continue
+            ratio = T[i, end] / tis
             if r == 0 || ratio < best || (ratio == best && basis[i] < basis[r])
                 r = i
                 best = ratio
             end
         end
         r == 0 && return :unbounded
+        degenerate = iszero(best) ? degenerate + 1 : 0
         _pivot!(T, z, basis, r, s)
     end
 end

@@ -411,9 +411,9 @@ function _select(::Optimize, scores::AbstractVector, sense::Symbol, tol::Real)
     bottom = minimum(scores)
     return findall(<=(bottom + tol), scores)
 end
-function _select(sel::Threshold, scores::AbstractVector, sense::Symbol, ::Real)
-    return sense === :max ? findall(>=(sel.level), scores) :
-           findall(<=(sel.level), scores)
+function _select(sel::Threshold, scores::AbstractVector, sense::Symbol, tol::Real)
+    return sense === :max ? findall(>=(sel.level - tol), scores) :
+           findall(<=(sel.level + tol), scores)
 end
 
 """
@@ -462,10 +462,11 @@ julia> r = decide(p, MinimaxRegret()); (r.scores, r.chosen)
 ```
 """
 function decide(problem::DecisionProblem, rule::DecisionRule; atol::Real=0,
-                rtol::Real=_default_rtol(eltype(problem.payoff)))
+                rtol::Union{Nothing,Real}=nothing)
     scores = robustness(problem, rule.metric)
+    rtol_eff = rtol === nothing ? _default_rtol(eltype(scores)) : rtol
     sense = _sense(rule.metric)
-    idx = _select(rule.selector, scores, sense, _tolerance(scores, atol, rtol))
+    idx = _select(rule.selector, scores, sense, _tolerance(scores, atol, rtol_eff))
     actions = feasible_actions(problem)
     details = rule.metric.transform isa IdentityTransform ? (;) :
               (; menu_dependent=true, note=_MENU_NOTE)
@@ -499,20 +500,22 @@ function _expectation_matrix(problem::DecisionProblem, rule::AbstractRule)
 end
 
 function decide(problem::DecisionProblem, rule::IntervalDominance; atol::Real=0,
-                rtol::Real=_default_rtol(eltype(problem.payoff)))
+                rtol::Union{Nothing,Real}=nothing)
     E, _ = _expectation_matrix(problem, rule)
+    rtol_eff = rtol === nothing ? _default_rtol(eltype(E)) : rtol
     lower = vec(minimum(E; dims=2))
     upper = vec(maximum(E; dims=2))
-    tol = _tolerance(E, atol, rtol)
+    tol = _tolerance(E, atol, rtol_eff)
     idx = findall(>=(maximum(lower) - tol), upper)
     actions = feasible_actions(problem)
     return DecisionResult(rule, actions, nothing, actions[idx], :max, (; lower, upper))
 end
 
 function decide(problem::DecisionProblem, rule::Maximal; atol::Real=0,
-                rtol::Real=_default_rtol(eltype(problem.payoff)))
+                rtol::Union{Nothing,Real}=nothing)
     E, _ = _expectation_matrix(problem, rule)
-    tol = _tolerance(E, atol, rtol)
+    rtol_eff = rtol === nothing ? _default_rtol(eltype(E)) : rtol
+    tol = _tolerance(E, atol, rtol_eff)
     n = size(E, 1)
     dominated(a) = any(b -> all(k -> E[b, k] - E[a, k] > tol, axes(E, 2)), 1:n)
     idx = findall(!dominated, 1:n)
@@ -568,10 +571,11 @@ function _eadmissible_witness(E::AbstractMatrix, a::Int; tol::Real=0, optimizer=
 end
 
 function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,
-                rtol::Real=_default_rtol(eltype(problem.payoff)), optimizer=nothing,
+                rtol::Union{Nothing,Real}=nothing, optimizer=nothing,
                 rounding_tol=_ROUNDING_TOLS)
     E, v = _expectation_matrix(problem, rule)
-    tol = _tolerance(E, atol, rtol)
+    rtol_eff = rtol === nothing ? _default_rtol(eltype(E)) : rtol
+    tol = _tolerance(E, atol, rtol_eff)
     T = eltype(E)
     actions = feasible_actions(problem)
     idx = Int[]
@@ -605,19 +609,17 @@ function decide(problem::DecisionProblem, rule::EAdmissible; atol::Real=0,
                           (; witnesses, weights, exact, route, dominated_by))
 end
 
-# Rows of `S` not dominated by another row (all >=, one > by more than `tol`).
-function _nondominated(S::AbstractMatrix, tol::Real)
+# Rows of `S` not dominated by another row (all >=, one > by more than `tols[j]`).
+function _nondominated(S::AbstractMatrix, tols::AbstractVector{<:Real})
     function dominates(b, a)
-        return all(j -> S[b, j] >= S[a, j] - tol, axes(S, 2)) &&
-               any(j -> S[b, j] > S[a, j] + tol, axes(S, 2))
+        return all(j -> S[b, j] >= S[a, j] - tols[j], axes(S, 2)) &&
+               any(j -> S[b, j] > S[a, j] + tols[j], axes(S, 2))
     end
     return findall(a -> !any(b -> dominates(b, a), axes(S, 1)), axes(S, 1))
 end
 
 function decide(problems::AbstractVector{<:DecisionProblem}, rule::ParetoFront;
-                objectives=nothing, atol::Real=0,
-                rtol::Real=mapreduce(p -> _default_rtol(eltype(p.payoff)), max, problems;
-                                     init=0))
+                objectives=nothing, atol::Real=0, rtol::Union{Nothing,Real}=nothing)
     isempty(problems) && throw(ArgumentError("ParetoFront needs at least one objective"))
     actions = feasible_actions(first(problems))
     for p in problems
@@ -625,8 +627,11 @@ function decide(problems::AbstractVector{<:DecisionProblem}, rule::ParetoFront;
             throw(LabelMismatchError("feasible actions of the objectives of a Pareto " *
                                      "front", actions, feasible_actions(p)))
     end
-    S = reduce(hcat, [aggregate(rule.aggregator, p) for p in problems])
-    idx = _nondominated(S, _tolerance(S, atol, rtol))
+    cols = [aggregate(rule.aggregator, p) for p in problems]
+    S = reduce(hcat, cols)
+    tols = [_tolerance(c, atol, rtol === nothing ? _default_rtol(eltype(c)) : rtol)
+            for c in cols]
+    idx = _nondominated(S, tols)
     names = objectives === nothing ? _default_labels("objective", length(problems)) :
             _labels(objectives)
     length(names) == length(problems) ||

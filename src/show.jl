@@ -85,7 +85,8 @@ _cell(x::AbstractFloat) = string(round(x; sigdigits=6))
 _cell(x::Integer) = string(x)
 function _cell(x::Rational)
     isone(denominator(x)) && return string(numerator(x))
-    return string(round(Float64(x); sigdigits=6))
+    f = Float64(x)
+    return isfinite(f) ? string(round(f; sigdigits=6)) : string(x)
 end
 _cell(x::Symbol) = String(x)
 _cell(::Nothing) = "-"
@@ -208,7 +209,7 @@ function _render_plain(io::IO, blocks)
 end
 
 _md_escape(s::AbstractString) = replace(s, "|" => "\\|", "*" => "\\*", "_" => "\\_")
-_md_code(s::AbstractString) = isempty(s) ? "" : "`" * s * "`"
+_md_code(s::AbstractString) = isempty(s) ? "" : "`" * replace(s, "|" => "\\|") * "`"
 function _md_cell(g::_Grid, j::Int, s::AbstractString; header::Bool=false)
     code = header ? (g.code_header && j > 1) : g.code[j]
     return code ? _md_code(s) : _md_escape(s)

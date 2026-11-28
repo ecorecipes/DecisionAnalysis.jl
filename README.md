@@ -282,8 +282,8 @@ table such a model produces. It exports no `regret` or `regrets` (the latter is 
 
 ## Not in this version
 
-Discounting, moment-matching EVSI, multilevel Monte Carlo, influence diagrams with more than one
-decision, and anything sequential. See the roadmap in the lab wiki.
+Multilevel Monte Carlo, influence diagrams with more than one decision, and
+continuous-state POMDPs. See the roadmap in the lab wiki.
 
 ## Licence
 

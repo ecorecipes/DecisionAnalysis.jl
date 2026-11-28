@@ -234,7 +234,7 @@ function _cvar(x::AbstractVector, p::AbstractVector, α::Real)
     end
     # In floating point the masses can fall short of α by rounding; divide by what was
     # actually accumulated.
-    return total / (α - max(remaining, zero(remaining)))
+    return _div(total, α - max(remaining, zero(remaining)))
 end
 
 function _quantile(x::AbstractVector, p::AbstractVector, α::Real)

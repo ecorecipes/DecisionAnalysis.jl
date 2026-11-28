@@ -52,7 +52,7 @@ function _cost_effective_policy(G, K, survey_cost, base::Int)
     current = fill(base, nz)
     value(policy) = sum(G[policy[z], z] for z in 1:nz)
     cost(policy) = survey_cost + sum(K[policy[z], z] for z in 1:nz)
-    ratio = value(current) / cost(current)
+    ratio = _div(value(current), cost(current))
     while true
         candidate = copy(current)
         for z in 1:nz
@@ -65,7 +65,7 @@ function _cost_effective_policy(G, K, survey_cost, base::Int)
             candidate[z] = best
         end
         candidate == current && return current
-        r = value(candidate) / cost(candidate)
+        r = _div(value(candidate), cost(candidate))
         r > ratio || return current
         current, ratio = candidate, r
     end
@@ -142,7 +142,8 @@ function survey_or_act(problem::DecisionProblem, experiment::Experiment; action_
     row = _baseline_row(problem, :survey_or_act)
     problem.feasible[row] ||
         throw(ArgumentError("the baseline $(problem.baseline) is not a feasible action"))
-    survey_cost > 0 || throw(ArgumentError("survey_cost must be more than zero"))
+    (isfinite(survey_cost) && survey_cost > 0) ||
+        throw(ArgumentError("survey_cost must be positive and finite, got $survey_cost"))
     all_costs = _action_costs(problem, action_costs)
     iszero(all_costs[row]) ||
         throw(ArgumentError("the baseline $(problem.baseline) must cost zero: " *
@@ -154,9 +155,9 @@ function survey_or_act(problem::DecisionProblem, experiment::Experiment; action_
     others = setdiff(eachindex(rows), base)
     isempty(others) &&
         throw(ArgumentError("no feasible action other than the baseline"))
-    all(>(0), costs[others]) ||
-        throw(ArgumentError("every feasible action other than the baseline must cost " *
-                            "more than zero"))
+    all(c -> isfinite(c) && c > 0, costs[others]) ||
+        throw(ArgumentError("every feasible action other than the baseline must have a " *
+                            "positive finite cost"))
     L = experiment.likelihood
     gains = problem.payoff.Q[rows, :] .- problem.payoff.Q[row:row, :]
     # G[a, z]: the gain of action a jointly with signal z; K[a, z]: its expected cost.
@@ -165,9 +166,9 @@ function survey_or_act(problem::DecisionProblem, experiment::Experiment; action_
     K = costs * transpose(pz)
 
     now_values = gains * p
-    a0 = others[argmax([now_values[a] / costs[a] for a in others])]
+    a0 = others[argmax([_div(now_values[a], costs[a]) for a in others])]
     act_now = (; action=actions[a0], value=now_values[a0], cost=costs[a0],
-               cost_effectiveness=now_values[a0] / costs[a0])
+               cost_effectiveness=_div(now_values[a0], costs[a0]))
 
     chosen = policy === nothing ? _cost_effective_policy(G, K, survey_cost, base) :
              _imposed_policy(policy, experiment.signals, actions)
@@ -179,7 +180,7 @@ function survey_or_act(problem::DecisionProblem, experiment::Experiment; action_
     acting = sum(pz[z] for z in possible if chosen[z] != base; init=zero(eltype(pz)))
     survey = (; policy=[experiment.signals[z] => actions[chosen[z]] for z in 1:nz], value,
               cost, largest_cost=largest, probability_of_acting=acting,
-              cost_effectiveness=value / cost)
+              cost_effectiveness=_div(value, cost))
 
     survey_first = survey.cost_effectiveness > act_now.cost_effectiveness
     return (; act_now, survey, survey_first,
@@ -244,22 +245,24 @@ function select_under_budget(units::AbstractVector, budget::Real; option::Symbol
         throw(ArgumentError("option is :chosen, :act_now or :survey, not :$option"))
     passes === nothing || passes >= 1 ||
         throw(ArgumentError("passes must be at least 1"))
-    budget >= 0 || throw(ArgumentError("the budget cannot be negative"))
+    (isfinite(budget) && budget >= 0) ||
+        throw(ArgumentError("the budget must be nonnegative and finite, got $budget"))
     picks = [_unit_option(u, option) for u in units]
-    ratio(i) = picks[i].value / picks[i].cost
+    ratio(i) = _div(picks[i].value, picks[i].cost)
     left = [i for i in eachindex(picks) if picks[i].value > 0]
     sort!(left; by=ratio, rev=true, alg=MergeSort)
     selected = Int[]
     remaining = budget
     made = 0
     while !isempty(left) && (passes === nothing || made < passes)
-        made += 1
-        if made > 1
+        if made >= 1
             let limit = remaining
                 filter!(i -> picks[i].cost <= limit, left)
             end
+            isempty(left) && break
             sort!(left; by=i -> (-ratio(i), picks[i].cost), alg=MergeSort)
         end
+        made += 1
         taken = 0
         for i in left
             picks[i].cost <= remaining || break

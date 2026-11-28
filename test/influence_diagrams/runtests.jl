@@ -231,6 +231,17 @@ end
         @test from_many.problem.payoff.Q == from_one.problem.payoff.Q
         @test from_many.experiment.likelihood == from_one.experiment.likelihood
         @test from_many.actions == actions
+        # B23: Dict and Vector{Pair} collections of BayesModels also dispatch cleanly.
+        from_pairs = normal_form([a => BN.do_intervention(m, :Response => a)
+                                  for a in actions];
+                                 states=:Bd, observed=:Swab,
+                                 outcome=(:Bd, :Response) => frogs)
+        @test from_pairs.problem.payoff.Q == from_one.problem.payoff.Q
+        from_dict = normal_form(Dict(a => BN.do_intervention(m, :Response => a)
+                                     for a in actions);
+                                states=:Bd, observed=:Swab,
+                                outcome=(:Bd, :Response) => frogs)
+        @test Set(action_labels(from_dict.problem)) == Set(actions)
         # A count read from an outcome node, by state name, by vector, and as two terms.
         habitat = BN.reference_habitat_model()
         by_name = normal_form(habitat; decision=:Irrigation, states=:Climate,

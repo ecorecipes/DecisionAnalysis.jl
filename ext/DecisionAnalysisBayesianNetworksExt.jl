@@ -15,7 +15,25 @@ const BN = BayesianNetworks
 
 _names(x::Union{Symbol,AbstractString}) = Symbol[Symbol(x)]
 _names(x) = Symbol[Symbol(v) for v in x]
-_joined(labels) = Symbol(join(labels, "_"))
+function _unique_joined(tuples)
+    labels = Symbol[Symbol(join(t, "_")) for t in tuples]
+    allunique(labels) && return labels
+    return Symbol[Symbol(join(t, "|")) for t in tuples]
+end
+
+function _to_named_tuple(x::NamedTuple)
+    isempty(x) && throw(ArgumentError("expected a non-empty named collection of networks"))
+    return x
+end
+function _to_named_tuple(x::Union{AbstractDict,AbstractVector{<:Pair}})
+    iter = x isa AbstractDict ? pairs(x) : x
+    items = [Symbol(first(p)) => last(p) for p in iter]
+    isempty(items) &&
+        throw(ArgumentError("expected a non-empty named collection of networks"))
+    ks = first.(items)
+    allunique(ks) || throw(ArgumentError("duplicate names in collection: $ks"))
+    return NamedTuple{Tuple(ks)}(Tuple(last.(items)))
+end
 
 function _variable_states(model::BN.BayesModel, x::Symbol)
     BN.has_variable(BN.syntax(model), x) ||
@@ -56,6 +74,24 @@ end
 _outcome_terms(model, outcome::Pair) = [_outcome_term(model, outcome)]
 _outcome_terms(model, outcome) = [_outcome_term(model, term) for term in outcome]
 
+function _axis_strides(dims::Tuple, axes::Vector{Int})
+    st = Vector{Int}(undef, length(axes))
+    acc = 1
+    @inbounds for k in eachindex(axes)
+        st[k] = acc
+        acc *= dims[axes[k]]
+    end
+    return st
+end
+
+function _lin_idx(ci::CartesianIndex, axes::Vector{Int}, strides::Vector{Int})
+    idx = 1
+    @inbounds for k in eachindex(axes)
+        idx += (ci[axes[k]] - 1) * strides[k]
+    end
+    return idx
+end
+
 # From one network: mass[θ, z] = P(state = θ, observed = z) and
 # value[θ, z] = Σ P(state = θ, observed = z, x) × outcome(x), with the state and signal
 # labels. θ and z run over the joint states of `states` and `observed`, the first
@@ -67,25 +103,37 @@ function _tables(model::BN.BayesModel, states::Vector{Symbol}, observed::Vector{
     joint = BN.marginal(model, query; max_states, atol).table
     position = Dict{Symbol,Int}(x => i for (i, x) in enumerate(query))
     dims = size(joint)
-    index(ci, variables) = LinearIndices(Tuple(dims[position[x]] for x in variables))[(ci[position[x]]
-                                                                                       for x in variables)...]
-    nθ = prod(dims[position[x]] for x in states; init=1)
-    nz = prod(dims[position[x]] for x in observed; init=1)
+    s_axes = Int[position[x] for x in states]
+    z_axes = Int[position[x] for x in observed]
+    s_strides = _axis_strides(dims, s_axes)
+    z_strides = _axis_strides(dims, z_axes)
+    term_specs = [(Int[position[x] for x in vars],
+                   _axis_strides(dims, Int[position[x] for x in vars]), table)
+                  for (vars, table) in terms]
+    nθ = prod(dims[ax] for ax in s_axes; init=1)
+    nz = prod(dims[ax] for ax in z_axes; init=1)
     mass = zeros(nθ, nz)
     value = zeros(nθ, nz)
     for ci in CartesianIndices(dims)
         p = joint[ci]
         iszero(p) && continue
-        θ, z = index(ci, states), index(ci, observed)
+        θ = _lin_idx(ci, s_axes, s_strides)
+        z = _lin_idx(ci, z_axes, z_strides)
         mass[θ, z] += p
-        value[θ, z] += p * sum(table[index(ci, variables)] for (variables, table) in terms)
+        acc = 0.0
+        for (t_axes, t_strides, table) in term_specs
+            acc += table[_lin_idx(ci, t_axes, t_strides)]
+        end
+        value[θ, z] += p * acc
     end
-    label(variables) = [_joined(labels[position[x]][c[k]]
-                                for (k, x) in enumerate(variables))
-                        for c in vec(collect(CartesianIndices(Tuple(dims[position[x]]
-                                                                    for x in variables))))]
+    label(variables) = _unique_joined(Tuple(labels[position[x]][c[k]]
+                                            for (k, x) in enumerate(variables))
+                                      for c in
+                                          vec(collect(CartesianIndices(Tuple(dims[position[x]]
+                                                                             for x in
+                                                                                 variables)))))
     return mass, value, label(states), label(observed),
-           Tuple(dims[position[x]] for x in observed)
+           Tuple(dims[ax] for ax in z_axes)
 end
 
 # The experiment with likelihood P(z | θ) from mass[θ, z].
@@ -136,8 +184,11 @@ function DecisionAnalysis.normal_form(models::NamedTuple{<:Any,
     for (a, v) in enumerate(values), θ in eachindex(prior)
         iszero(prior[θ]) && continue
         Q[a, θ] = sum(view(v, θ, :)) / prior[θ]
-        # The state must carry everything the observation says about the outcome.
-        scale = max(1.0, maximum(abs, Q))
+    end
+    # The state must carry everything the observation says about the outcome.
+    scale = max(1.0, maximum(abs, Q))
+    for (a, v) in enumerate(values), θ in eachindex(prior)
+        iszero(prior[θ]) && continue
         for z in axes(v, 2)
             mass[θ, z] > atol || continue
             abs(v[θ, z] / mass[θ, z] - Q[a, θ]) <= 1e-7 * scale ||
@@ -200,6 +251,19 @@ function DecisionAnalysis.normal_form(hypotheses::NamedTuple{<:Any,
     problem = DecisionProblem(PayoffTable(actions, names, Q), belief; baseline)
     return (; problem, experiment=nothing, experiments=(;), actions, states=[:hypothesis],
             observed=Symbol[])
+end
+
+function DecisionAnalysis.normal_form(models::Union{AbstractDict,AbstractVector{<:Pair}};
+                                      kw...)
+    nt = _to_named_tuple(models)
+    first_val = first(values(nt))
+    if first_val isa BN.BayesModel
+        all(v -> v isa BN.BayesModel, values(nt)) ||
+            throw(ArgumentError("expected a collection of BayesModel values"))
+        return DecisionAnalysis.normal_form(nt; kw...)
+    end
+    nested = NamedTuple{keys(nt)}(Tuple(_to_named_tuple(v) for v in values(nt)))
+    return DecisionAnalysis.normal_form(nested; kw...)
 end
 
 end # module

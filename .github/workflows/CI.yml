@@ -44,6 +44,21 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         with:
           project: DecisionAnalysis.jl
+  bridge-tests:
+    name: Extension bridge tests (ID / BN)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.13'
+      - uses: julia-actions/cache@v3
+        with:
+          cache-compiled: 'true'
+      - name: Instantiate bridge environment
+        run: julia --project=test/influence_diagrams -e 'using Pkg; Pkg.instantiate()'
+      - name: Run influence-diagram and Bayesian-network bridge tests
+        run: julia --project=test/influence_diagrams test/influence_diagrams/runtests.jl
   format:
     name: Formatter check
     runs-on: ubuntu-latest

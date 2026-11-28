@@ -181,7 +181,9 @@ end
         outcome = Experiment(BigRat[7//10 3//10; 3//10 7//10];
                              signals=[:failure, :success])
         r = adaptive_management(trial, (; new=outcome); horizon=30)
-        @test r.beliefs_evaluated == 4960    # (periods left, successes, failures)
+        # Normalised beliefs collapse cancelling (success, failure) pairs: (h, s - f)
+        # gives Σ_{t=0}^{29} (2t + 1) = 900 distinct beliefs instead of 4960.
+        @test r.beliefs_evaluated == 900
         @test r.no_learning == 15 && r.act_now_action == :old
         @test r.no_learning == r.passive < r.active < r.perfect
         @test r.first_action == :new

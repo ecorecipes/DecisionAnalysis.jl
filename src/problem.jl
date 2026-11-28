@@ -138,11 +138,13 @@ it, and a [`PointBelief`](@ref) must lie in it.
 """
 function restrict_scenarios(p::DecisionProblem, states)
     wanted = _labels(states)
+    known = Set(p.payoff.states)
     for s in wanted
-        s in p.payoff.states ||
+        s in known ||
             throw(ArgumentError("state $s is not among the states $(p.payoff.states)"))
     end
-    cols = findall(in(wanted), p.payoff.states)
+    wanted_set = Set(wanted)
+    cols = findall(in(wanted_set), p.payoff.states)
     isempty(cols) && throw(ArgumentError("the scenario subset is empty"))
     payoff = _subtable(p.payoff, :, cols)
     return DecisionProblem(payoff, _restrict_belief(p.belief, p.payoff.states, cols),
@@ -154,7 +156,7 @@ function _condition(probabilities::AbstractVector, cols)
     iszero(mass) &&
         throw(ArgumentError("a belief gives the scenario subset probability zero and " *
                             "cannot be conditioned on it"))
-    return probabilities[cols] ./ mass
+    return [_div(probabilities[c], mass) for c in cols]
 end
 function _restrict_belief(b::FiniteBelief, states, cols)
     return FiniteBelief(states[cols], _condition(b.probabilities, cols))

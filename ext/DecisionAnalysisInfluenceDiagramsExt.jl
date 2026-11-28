@@ -12,7 +12,29 @@ using InfluenceDiagrams: InfluenceDiagrams
 
 const ID = InfluenceDiagrams
 
-_joined(labels) = Symbol(join(labels, "_"))
+function _unique_joined(tuples)
+    labels = Symbol[Symbol(join(t, "_")) for t in tuples]
+    allunique(labels) && return labels
+    return Symbol[Symbol(join(t, "|")) for t in tuples]
+end
+
+function _strides(sizes::Vector{Int})
+    st = Vector{Int}(undef, length(sizes))
+    acc = 1
+    @inbounds for k in eachindex(sizes)
+        st[k] = acc
+        acc *= sizes[k]
+    end
+    return st
+end
+
+function _lin_idx(ci::CartesianIndex, axes::Vector{Int}, strides::Vector{Int})
+    idx = 1
+    @inbounds for k in eachindex(axes)
+        idx += (ci[axes[k]] - 1) * strides[k]
+    end
+    return idx
+end
 
 function _variable_names(id, ids)
     return Symbol[ID.variable_name(id, v) for v in ids]
@@ -59,30 +81,37 @@ function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothin
     for a in actions
         J = ID.joint_table(ID.instantiate(ID.fix_decision(m, decision => a)))
         position = Dict(x => i for (i, x) in enumerate(J.variables))
-        s_axes = [position[x] for x in chosen]
-        z_axes = [position[x] for x in observed]
-        s_sizes = [length(J.states[i]) for i in s_axes]
-        z_sizes = [length(J.states[i]) for i in z_axes]
-        s_index = LinearIndices(Tuple(s_sizes))
-        z_index = LinearIndices(Tuple(z_sizes))
+        s_axes = Int[position[x] for x in chosen]
+        z_axes = Int[position[x] for x in observed]
+        s_sizes = Int[length(J.states[i]) for i in s_axes]
+        z_sizes = Int[length(J.states[i]) for i in z_axes]
+        s_strides = _strides(s_sizes)
+        z_strides = _strides(z_sizes)
         Z = zeros(prod(s_sizes), prod(z_sizes))
         N = zeros(size(Z))
+        assignment = Dict{Symbol,Symbol}()
+        sizehint!(assignment, length(J.variables))
         for ci in CartesianIndices(J.table)
             p = J.table[ci]
             iszero(p) && continue
-            assignment = Dict{Symbol,Symbol}(x => J.states[i][ci[i]]
-                                             for (i, x) in enumerate(J.variables))
-            θ = s_index[(ci[i] for i in s_axes)...]
-            z = z_index[(ci[i] for i in z_axes)...]
+            @inbounds for i in eachindex(J.variables)
+                assignment[J.variables[i]] = J.states[i][ci[i]]
+            end
+            θ = _lin_idx(ci, s_axes, s_strides)
+            z = _lin_idx(ci, z_axes, z_strides)
             Z[θ, z] += p
             N[θ, z] += p * ID.total_utility(m, assignment)
         end
         if mass === nothing
             mass = Z
-            state_labels = [_joined(J.states[i][c[k]] for (k, i) in enumerate(s_axes))
-                            for c in vec(collect(CartesianIndices(Tuple(s_sizes))))]
-            signal_labels = [_joined(J.states[i][c[k]] for (k, i) in enumerate(z_axes))
-                             for c in vec(collect(CartesianIndices(Tuple(z_sizes))))]
+            state_labels = _unique_joined(Tuple(J.states[i][c[k]]
+                                                for (k, i) in enumerate(s_axes))
+                                          for c in
+                                              vec(collect(CartesianIndices(Tuple(s_sizes)))))
+            signal_labels = _unique_joined(Tuple(J.states[i][c[k]]
+                                                 for (k, i) in enumerate(z_axes))
+                                           for c in
+                                               vec(collect(CartesianIndices(Tuple(z_sizes)))))
         else
             maximum(abs, Z .- mass) <= atol ||
                 throw(ArgumentError("the distribution of the state and the " *
@@ -96,9 +125,12 @@ function DecisionAnalysis.normal_form(m::ID.InfluenceDiagramModel; states=nothin
     for (a, N) in enumerate(weighted), θ in eachindex(prior)
         iszero(prior[θ]) && continue
         Q[a, θ] = sum(view(N, θ, :)) / prior[θ]
-        # The state must carry everything the information says about the utility:
-        # E[U | action, state, signal] = E[U | action, state] wherever it is defined.
-        scale = max(1.0, maximum(abs, Q))
+    end
+    # The state must carry everything the information says about the utility:
+    # E[U | action, state, signal] = E[U | action, state] wherever it is defined.
+    scale = max(1.0, maximum(abs, Q))
+    for (a, N) in enumerate(weighted), θ in eachindex(prior)
+        iszero(prior[θ]) && continue
         for z in axes(N, 2)
             mass[θ, z] > atol || continue
             abs(N[θ, z] / mass[θ, z] - Q[a, θ]) <= 1e-7 * scale ||

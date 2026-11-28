@@ -364,11 +364,30 @@ using GAM: GAM
         cell = DecisionProblem(PayoffTable([1.0; 1.0;;]; standard_errors=[0.3; 0.4;;]),
                                SampleBelief(1))
         @test evpi(cell, SampleAverage()).bias.cells ≈ sqrt((0.3^2 + 0.4^2) / (2π)) rtol = 0.2
-        # Noise shared between the actions cancels: with correlation ρ the bias scales
-        # by √(1 − ρ), and vanishes at ρ = 1.
+        # With correlation ρ between two actions of standard errors σ1, σ2,
+        # Var(ε1 − ε2) = σ1² + σ2² − 2ρ σ1 σ2; equal standard errors cancel at ρ = 1,
+        # while unequal ones retain |σ1 − σ2| / √(2π).
         @test evpi(cell, SampleAverage(); noise_correlation=0.75).bias.cells ≈
-              0.5 * sqrt((0.3^2 + 0.4^2) / (2π)) rtol = 0.2
-        @test evpi(cell, SampleAverage(); noise_correlation=1).bias.cells == 0
+              sqrt((0.3^2 + 0.4^2 - 2 * 0.75 * 0.3 * 0.4) / (2π)) rtol = 0.2
+        @test evpi(cell, SampleAverage(); noise_correlation=1).bias.cells ≈
+              abs(0.4 - 0.3) / sqrt(2π) rtol = 0.2
+        equal_cell = DecisionProblem(PayoffTable([1.0; 1.0;;];
+                                                 standard_errors=[0.4; 0.4;;]),
+                                     SampleBelief(1))
+        @test evpi(equal_cell, SampleAverage(); noise_correlation=0.75).bias.cells ≈
+              0.5 * sqrt((0.4^2 + 0.4^2) / (2π)) rtol = 0.2
+        @test evpi(equal_cell, SampleAverage(); noise_correlation=1).bias.cells == 0
+        det_base = DecisionProblem(PayoffTable([0.0; 0.0;;];
+                                               standard_errors=[0.0; 10.0;;]),
+                                   SampleBelief(1))
+        @test evpi(det_base, SampleAverage(); noise_correlation=1).bias.cells ≈
+              10.0 / sqrt(2π) rtol = 0.2
+        three_act = DecisionProblem(PayoffTable([0.0; 0.0; 0.0;;];
+                                                standard_errors=[1.0; 1.0; 1.0;;]),
+                                    SampleBelief(1))
+        @test_throws ArgumentError evpi(three_act, SampleAverage();
+                                        noise_correlation=-0.6)
+        @test evpi(three_act, SampleAverage(); noise_correlation=-0.5).bias.cells > 0
         @test_throws ArgumentError evpi(cell, SampleAverage(); noise_correlation=2)
         # The achieved correlation of an outcome table, against explicit loops: runs
         # that share a replicate effect across actions, and runs that do not.

@@ -9,6 +9,7 @@ The schema identifier written into every certificate, `"decision-certificate/1"`
 """
 const CERTIFICATE_SCHEMA = "decision-certificate/1"
 
+_rational_string(x::Bool) = x ? "1" : "0"
 _rational_string(x::Integer) = string(x)
 function _rational_string(x::Rational)
     return isone(denominator(x)) ? string(numerator(x)) :

@@ -204,9 +204,10 @@ function OutcomeTable(runs; draw=:draw, action=:action, replicate=:replicate, ou
     wv = w === nothing ? fill(1 // nd, nd) : _normalise_weights(collect(w))
     length(wv) == nd || throw(ArgumentError("$(length(wv)) weights for $nd draws"))
 
-    state = fill(_ABSENT, length(alabels), nd, length(rlabels))
-    raw = Array{Any}(undef, length(alabels), nd, length(rlabels), length(names))
-    fill!(raw, 0)
+    na, nr, no = length(alabels), length(rlabels), length(names)
+    state = fill(_ABSENT, na, nd, nr)
+    ok_rows = Int[]
+    sizehint!(ok_rows, n)
     T = Union{}
     for i in 1:n
         a, d, r = ai[i], di[i], ri[i]
@@ -227,14 +228,20 @@ function OutcomeTable(runs; draw=:draw, action=:action, replicate=:replicate, ou
                                           "$(alabels[a]), draw $(dlabels[d]), replicate " *
                                           "$(rlabels[r]) is $(repr(v)), not a finite " *
                                           "number, in a run whose status is acceptable"))
-            raw[a, d, r, k] = v
             T = promote_type(T, typeof(v))
         end
+        push!(ok_rows, i)
     end
     T === Union{} && throw(InvalidOutcomeError("no run of the table has an acceptable " *
                                                "status"))
     T === Bool && (T = Int)
-    return OutcomeTable(dlabels, alabels, names, rlabels, Array{T,4}(raw), state, pars, wv)
+    vals = zeros(T, na, nd, nr, no)
+    for (k, col) in enumerate(ocols)
+        @inbounds for i in ok_rows
+            vals[ai[i], di[i], ri[i], k] = col[i]
+        end
+    end
+    return OutcomeTable(dlabels, alabels, names, rlabels, vals, state, pars, wv)
 end
 
 state_labels(t::OutcomeTable) = t.draws
@@ -339,25 +346,31 @@ julia> action_labels(t), run_counts(t).ok
 ```
 """
 function combine_actions(first::OutcomeTable, rest::OutcomeTable...)
-    status, actions = first.status, copy(first.actions)
+    actions = copy(first.actions)
+    seen_actions = Set(actions)
     names = filter(o -> all(t -> o in t.outcomes, rest), first.outcomes)
     isempty(names) && throw(ArgumentError("the tables record no outcome in common"))
-    pick(t) = t.values[:, :, :, [findfirst(==(o), t.outcomes) for o in names]]
-    values = pick(first)
+    nd, nr, no = length(first.draws), length(first.replicates), length(names)
+    d_perms = Vector{Vector{Int}}(undef, length(rest))
+    r_perms = Vector{Vector{Int}}(undef, length(rest))
+    o_perms = Vector{Vector{Int}}(undef, length(rest))
+    T = eltype(first.values)
     for (k, t) in enumerate(rest)
         which = "table $(k + 1)"
-        sort(t.draws) == sort(first.draws) ||
+        d_map = Dict{Symbol,Int}(l => i for (i, l) in enumerate(t.draws))
+        (length(t.draws) == nd && all(l -> haskey(d_map, l), first.draws)) ||
             throw(ArgumentError("$which does not have the draws of the first: " *
                                 "$(symdiff(t.draws, first.draws)) are in one only"))
-        sort(t.replicates) == sort(first.replicates) ||
+        r_map = Dict{Symbol,Int}(l => i for (i, l) in enumerate(t.replicates))
+        (length(t.replicates) == nr && all(l -> haskey(r_map, l), first.replicates)) ||
             throw(ArgumentError("$which does not have the replicates of the first " *
                                 "($(first.replicates)): it has $(t.replicates)"))
-        shared = intersect(actions, t.actions)
+        shared = [a for a in t.actions if a in seen_actions]
         isempty(shared) ||
             throw(ArgumentError("$which repeats the actions $shared; drop them from " *
                                 "one table, since a run cannot be in the table twice"))
-        d = [findfirst(==(l), t.draws) for l in first.draws]
-        r = [findfirst(==(l), t.replicates) for l in first.replicates]
+        d = Int[d_map[l] for l in first.draws]
+        r = Int[r_map[l] for l in first.replicates]
         t.weights[d] == first.weights ||
             throw(ArgumentError("$which gives the draws other weights than the first"))
         for name in intersect(keys(first.parameters), keys(t.parameters))
@@ -365,9 +378,35 @@ function combine_actions(first::OutcomeTable, rest::OutcomeTable...)
                 throw(ArgumentError("$which has other values of the parameter $name " *
                                     "than the first, so its draws are not the same"))
         end
-        values = cat(values, pick(t)[:, d, r, :]; dims=1)
-        status = cat(status, t.status[:, d, r]; dims=1)
+        o_map = Dict{Symbol,Int}(l => i for (i, l) in enumerate(t.outcomes))
+        d_perms[k] = d
+        r_perms[k] = r
+        o_perms[k] = Int[o_map[o] for o in names]
+        T = promote_type(T, eltype(t.values))
         append!(actions, t.actions)
+        union!(seen_actions, t.actions)
+    end
+    na_total = length(actions)
+    values = Array{T,4}(undef, na_total, nd, nr, no)
+    status = Array{String,3}(undef, na_total, nd, nr)
+    first_o_map = Dict{Symbol,Int}(l => i for (i, l) in enumerate(first.outcomes))
+    first_o = Int[first_o_map[o] for o in names]
+    na1 = length(first.actions)
+    @inbounds for k in 1:no, r in 1:nr, d in 1:nd, a in 1:na1
+        values[a, d, r, k] = first.values[a, d, r, first_o[k]]
+    end
+    status[1:na1, :, :] .= first.status
+    offset = na1
+    for (idx, t) in enumerate(rest)
+        nat = length(t.actions)
+        dp, rp, op = d_perms[idx], r_perms[idx], o_perms[idx]
+        @inbounds for k in 1:no, r in 1:nr, d in 1:nd, a in 1:nat
+            values[offset + a, d, r, k] = t.values[a, dp[d], rp[r], op[k]]
+        end
+        @inbounds for r in 1:nr, d in 1:nd, a in 1:nat
+            status[offset + a, d, r] = t.status[a, dp[d], rp[r]]
+        end
+        offset += nat
     end
     return OutcomeTable(copy(first.draws), actions, names, copy(first.replicates), values,
                         status, first.parameters, copy(first.weights))
@@ -420,17 +459,85 @@ function _outcome_tuple(o)
                                      "$(typeof(o))"))
 end
 
+# Run one parameter draw across all actions and replicates, hoisting `with_parameters` per
+# draw and `apply_action` per (draw, action). Returns nothing; records any fatal error in
+# `fatal_errs[d]` (or rethrows immediately when `rethrow_fatal` is true).
+function _run_outcome_draw!(results::Array{Any,3}, state::Array{String,3},
+                            first_errs::Vector{Any}, fatal_errs::Vector{Any}, prob,
+                            named::Vector, row, seeds::Matrix, d::Int, replicates::Int,
+                            on_error::Symbol, rethrow_fatal::Bool)
+    na = length(named)
+    p_d = try
+        with_parameters(prob, row)
+    catch err
+        if err isa InterruptException || err isa InvalidOutcomeError || on_error === :throw
+            rethrow_fatal && rethrow()
+            fatal_errs[d] = err
+            return nothing
+        end
+        first_errs[d] === nothing && (first_errs[d] = err)
+        tag = "error:" * string(nameof(typeof(err)))
+        for r in 1:replicates, a in 1:na
+            state[a, d, r] = tag
+        end
+        return nothing
+    end
+    for a in 1:na
+        act = last(named[a])
+        acted = try
+            apply_action(p_d, act)
+        catch err
+            if err isa InterruptException || err isa InvalidOutcomeError ||
+               on_error === :throw
+                rethrow_fatal && rethrow()
+                fatal_errs[d] = err
+                return nothing
+            end
+            first_errs[d] === nothing && (first_errs[d] = err)
+            tag = "error:" * string(nameof(typeof(err)))
+            for r in 1:replicates
+                state[a, d, r] = tag
+            end
+            continue
+        end
+        for r in 1:replicates
+            try
+                rng = Xoshiro(seeds[d, r])
+                results[a, d, r] = _outcome_tuple(outcome(acted, simulate(acted; rng)))
+            catch err
+                if err isa InterruptException || err isa InvalidOutcomeError ||
+                   on_error === :throw
+                    rethrow_fatal && rethrow()
+                    fatal_errs[d] = err
+                    return nothing
+                end
+                first_errs[d] === nothing && (first_errs[d] = err)
+                state[a, d, r] = "error:" * string(nameof(typeof(err)))
+            end
+        end
+    end
+    return nothing
+end
+
+function _run_outcomes_threaded!(results::Array{Any,3}, state::Array{String,3},
+                                 first_errs::Vector{Any}, fatal_errs::Vector{Any}, prob,
+                                 named::Vector, rows::Vector, seeds::Matrix, nd::Int,
+                                 replicates::Int, on_error::Symbol)
+    Threads.@threads for d in 1:nd
+        _run_outcome_draw!(results, state, first_errs, fatal_errs, prob, named, rows[d],
+                           seeds, d, replicates, on_error, false)
+    end
+    return nothing
+end
+
 """
     outcomes(prob, actions, draws; replicates=1, seed, run_seed=nothing,
-             on_error=:record) -> OutcomeTable
+             on_error=:record, threaded=false) -> OutcomeTable
 
 Run a model over draws × actions × replicates and collect the named outcomes. The
 model is reached through the adapter verbs only, which must have methods for the
-type of `prob`: each run is
-
-    p = apply_action(with_parameters(prob, θ), a)
-    outcome(p, simulate(p; rng))
-
+type of `prob`: each draw sets `p_d = with_parameters(prob, θ)`, each action sets
+`p = apply_action(p_d, a)`, and each replicate runs `outcome(p, simulate(p; rng))`
 ([`with_parameters`](@ref), [`apply_action`](@ref), [`simulate`](@ref),
 [`outcome`](@ref); `outcome(p, solution)` falls back on `outcome(solution)`).
 
@@ -460,6 +567,10 @@ type of `prob`: each run is
   be deterministic and should give different seeds to different runs; two runs with
   the same seed throw an `ArgumentError`, because their outcomes would be copies and
   not replicates. Give `seed` or `run_seed`, not both.
+- `threaded`: when `true`, runs parameter draws in parallel across Julia threads
+  (`Threads.@threads`). Requires thread-safe adapter methods (`with_parameters`,
+  `apply_action`, `simulate`, `outcome`) and produces the exact same values as
+  `threaded=false` because every run uses its own seeded `Xoshiro`.
 
 A run that throws is kept as a failed run with the status `error:<exception type>`
 (see [`failed_runs`](@ref)); an `InterruptException` is rethrown. If every run fails,
@@ -470,7 +581,7 @@ failed run is a mistake to find and not an outcome of the model to count.
 """
 function outcomes(prob, actions, draws; replicates::Integer=1,
                   seed::Union{Nothing,Integer}=nothing, run_seed=nothing,
-                  on_error::Symbol=:record)
+                  on_error::Symbol=:record, threaded::Bool=false)
     seed === nothing && run_seed === nothing &&
         throw(ArgumentError("give `seed`: runs are reproducible only with a stated seed"))
     seed === nothing || run_seed === nothing ||
@@ -486,53 +597,65 @@ function outcomes(prob, actions, draws; replicates::Integer=1,
     allunique(labels) || throw(ArgumentError("the action labels must be distinct"))
     rows = isempty(belief.draws) ? fill((;), length(belief)) : Tables.rowtable(belief.draws)
     nd = length(rows)
-    results = Array{Any}(undef, length(named), nd, replicates)
-    state = fill(_OK, length(named), nd, replicates)
-    names = nothing
-    first_error = nothing
-    seeds = [_seed_of_run(seed, run_seed, rows[d], d, r) for d in 1:nd, r in 1:replicates]
+    na = length(named)
+    nr = Int(replicates)
+    results = Array{Any}(undef, na, nd, nr)
+    state = fill(_OK, na, nd, nr)
+    first_errs = Vector{Any}(fill(nothing, nd))
+    fatal_errs = Vector{Any}(fill(nothing, nd))
+    seeds = [_seed_of_run(seed, run_seed, rows[d], d, r) for d in 1:nd, r in 1:nr]
     run_seed === nothing || allunique(seeds) ||
         throw(ArgumentError("`run_seed` gave the same seed to two runs, whose outcomes " *
                             "would be copies of each other and not replicates"))
-    for d in 1:nd, r in 1:replicates
-        for (a, (_, act)) in enumerate(named)
-            try
-                rng = Xoshiro(seeds[d, r])
-                acted = apply_action(with_parameters(prob, rows[d]), act)
-                o = _outcome_tuple(outcome(acted, simulate(acted; rng)))
-                names === nothing && (names = keys(o))
-                keys(o) == names ||
-                    throw(InvalidOutcomeError("`outcome` returned the names $(keys(o)) " *
-                                              "in one run and $names in another"))
-                results[a, d, r] = o
-            catch err
-                (err isa InterruptException || err isa InvalidOutcomeError ||
-                 on_error === :throw) && rethrow()
-                first_error === nothing && (first_error = err)
-                state[a, d, r] = "error:" * string(nameof(typeof(err)))
-            end
+    if threaded && nd > 1 && Threads.nthreads() > 1
+        _run_outcomes_threaded!(results, state, first_errs, fatal_errs, prob, named, rows,
+                                seeds, nd, nr, on_error)
+        for d in 1:nd
+            fatal_errs[d] === nothing || throw(fatal_errs[d])
+        end
+    else
+        for d in 1:nd
+            _run_outcome_draw!(results, state, first_errs, fatal_errs, prob, named, rows[d],
+                               seeds, d, nr, on_error, true)
         end
     end
-    names === nothing &&
-        throw(InvalidOutcomeError("every run failed; the first error was: " *
-                                  sprint(showerror, first_error)))
+    names = nothing
     T = Union{}
-    raw = Array{Any}(undef, length(named), nd, replicates, length(names))
-    fill!(raw, 0)
-    for idx in CartesianIndices(state)
-        state[idx] == _OK || continue
-        for (k, v) in enumerate(values(results[idx]))
+    for d in 1:nd, r in 1:nr, a in 1:na
+        state[a, d, r] == _OK || continue
+        o = results[a, d, r]
+        if names === nothing
+            names = keys(o)
+        elseif keys(o) != names
+            throw(InvalidOutcomeError("`outcome` returned the names $(keys(o)) " *
+                                      "in one run and $names in another"))
+        end
+        for (k, v) in enumerate(values(o))
             (v isa Real && isfinite(v)) ||
                 throw(InvalidOutcomeError("outcome $(names[k]) of action " *
-                                          "$(labels[idx[1]]), draw " *
-                                          "$(belief.states[idx[2]]) is $(repr(v)), not " *
+                                          "$(labels[a]), draw " *
+                                          "$(belief.states[d]) is $(repr(v)), not " *
                                           "a finite number"))
-            raw[idx, k] = v
             T = promote_type(T, typeof(v))
         end
     end
+    if names === nothing
+        first_error = findfirst(!isnothing, first_errs)
+        err = first_error === nothing ? ErrorException("unknown error") :
+              first_errs[first_error]
+        throw(InvalidOutcomeError("every run failed; the first error was: " *
+                                  sprint(showerror, err)))
+    end
     T === Bool && (T = Int)
+    vals = zeros(T, na, nd, nr, length(names))
+    @inbounds for r in 1:nr, d in 1:nd, a in 1:na
+        state[a, d, r] == _OK || continue
+        vs = values(results[a, d, r])
+        for k in eachindex(vs)
+            vals[a, d, r, k] = vs[k]
+        end
+    end
     return OutcomeTable(belief.states, labels, collect(Symbol, names),
-                        _default_labels("r", replicates), Array{T,4}(raw), state,
+                        _default_labels("r", nr), vals, state,
                         belief.draws, belief.weights)
 end

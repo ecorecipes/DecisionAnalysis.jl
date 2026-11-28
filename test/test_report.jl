@@ -188,12 +188,20 @@
         @test rf.monte_carlo.variance === nothing
         @test occursin("single simulator run", sprint(show, MIME"text/plain"(), rf))
         @test any(a -> occursin("carry no parameters", a), rf.assumptions)
-        # Too few draws for the default regression: said, not attempted.
+        # With automatic knot selection, 30 draws on one parameter fits cleanly; too few
+        # draws for a 5-parameter GP (n <= p + 3) is skipped and noted.
         few = DecisionProblem(PayoffTable(Q[:, 1:30]; standard_errors=se[:, 1:30]),
                               SampleBelief((; x=x[1:30])))
-        @test any(a -> occursin("too few draws", a), DecisionReport(few).assumptions)
+        @test DecisionReport(few).monte_carlo.evpi_regression !== nothing
         @test DecisionReport(few; regression=nothing).monte_carlo.evpi_regression ===
               nothing
+        tiny_draws = NamedTuple{(:p1, :p2, :p3, :p4, :p5)}(Tuple(randn(Xoshiro(i), 6)
+                                                                 for i in 1:5))
+        tiny = DecisionProblem(PayoffTable(Q[:, 1:6]; standard_errors=se[:, 1:6]),
+                               SampleBelief(tiny_draws))
+        rtiny = DecisionReport(tiny)
+        @test rtiny.monte_carlo.evpi_regression === nothing
+        @test any(a -> occursin("too few draws", a), rtiny.assumptions)
         # `parameters` belongs to samples.
         finite = DecisionProblem(PayoffTable([1 2; 3 0]), [1 // 2, 1 // 2])
         @test_throws BeliefFormError DecisionReport(finite; parameters=[:x])

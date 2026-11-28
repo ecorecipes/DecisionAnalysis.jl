@@ -43,8 +43,7 @@ julia> profile.evsi, profile.probability_zero
 ```
 """
 function voi_profile(problem::DecisionProblem, experiment::Experiment; atol::Real=0,
-                     rtol::Real=_default_rtol(promote_type(eltype(problem.payoff),
-                                                           eltype(experiment))))
+                     rtol::Union{Nothing,Real}=nothing)
     _check_states(experiment, problem.payoff.states, "payoff table")
     p = _prior(problem, :voi_profile)
     Q = _feasible_Q(problem)
@@ -52,7 +51,8 @@ function voi_profile(problem::DecisionProblem, experiment::Experiment; atol::Rea
     actions = feasible_actions(problem)
     a0 = argmax(Q * p)
     T = promote_type(eltype(Q), eltype(p), eltype(L))
-    V = Base.promote_op(/, T, T)
+    V = _div_type(T, T)
+    rtol_eff = rtol === nothing ? _default_rtol(T) : rtol
     outcomes = map(axes(L, 1)) do z
         joint = p .* view(L, z, :)
         pz = sum(joint)
@@ -61,17 +61,17 @@ function voi_profile(problem::DecisionProblem, experiment::Experiment; atol::Rea
             return (; signal, probability=pz, best=Symbol[], posterior_value=nothing,
                     value=zero(V), changes_decision=false)
         scores = Q * joint
-        best = _select(Optimize(), scores, :max, _tolerance(scores, atol, rtol))
+        best = _select(Optimize(), scores, :max, _tolerance(scores, atol, rtol_eff))
         stays = a0 in best
-        value = stays ? zero(V) : (maximum(scores) - scores[a0]) / pz
+        value = stays ? zero(V) : _div(maximum(scores) - scores[a0], pz)
         return (; signal, probability=pz, best=actions[best],
-                posterior_value=maximum(scores) / pz, value, changes_decision=!stays)
+                posterior_value=_div(maximum(scores), pz), value,
+                changes_decision=!stays)
     end
     total = sum(o.probability * o.value for o in outcomes; init=zero(V))
-    second = sum(o.probability * o.value^2 for o in outcomes; init=zero(V))
+    variance = sum(o.probability * (o.value - total)^2 for o in outcomes; init=zero(V))
     unchanged = sum(o.probability for o in outcomes if !o.changes_decision;
                     init=zero(promote_type(eltype(p), eltype(L))))
-    variance = second - total^2
     return (; act_now_action=actions[a0], outcomes, evsi=total, variance,
             standard_deviation=sqrt(max(Float64(variance), 0.0)),
             probability_zero=unchanged)
@@ -79,7 +79,8 @@ end
 
 function _variance_split(total::Real, between::Real)
     return (; prior_variance=total, expected_posterior_variance=total - between,
-            reduction=between, share=iszero(total) ? zero(between) : between / total)
+            reduction=between,
+            share=iszero(total) ? zero(_div(between, one(total))) : _div(between, total))
 end
 
 function _state_quantity(problem::DecisionProblem, quantity::AbstractVector{<:Real})
@@ -136,14 +137,15 @@ function expected_variance_reduction(problem::DecisionProblem, experiment::Exper
     g = _state_quantity(problem, quantity)
     L = experiment.likelihood
     centre = dot(p, g)
-    total = sum(p[j] * g[j]^2 for j in eachindex(g)) - centre^2
-    explained = zero(Base.promote_op(/, typeof(total), eltype(L)))
+    total = sum(p[j] * (g[j] - centre)^2 for j in eachindex(g))
+    between = zero(_div_type(typeof(total), promote_type(eltype(p), eltype(L))))
     for z in axes(L, 1)
         pz = sum(p[j] * L[z, j] for j in eachindex(g))
         iszero(pz) && continue
-        explained += sum(p[j] * L[z, j] * g[j] for j in eachindex(g))^2 / pz
+        num = sum(p[j] * L[z, j] * (g[j] - centre) for j in eachindex(g))
+        between += _div(num^2, pz)
     end
-    return _variance_split(total, explained - centre^2)
+    return _variance_split(total, between)
 end
 
 function expected_variance_reduction(problem::DecisionProblem, partition::AbstractVector,
@@ -154,15 +156,15 @@ function expected_variance_reduction(problem::DecisionProblem, partition::Abstra
         throw(ArgumentError("the partition has $(length(partition)) entries for the " *
                             "$(length(g)) states of the payoff table"))
     centre = dot(p, g)
-    total = sum(p[j] * g[j]^2 for j in eachindex(g)) - centre^2
-    explained = zero(Base.promote_op(/, typeof(total), eltype(p)))
-    for cell in unique(partition)
-        cols = findall(isequal(cell), partition)
+    total = sum(p[j] * (g[j] - centre)^2 for j in eachindex(g))
+    between = zero(_div_type(typeof(total), eltype(p)))
+    for cols in _cell_columns(partition)
         mass = sum(p[cols])
         iszero(mass) && continue
-        explained += sum(p[j] * g[j] for j in cols)^2 / mass
+        num = sum(p[j] * (g[j] - centre) for j in cols)
+        between += _div(num^2, mass)
     end
-    return _variance_split(total, explained - centre^2)
+    return _variance_split(total, between)
 end
 
 function expected_variance_reduction(problem::DecisionProblem,
@@ -294,7 +296,9 @@ function optimal_design(problem::DecisionProblem, designs; costs=nothing,
                 net_standard_error=population * e.standard_error)
     end
     nets = [r.net for r in rows]
-    tied = [r.name for r in rows if r.net == maximum(nets)]
+    tol = _tolerance(nets, 0, _default_rtol(eltype(nets)))
+    top = maximum(nets)
+    tied = [r.name for r in rows if r.net >= top - tol]
     return (; designs=rows, best=first(tied), tied,
             criterion=all(iszero, cost) ? :evsi : :net_benefit, population)
 end
@@ -371,18 +375,28 @@ function value_of_waiting(problem::DecisionProblem, delayed::PayoffTable,
     L = experiment.likelihood
     actions = feasible_actions(problem)
     now = Q * p
-    a0 = argmax(now)
+    now_tol = _tolerance(now, 0, _default_rtol(eltype(now)))
+    a0 = findfirst(>=(maximum(now) - now_tol), now)
     late_now = late * p
+    late_tol = _tolerance(late_now, 0, _default_rtol(eltype(late_now)))
     joint = [late * (p .* view(L, z, :)) for z in axes(L, 1)]
     waiting = sum(maximum, joint)
-    policy = [experiment.signals[z] => actions[argmax(joint[z])]
-              for z in axes(L, 1) if !iszero(sum(p .* view(L, z, :)))]
+    policy = map(z -> begin
+                     scores = joint[z]
+                     ztol = _tolerance(scores, 0, _default_rtol(eltype(scores)))
+                     experiment.signals[z] => actions[findfirst(>=(maximum(scores) - ztol),
+                                                                scores)]
+                 end, [z for z in axes(L, 1) if !iszero(sum(p .* view(L, z, :)))])
     value = waiting - now[a0]
-    return (; value, wait=value > 0, act_now_value=now[a0], act_now_action=actions[a0],
+    val_tol = _is_exact(typeof(value)) ? zero(value) :
+              _default_rtol(typeof(value)) * max(one(value), abs(waiting), abs(now[a0]))
+    return (; value, wait=value > val_tol, act_now_value=now[a0],
+            act_now_action=actions[a0],
             waiting_value=waiting, delay_cost=now[a0] - maximum(late_now),
             evsi_delayed=waiting - maximum(late_now),
             evsi_now=sum(maximum(Q * (p .* view(L, z, :))) for z in axes(L, 1)) - now[a0],
-            late_action=actions[argmax(late_now)], policy)
+            late_action=actions[findfirst(>=(maximum(late_now) - late_tol), late_now)],
+            policy)
 end
 
 function value_of_waiting(problem::DecisionProblem, options)
@@ -394,8 +408,10 @@ function value_of_waiting(problem::DecisionProblem, options)
         return value_of_waiting(problem, option[1], option[2])
     end
     values = [r.value for r in results]
-    k = argmax(values)
+    tol = _tolerance(values, 0, _default_rtol(eltype(values)))
+    top = maximum(values)
+    k = findfirst(>=(top - tol), values)
     return (; act_now_value=first(results).act_now_value,
             act_now_action=first(results).act_now_action, options=first.(named), values,
-            results, best=values[k] > 0 ? first(named[k]) : :act_now)
+            results, best=results[k].wait ? first(named[k]) : :act_now)
 end

@@ -73,81 +73,91 @@ _objective_at(data, x) = dot(data.c, x) + data.c_offset
 
 # The matrix form  bl ≤ A x ≤ bu, xl ≤ x ≤ xu  as the form of the built-in simplex:
 # minimise c'x subject to Aeq x = beq, Aub x ≤ bub, x ≥ 0 except for the free variables.
+# Variables with a finite lower bound are shifted (`x' = x - xl >= 0`) rather than split.
 function _solve_internal(data)
     A = Matrix(data.A)
     m, n = size(A)
     R = _BigRat
-    eq_rows, eq_rhs = Vector{R}[], R[]
-    ub_rows, ub_rhs = Vector{R}[], R[]
-    for i in 1:m
-        row = R.(A[i, :])
-        lo, hi = data.b_lower[i], data.b_upper[i]
-        if lo == hi
-            push!(eq_rows, row)
-            push!(eq_rhs, R(lo))
-        else
-            if isfinite(hi)
-                push!(ub_rows, row)
-                push!(ub_rhs, R(hi))
-            end
-            if isfinite(lo)
-                push!(ub_rows, -row)
-                push!(ub_rhs, -R(lo))
-            end
-        end
-    end
+    shift = zeros(R, n)
     free = Int[]
+    ub_rows, ub_rhs = Vector{R}[], R[]
     unit(j, s) = R[k == j ? s : 0 for k in 1:n]
     for j in 1:n
         lo, hi = data.x_lower[j], data.x_upper[j]
-        if !iszero(lo)
+        if isfinite(lo) && isfinite(hi) && lo > hi
+            return :infeasible, R[]
+        end
+        if isfinite(lo)
+            shift[j] = R(lo)
+            if isfinite(hi)
+                push!(ub_rows, unit(j, 1))
+                push!(ub_rhs, R(hi) - shift[j])
+            end
+        else
             push!(free, j)
-            if isfinite(lo)
-                push!(ub_rows, unit(j, -1))
-                push!(ub_rhs, -R(lo))
+            if isfinite(hi)
+                push!(ub_rows, unit(j, 1))
+                push!(ub_rhs, R(hi))
             end
         end
-        if isfinite(hi)
-            push!(ub_rows, unit(j, 1))
-            push!(ub_rhs, R(hi))
+    end
+    has_shift = any(!iszero, shift)
+    eq_rows, eq_rhs = Vector{R}[], R[]
+    for i in 1:m
+        row = R.(A[i, :])
+        offset = has_shift ? dot(row, shift) : zero(R)
+        lo, hi = data.b_lower[i], data.b_upper[i]
+        if lo == hi
+            push!(eq_rows, row)
+            push!(eq_rhs, R(lo) - offset)
+        else
+            if isfinite(hi)
+                push!(ub_rows, row)
+                push!(ub_rhs, R(hi) - offset)
+            end
+            if isfinite(lo)
+                push!(ub_rows, -row)
+                push!(ub_rhs, offset - R(lo))
+            end
         end
     end
     stack(rows) = isempty(rows) ? zeros(R, 0, n) : permutedims(reduce(hcat, rows))
     c = _minimising_sign(data) .* R.(data.c)
     sol = _solve_lp(c, stack(eq_rows), eq_rhs, stack(ub_rows), ub_rhs; free)
-    return sol.status, sol.x
+    sol.status === :optimal || return sol.status, sol.x
+    return sol.status, has_shift ? (sol.x .+ shift) : sol.x
 end
 
-# A `Float64` copy of the matrix form, with its variables and rows in the same order
-# (a row with no finite bound has no constraint and the entry `nothing`).
-function _float_twin(data)
+# A typed copy of the matrix form, with its variables and rows in the same order
+# (a row with no finite bound has no constraint and the entry `nothing`). Building a fresh
+# twin leaves `prog.model` untouched and gives row handles in the order of `data.A`.
+function _typed_twin(data, ::Type{S}) where {S<:Real}
     m, n = size(data.A)
-    twin = JuMP.Model()
+    twin = JuMP.GenericModel{S}()
     x = JuMP.@variable(twin, [1:n])
     for j in 1:n
-        isfinite(data.x_lower[j]) && JuMP.set_lower_bound(x[j], Float64(data.x_lower[j]))
-        isfinite(data.x_upper[j]) && JuMP.set_upper_bound(x[j], Float64(data.x_upper[j]))
+        isfinite(data.x_lower[j]) && JuMP.set_lower_bound(x[j], S(data.x_lower[j]))
+        isfinite(data.x_upper[j]) && JuMP.set_upper_bound(x[j], S(data.x_upper[j]))
     end
     A = Matrix(data.A)
     rows = Any[]
     for i in 1:m
-        expr = sum(Float64(A[i, j]) * x[j] for j in 1:n if !iszero(A[i, j]); init=0.0)
-        expr = expr + JuMP.AffExpr(0.0)
+        expr = sum(S(A[i, j]) * x[j] for j in 1:n if !iszero(A[i, j]); init=zero(S))
+        expr = expr + JuMP.GenericAffExpr{S,JuMP.GenericVariableRef{S}}(zero(S))
         lo, hi = data.b_lower[i], data.b_upper[i]
         if lo == hi
-            push!(rows, JuMP.@constraint(twin, expr == Float64(lo)))
+            push!(rows, JuMP.@constraint(twin, expr == S(lo)))
         elseif isfinite(lo) && isfinite(hi)
-            push!(rows, JuMP.@constraint(twin, Float64(lo) <= expr <= Float64(hi)))
+            push!(rows, JuMP.@constraint(twin, S(lo) <= expr <= S(hi)))
         elseif isfinite(lo)
-            push!(rows, JuMP.@constraint(twin, expr >= Float64(lo)))
+            push!(rows, JuMP.@constraint(twin, expr >= S(lo)))
         elseif isfinite(hi)
-            push!(rows, JuMP.@constraint(twin, expr <= Float64(hi)))
+            push!(rows, JuMP.@constraint(twin, expr <= S(hi)))
         else
             push!(rows, nothing)
         end
     end
-    objective = sum(Float64(data.c[j]) * x[j] for j in 1:n; init=0.0) +
-                Float64(data.c_offset)
+    objective = sum(S(data.c[j]) * x[j] for j in 1:n; init=zero(S)) + S(data.c_offset)
     if data.sense == _MOI.MAX_SENSE
         JuMP.@objective(twin, Max, objective)
     elseif data.sense == _MOI.MIN_SENSE
@@ -155,6 +165,7 @@ function _float_twin(data)
     end
     return twin, x, rows
 end
+_float_twin(data) = _typed_twin(data, Float64)
 
 # `nothing` if `x` satisfies every row and bound of the matrix form exactly.
 function _primal_defect(data, x::AbstractVector)
@@ -284,16 +295,26 @@ function solve_program(prog::DecisionProgram{T}; optimizer=nothing,
         status === :optimal || return _failed(prog, status, :internal, rational)
         return _solved(prog, data, x, :internal, rational)
     elseif _supports_number_type(optimizer, T)
-        status = _run!(prog.model, optimizer)
+        twin, xs, rows = _typed_twin(data, T)
+        status = _run!(twin, optimizer)
         route = rational ? :exact_optimizer : :float_optimizer
         status === :optimal || return _failed(prog, status, route, rational)
-        x = T[JuMP.value(v) for v in data.variables]
+        x = T[JuMP.value(v) for v in xs]
         if rational
             defect = _primal_defect(data, x)
             defect === nothing ||
                 throw(ExactVerificationError(prog.name,
                                              "the point returned by the exact " *
                                              "optimiser is not feasible: $defect"))
+            optimising = data.sense != _MOI.FEASIBILITY_SENSE
+            if optimising && JuMP.has_duals(twin)
+                y = T[r === nothing ? zero(T) : JuMP.dual(r) for r in rows]
+                (_dual_certifies(data, x, y) || _dual_certifies(data, x, -y)) ||
+                    throw(ExactVerificationError(prog.name,
+                                                 "the dual multipliers returned by the " *
+                                                 "exact optimiser do not certify " *
+                                                 "optimality"))
+            end
         end
         return _solved(prog, data, x, route, rational)
     elseif rational && _supports_number_type(optimizer, Float64)

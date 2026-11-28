@@ -64,10 +64,10 @@ and exports no `regret` or `regrets`.
 module DecisionAnalysis
 
 using JuMP: JuMP
-using LinearAlgebra: ColumnNorm, Diagonal, I, Symmetric, cholesky, dot, eigen, issuccess,
-                     logdet, qr, tr
+using LinearAlgebra: ColumnNorm, Diagonal, I, LAPACK, Symmetric, cholesky, cholesky!, dot,
+                     eigen, issuccess, logdet, mul!, qr, tr
 using Random: AbstractRNG, Xoshiro, randn!
-using SpecialFunctions: erfc
+using SpecialFunctions: erfc, loggamma
 using Statistics: mean
 using Logging: NullLogger, with_logger
 using Tables: Tables
